@@ -333,13 +333,21 @@ export default function RequestForm() {
 
           <button
             type="submit"
-            className="w-full bg-amber px-5 py-3.5 text-sm font-semibold tracking-wide text-ink transition hover:bg-amber-deep sm:w-auto"
+            className="group mt-2 flex w-full items-center justify-center gap-2 bg-amber px-6 py-4 text-base font-semibold tracking-wide text-ink shadow-[0_10px_24px_rgba(212,160,23,0.28)] transition duration-200 hover:-translate-y-0.5 hover:bg-amber-deep hover:shadow-[0_14px_28px_rgba(184,134,11,0.35)] active:translate-y-0 active:shadow-none"
           >
-            {isOperator
-              ? "Submit operator interest"
-              : isSpecificTour
-                ? "Send interest for this tour"
-                : "Send my tour request"}
+            <span>
+              {isOperator
+                ? "Submit operator interest"
+                : isSpecificTour
+                  ? "Send interest for this tour"
+                  : "Send my tour request"}
+            </span>
+            <span
+              aria-hidden
+              className="translate-x-0 transition duration-200 group-hover:translate-x-1"
+            >
+              →
+            </span>
           </button>
         </form>
       </div>
