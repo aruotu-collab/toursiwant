@@ -16,9 +16,15 @@ function jitter(base: number, spread: number) {
   return Math.max(1, base + Math.round((Math.random() - 0.4) * spread));
 }
 
+function seedCount() {
+  return activityFeedSeed.length;
+}
+
 export function TourMarketBoard() {
   const [signals, setSignals] = useState(nycDestinationSignals);
   const [feed, setFeed] = useState(activityFeedSeed);
+  const [liveCount, setLiveCount] = useState(0);
+  const [mockCount, setMockCount] = useState(seedCount());
   const [clock, setClock] = useState("");
   const [flashId, setFlashId] = useState<string | null>(null);
 
@@ -27,6 +33,31 @@ export function TourMarketBoard() {
     const seats = signals.reduce((sum, row) => sum + row.seatsFilling, 0);
     return { planned, seats, destinations: signals.length };
   }, [signals]);
+
+  useEffect(() => {
+    async function loadLiveActivity() {
+      try {
+        const response = await fetch("/api/requests", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = (await response.json()) as {
+          liveCount?: number;
+          mockCount?: number;
+          activity?: ActivityEvent[];
+        };
+        if (payload.activity?.length) {
+          setFeed(payload.activity.slice(0, 10));
+        }
+        setLiveCount(payload.liveCount || 0);
+        setMockCount(payload.mockCount || seedCount());
+      } catch {
+        // Keep seeded feed if API is unavailable.
+      }
+    }
+
+    loadLiveActivity();
+    const refresh = window.setInterval(loadLiveActivity, 15000);
+    return () => window.clearInterval(refresh);
+  }, []);
 
   useEffect(() => {
     function tickClock() {
@@ -65,22 +96,12 @@ export function TourMarketBoard() {
         return next;
       });
 
-      setFeed((current) => {
-        const template = activityFeedSeed[Math.floor(Math.random() * activityFeedSeed.length)];
-        const event: ActivityEvent = {
-          ...template,
-          id: `${Date.now()}`,
-          minutesAgo: 0,
-          detail: template.detail,
-        };
-        return [
-          event,
-          ...current.map((item) => ({
-            ...item,
-            minutesAgo: item.minutesAgo + 1,
-          })),
-        ].slice(0, 8);
-      });
+      setFeed((current) =>
+        current.map((item) => ({
+          ...item,
+          minutesAgo: item.minutesAgo + 1,
+        })),
+      );
     }, 4200);
 
     return () => window.clearInterval(id);
@@ -119,7 +140,9 @@ export function TourMarketBoard() {
               <p>NYC {clock || "--:--:--"}</p>
               <p className="mt-1 flex items-center justify-end gap-2 text-amber">
                 <span className="live-dot" aria-hidden />
-                LIVE DEMO SIGNALS
+                {liveCount > 0
+                  ? `${liveCount} LIVE · ${mockCount} SEED`
+                  : `${mockCount} SEED REQUESTS`}
               </p>
             </div>
           </div>
@@ -171,6 +194,7 @@ export function TourMarketBoard() {
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-mono text-[10px] font-semibold tracking-[0.14em] text-amber">
                         {activityVerb(event.kind)}
+                        {event.source === "live" ? " · LIVE" : ""}
                       </span>
                       <span className="font-mono text-[10px] text-white/40">
                         {event.minutesAgo === 0
@@ -188,9 +212,9 @@ export function TourMarketBoard() {
 
           <div className="mt-10 flex flex-col gap-4 border-t border-white/10 pt-8 sm:flex-row sm:items-center sm:justify-between">
             <p className="max-w-xl text-sm text-white/60">
-              Sample intelligence for the New York MVP. When operators and
-              travellers go live, these numbers become real enquiries, joins,
-              and planned departures.
+              Board starts with seeded New York demand, then grows as real
+              travellers submit requests. Live captures gradually replace the
+              demo tape.
             </p>
             <Link
               href="/tours"

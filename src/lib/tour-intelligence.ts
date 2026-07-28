@@ -17,6 +17,7 @@ export type ActivityEvent = {
   destination: string;
   detail: string;
   minutesAgo: number;
+  source?: "mock" | "live";
 };
 
 export const nycDestinationSignals: DestinationSignal[] = [
@@ -80,6 +81,66 @@ export const nycDestinationSignals: DestinationSignal[] = [
     level: "open",
     window: "today",
   },
+  {
+    id: "broadway",
+    name: "Broadway & Times Square",
+    shortName: "BWAY",
+    planned: 31,
+    changePct: 9,
+    seatsFilling: 54,
+    level: "hot",
+    window: "this week",
+  },
+  {
+    id: "soho",
+    name: "SoHo & Nolita food walks",
+    shortName: "SOHO",
+    planned: 16,
+    changePct: 7,
+    seatsFilling: 28,
+    level: "rising",
+    window: "this week",
+  },
+  {
+    id: "highline",
+    name: "High Line & Chelsea",
+    shortName: "HLINE",
+    planned: 12,
+    changePct: 2,
+    seatsFilling: 19,
+    level: "steady",
+    window: "this week",
+  },
+  {
+    id: "cruise",
+    name: "Cruise shore excursions",
+    shortName: "SHORE",
+    planned: 22,
+    changePct: 14,
+    seatsFilling: 40,
+    level: "hot",
+    window: "this week",
+  },
+  {
+    id: "lga",
+    name: "LaGuardia transfers",
+    shortName: "LGA",
+    planned: 19,
+    changePct: 3,
+    seatsFilling: 27,
+    level: "open",
+    window: "today",
+  },
+  {
+    id: "harbor",
+    name: "Harbor & yacht sunsets",
+    shortName: "HARBOR",
+    planned: 15,
+    changePct: 11,
+    seatsFilling: 33,
+    level: "rising",
+    window: "this week",
+  },
 ];
 
 export const activityFeedSeed: ActivityEvent[] = [
@@ -89,6 +150,7 @@ export const activityFeedSeed: ActivityEvent[] = [
     destination: "The Met Museum",
     detail: "Family of 4 planning a guided visit",
     minutesAgo: 2,
+    source: "mock",
   },
   {
     id: "2",
@@ -96,6 +158,7 @@ export const activityFeedSeed: ActivityEvent[] = [
     destination: "Brooklyn food crawl",
     detail: "2 travellers joining a shared group",
     minutesAgo: 5,
+    source: "mock",
   },
   {
     id: "3",
@@ -103,6 +166,7 @@ export const activityFeedSeed: ActivityEvent[] = [
     destination: "Statue of Liberty",
     detail: "Cruise passenger requesting shore-safe return",
     minutesAgo: 8,
+    source: "mock",
   },
   {
     id: "4",
@@ -110,6 +174,7 @@ export const activityFeedSeed: ActivityEvent[] = [
     destination: "Private Midtown driver",
     detail: "Operator sent a same-day quote",
     minutesAgo: 11,
+    source: "mock",
   },
   {
     id: "5",
@@ -117,6 +182,7 @@ export const activityFeedSeed: ActivityEvent[] = [
     destination: "Harlem gospel afternoon",
     detail: "Couple planning for next Saturday",
     minutesAgo: 14,
+    source: "mock",
   },
   {
     id: "6",
@@ -124,6 +190,7 @@ export const activityFeedSeed: ActivityEvent[] = [
     destination: "Lower Manhattan highlights",
     detail: "1 seat claimed · 2 spaces left",
     minutesAgo: 18,
+    source: "mock",
   },
   {
     id: "7",
@@ -131,6 +198,7 @@ export const activityFeedSeed: ActivityEvent[] = [
     destination: "JFK → Manhattan",
     detail: "Arrival transfer planned for Friday",
     minutesAgo: 21,
+    source: "mock",
   },
   {
     id: "8",
@@ -138,6 +206,71 @@ export const activityFeedSeed: ActivityEvent[] = [
     destination: "Central Park",
     detail: "Custom photography walk requested",
     minutesAgo: 27,
+    source: "mock",
+  },
+  {
+    id: "9",
+    kind: "joining",
+    destination: "Broadway lights evening",
+    detail: "3 seats claimed for tonight",
+    minutesAgo: 31,
+    source: "mock",
+  },
+  {
+    id: "10",
+    kind: "planned",
+    destination: "SoHo tasting walk",
+    detail: "Solo traveller open to shared group",
+    minutesAgo: 36,
+    source: "mock",
+  },
+  {
+    id: "11",
+    kind: "enquiry",
+    destination: "Cruise shore Lower Manhattan",
+    detail: "Party of 6 · must return by 3:30 p.m.",
+    minutesAgo: 42,
+    source: "mock",
+  },
+  {
+    id: "12",
+    kind: "quote",
+    destination: "Private Brooklyn day",
+    detail: "Two operator quotes received",
+    minutesAgo: 48,
+    source: "mock",
+  },
+  {
+    id: "13",
+    kind: "planned",
+    destination: "Sunset harbor yacht",
+    detail: "Anniversary couple booking sunset slot",
+    minutesAgo: 55,
+    source: "mock",
+  },
+  {
+    id: "14",
+    kind: "joining",
+    destination: "High Line & Chelsea",
+    detail: "2 travellers joined afternoon walk",
+    minutesAgo: 63,
+    source: "mock",
+  },
+  {
+    id: "15",
+    kind: "enquiry",
+    destination: "LaGuardia transfer",
+    detail: "Flight lands 9:40 p.m. · 3 bags",
+    minutesAgo: 70,
+    source: "mock",
+  },
+  {
+    id: "16",
+    kind: "planned",
+    destination: "Chinatown & Little Italy",
+    detail: "Food crawl for 5 · gluten-free notes",
+    minutesAgo: 78,
+    source: "mock",
   },
 ];
 
@@ -147,6 +280,11 @@ export const marketHeadlines = [
   "Brooklyn food crawl filling for the weekend",
   "42 airport transfers on the board today",
   "Harlem afternoons trending · limited Saturday seats",
+  "Broadway evening walks hot · 31 groups planning",
+  "Cruise shore requests rising ahead of weekend ships",
+  "SoHo tasting seats down to single digits tonight",
+  "Sunset yacht cruise watching count above 50",
+  "LaGuardia late arrivals driving transfer demand",
 ];
 
 export function demandLabel(level: DemandLevel) {

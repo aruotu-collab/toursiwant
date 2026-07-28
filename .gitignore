@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local captured requests (seeded mock data stays in code)
+/data/captured-requests.json
+!/data/.gitkeep

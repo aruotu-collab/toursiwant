@@ -26,6 +26,8 @@ export default function RequestForm() {
   const hasAdvanceDate = Boolean(dateParam);
 
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [interests, setInterests] = useState<TourInterest[]>(
     selectedTour ? [selectedTour.interest] : [],
   );
@@ -46,9 +48,61 @@ export default function RequestForm() {
     );
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError(null);
+
+    const form = event.currentTarget;
+    const data = new FormData(form);
+
+    const type = isOperator
+      ? "operator_interest"
+      : isSpecificTour
+        ? "tour_interest"
+        : "custom_request";
+
+    const interestNote =
+      interests.length > 0 ? `Interests: ${interests.join(", ")}. ` : "";
+    const detailsFromForm = String(data.get("details") || "");
+
+    try {
+      const response = await fetch("/api/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          name: String(data.get("name") || ""),
+          email: String(data.get("email") || ""),
+          phone: String(data.get("phone") || ""),
+          travelDate: String(data.get("date") || travelDate || ""),
+          tourSlug: selectedTour?.slug,
+          tourTitle: selectedTour?.title,
+          groupSize: data.get("groupSize") || undefined,
+          pickup: String(data.get("pickup") || ""),
+          details: `${interestNote}${detailsFromForm}`.trim(),
+          joinGroup,
+          businessName: String(data.get("business") || ""),
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(payload?.error || "Could not save your request.");
+      }
+
+      setSubmitted(true);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "Could not save your request. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const departureSummary = (() => {
@@ -79,10 +133,10 @@ export default function RequestForm() {
           </h1>
           <p className="mt-4 text-ink-soft">
             {isOperator
-              ? "We'll follow up about verification, listings, and early operator access for New York."
+              ? "Your operator interest is saved. We'll follow up about verification and New York listings."
               : selectedTour
-                ? `The operator for this listing will get your details for ${formatDisplayDate(travelDate)}. In the full product you'll confirm a seat or get a quote here and by email.`
-                : `Local New York operators will be matched to your request for ${formatDisplayDate(travelDate)}.`}
+                ? `Your interest is captured for ${formatDisplayDate(travelDate)}. It now feeds the live demand board as real traveller activity.`
+                : `Your request for ${formatDisplayDate(travelDate)} is captured and will show up in live demand as travellers keep adding requests.`}
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
@@ -331,23 +385,32 @@ export default function RequestForm() {
             </>
           )}
 
+          {submitError ? (
+            <p className="text-sm text-rose-700">{submitError}</p>
+          ) : null}
+
           <button
             type="submit"
-            className="group mt-2 flex w-full items-center justify-center gap-2 bg-amber px-6 py-4 text-base font-semibold tracking-wide text-ink shadow-[0_10px_24px_rgba(212,160,23,0.28)] transition duration-200 hover:-translate-y-0.5 hover:bg-amber-deep hover:shadow-[0_14px_28px_rgba(184,134,11,0.35)] active:translate-y-0 active:shadow-none"
+            disabled={submitting}
+            className="group mt-2 flex w-full items-center justify-center gap-2 bg-amber px-6 py-4 text-base font-semibold tracking-wide text-ink shadow-[0_10px_24px_rgba(212,160,23,0.28)] transition duration-200 hover:-translate-y-0.5 hover:bg-amber-deep hover:shadow-[0_14px_28px_rgba(184,134,11,0.35)] active:translate-y-0 active:shadow-none disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
           >
             <span>
-              {isOperator
-                ? "Submit operator interest"
-                : isSpecificTour
-                  ? "Send interest for this tour"
-                  : "Send my tour request"}
+              {submitting
+                ? "Saving your request…"
+                : isOperator
+                  ? "Submit operator interest"
+                  : isSpecificTour
+                    ? "Send interest for this tour"
+                    : "Send my tour request"}
             </span>
-            <span
-              aria-hidden
-              className="translate-x-0 transition duration-200 group-hover:translate-x-1"
-            >
-              →
-            </span>
+            {!submitting ? (
+              <span
+                aria-hidden
+                className="translate-x-0 transition duration-200 group-hover:translate-x-1"
+              >
+                →
+              </span>
+            ) : null}
           </button>
         </form>
       </div>
