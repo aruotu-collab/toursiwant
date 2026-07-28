@@ -132,6 +132,9 @@ export function TourRushBoard() {
                 }`}
               >
                 <div className="relative aspect-[16/10] shrink-0 overflow-hidden">
+                  <Link href={`/tours/${lot.tourSlug}?date=${today}`} className="absolute inset-0 z-[1]">
+                    <span className="sr-only">View {lot.title}</span>
+                  </Link>
                   <Image
                     src={lot.image}
                     alt={lot.imageAlt}
@@ -176,7 +179,12 @@ export function TourRushBoard() {
 
                 <div className="flex flex-1 flex-col p-4 sm:p-5">
                   <h3 className="min-h-[2.75rem] font-display text-lg leading-snug text-ink line-clamp-2 sm:text-xl">
-                    {lot.title}
+                    <Link
+                      href={`/tours/${lot.tourSlug}?date=${today}`}
+                      className="transition hover:text-skyline"
+                    >
+                      {lot.title}
+                    </Link>
                   </h3>
                   <p className="mt-1 truncate text-sm text-ink-soft">
                     Meet at {lot.meetup}
@@ -231,16 +239,16 @@ export function TourRushBoard() {
                     </div>
                   </div>
 
-                  <Link
-                    href={`/request?tour=${lot.tourSlug}&date=${today}`}
-                    className={`mt-auto flex w-full items-center justify-center px-4 py-3 text-sm font-semibold tracking-wide transition ${
-                      critical
-                        ? "bg-rose-700 text-white hover:bg-rose-800"
-                        : "bg-ink text-white hover:bg-ink-soft"
-                    }`}
-                  >
-                    {lot.spacesLeft <= 1 ? "Claim last seat" : "Claim a seat"}
-                  </Link>
+              <Link
+                href={`/tours/${lot.tourSlug}?date=${today}`}
+                className={`mt-auto flex w-full items-center justify-center px-4 py-3 text-sm font-semibold tracking-wide transition ${
+                  critical
+                    ? "bg-rose-700 text-white hover:bg-rose-800"
+                    : "bg-ink text-white hover:bg-ink-soft"
+                }`}
+              >
+                {lot.spacesLeft <= 1 ? "View & claim last seat" : "View tour details"}
+              </Link>
                 </div>
               </article>
             );

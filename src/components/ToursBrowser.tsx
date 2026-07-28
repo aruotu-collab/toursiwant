@@ -173,7 +173,14 @@ export function ToursBrowser() {
             >
               <div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="font-display text-2xl text-ink">{tour.title}</h2>
+                  <h2 className="font-display text-2xl text-ink">
+                    <Link
+                      href={`/tours/${tour.slug}?date=${tour.date}`}
+                      className="transition hover:text-skyline"
+                    >
+                      {tour.title}
+                    </Link>
+                  </h2>
                   {tour.joinable ? (
                     <span className="text-xs font-semibold uppercase tracking-wider text-amber-deep">
                       Joinable
@@ -196,10 +203,10 @@ export function ToursBrowser() {
                 </p>
               </div>
               <Link
-                href={`/request?tour=${tour.slug}&date=${tour.date}`}
+                href={`/tours/${tour.slug}?date=${tour.date}`}
                 className="inline-flex items-center justify-center bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink-soft"
               >
-                I want this tour
+                View details
               </Link>
             </article>
           ))
