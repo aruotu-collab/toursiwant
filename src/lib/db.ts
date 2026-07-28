@@ -5,11 +5,21 @@ let sqlClient: NeonQueryFunction<false, false> | null = null;
 let schemaReady: Promise<void> | null = null;
 
 export function hasDatabase() {
-  return Boolean(process.env.DATABASE_URL?.trim());
+  return Boolean(getDatabaseUrl());
+}
+
+export function getDatabaseUrl() {
+  return (
+    process.env.DATABASE_URL?.trim() ||
+    process.env.POSTGRES_URL?.trim() ||
+    process.env.POSTGRES_PRISMA_URL?.trim() ||
+    process.env.NEON_DATABASE_URL?.trim() ||
+    ""
+  );
 }
 
 function getSql() {
-  const url = process.env.DATABASE_URL?.trim();
+  const url = getDatabaseUrl();
   if (!url) {
     throw new Error("DATABASE_URL is not configured.");
   }
