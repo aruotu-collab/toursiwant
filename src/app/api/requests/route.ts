@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createRequest, listRequests } from "@/lib/requests-store";
+import { createRequest, listRequests, storageMode } from "@/lib/requests-store";
 import { requestToActivity } from "@/lib/seed-requests";
 import type { CapturedRequestType } from "@/lib/seed-requests";
 
@@ -10,6 +10,7 @@ export async function GET() {
   const activity = requests.slice(0, 20).map(requestToActivity);
 
   return NextResponse.json({
+    storage: storageMode(),
     count: requests.length,
     liveCount: requests.filter((item) => item.source === "live").length,
     mockCount: requests.filter((item) => item.source === "mock").length,

@@ -1,6 +1,11 @@
 import { promises as fs } from "fs";
 import path from "path";
 import {
+  dbInsertRequest,
+  dbListLiveRequests,
+  hasDatabase,
+} from "@/lib/db";
+import {
   seedCapturedRequests,
   type CapturedRequest,
   type CapturedRequestType,
@@ -27,7 +32,7 @@ type NewRequestInput = {
   citySlug?: string;
 };
 
-async function readLiveRequests(): Promise<CapturedRequest[]> {
+async function readFileLiveRequests(): Promise<CapturedRequest[]> {
   try {
     const raw = await fs.readFile(STORE_FILE, "utf8");
     const parsed = JSON.parse(raw) as CapturedRequest[];
@@ -37,9 +42,20 @@ async function readLiveRequests(): Promise<CapturedRequest[]> {
   }
 }
 
-async function writeLiveRequests(requests: CapturedRequest[]) {
+async function writeFileLiveRequests(requests: CapturedRequest[]) {
   await fs.mkdir(path.dirname(STORE_FILE), { recursive: true });
   await fs.writeFile(STORE_FILE, JSON.stringify(requests, null, 2), "utf8");
+}
+
+async function readLiveRequests(): Promise<CapturedRequest[]> {
+  if (hasDatabase()) {
+    return dbListLiveRequests();
+  }
+  return readFileLiveRequests();
+}
+
+export function storageMode() {
+  return hasDatabase() ? "postgres" : "file";
 }
 
 export async function listRequests(): Promise<CapturedRequest[]> {
@@ -54,7 +70,6 @@ export async function listRequests(): Promise<CapturedRequest[]> {
 export async function createRequest(
   input: NewRequestInput,
 ): Promise<CapturedRequest> {
-  const live = await readLiveRequests();
   const request: CapturedRequest = {
     id: `live-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: input.type,
@@ -74,7 +89,13 @@ export async function createRequest(
     source: "live",
   };
 
+  if (hasDatabase()) {
+    await dbInsertRequest(request);
+    return request;
+  }
+
+  const live = await readFileLiveRequests();
   const next = [request, ...live].slice(0, 500);
-  await writeLiveRequests(next);
+  await writeFileLiveRequests(next);
   return request;
 }
