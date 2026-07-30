@@ -8,7 +8,7 @@ export function SiteHeader() {
   const pathname = usePathname();
   const onHome = pathname === "/";
 
-  // Homepage uses a flat cinematic top bar instead of the stacked header.
+  // Homepage has its own command-center chrome.
   if (onHome) return null;
 
   return (
@@ -28,21 +28,27 @@ export function SiteHeader() {
             href="/#pulse"
             className="hidden transition hover:text-ink sm:inline"
           >
-            Tour Pulse
+            Pulse
           </Link>
           <Link
-            href="/tours"
+            href="/#rush"
+            className="hidden transition hover:text-ink md:inline"
+          >
+            Live seats
+          </Link>
+          <Link
+            href="/#tours"
             className="hidden transition hover:text-ink md:inline"
           >
             Find tours
           </Link>
           <Link
-            href="/events"
+            href="/#events"
             className="hidden transition hover:text-ink sm:inline"
           >
             Events
           </Link>
-          <Link href="/request" className="transition hover:text-ink">
+          <Link href="/#request" className="transition hover:text-ink">
             Request
           </Link>
           <AuthNav />

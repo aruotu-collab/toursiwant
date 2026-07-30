@@ -61,7 +61,7 @@ export function AuthGreeting({ variant = "light" }: { variant?: Variant }) {
 
   return (
     <Link
-      href="/account"
+      href="/#account"
       className={
         dark
           ? "mt-0.5 block text-xs font-medium text-white/70 transition hover:text-white"
@@ -130,7 +130,7 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
 
   return (
     <>
-      <Link href="/account" className={accountClass}>
+      <Link href="/#account" className={accountClass}>
         My account
       </Link>
       {user.role === "operator" || user.role === "admin" ? (

@@ -29,7 +29,11 @@ function urgencyClass(urgency: TourRushLot["urgency"]) {
   }
 }
 
-export function TourRushBoard() {
+export function TourRushBoard({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const [lots, setLots] = useState<LiveLot[]>(() =>
     tourRushLots.map((lot) => ({
       ...lot,
@@ -90,32 +94,51 @@ export function TourRushBoard() {
 
   return (
     <section
-      id="rush"
-      className="scroll-mt-0 border-b border-ink/10 bg-[linear-gradient(180deg,var(--paper)_0%,#efe8da_100%)]"
+      id={embedded ? undefined : "rush"}
+      className={
+        embedded
+          ? "text-white"
+          : "scroll-mt-0 border-b border-ink/10 bg-[linear-gradient(180deg,var(--paper)_0%,#efe8da_100%)]"
+      }
     >
-      <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10 md:py-12">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-2xl">
-            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-skyline">
-              Tour Rush · live now
-            </p>
-            <h2 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
-              Seats are filling. Timers are running.
-            </h2>
-            <p className="mt-2 max-w-xl text-sm text-ink-soft sm:text-base">
-              Countdown, scarcity, and live interest — claim a New York seat
-              before someone else does.
-            </p>
+      <div
+        className={
+          embedded
+            ? "w-full"
+            : "mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10 md:py-12"
+        }
+      >
+        {!embedded ? (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="max-w-2xl">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-skyline">
+                Tour Rush · live now
+              </p>
+              <h2 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
+                Seats are filling. Timers are running.
+              </h2>
+              <p className="mt-2 max-w-xl text-sm text-ink-soft sm:text-base">
+                Countdown, scarcity, and live interest — claim a New York seat
+                before someone else does.
+              </p>
+            </div>
+            <div className="font-mono text-xs uppercase tracking-[0.14em] text-ink-soft">
+              <p className="flex items-center gap-2 text-rose-700">
+                <span className="live-dot !bg-rose-600" aria-hidden />
+                {endingSoonCount} lots ending within 2 hrs
+              </p>
+            </div>
           </div>
-          <div className="font-mono text-xs uppercase tracking-[0.14em] text-ink-soft">
-            <p className="flex items-center gap-2 text-rose-700">
-              <span className="live-dot !bg-rose-600" aria-hidden />
-              {endingSoonCount} lots ending within 2 hrs
-            </p>
-          </div>
-        </div>
+        ) : (
+          <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-rose-300">
+            <span className="live-dot !bg-rose-500" aria-hidden />
+            {endingSoonCount} lots ending within 2 hrs
+          </p>
+        )}
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:items-stretch">
+        <div
+          className={`${embedded ? "" : "mt-6 "}grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:items-stretch`}
+        >
           {lots.map((lot) => {
             const filled =
               ((lot.spacesTotal - lot.spacesLeft) / lot.spacesTotal) * 100;
@@ -125,14 +148,21 @@ export function TourRushBoard() {
             return (
               <article
                 key={lot.id}
-                className={`group flex h-full flex-col overflow-hidden border bg-white transition duration-300 ${
-                  flashing
-                    ? "border-amber shadow-[0_0_0_1px_rgba(212,160,23,0.45)]"
-                    : "border-ink/10 hover:border-ink/25"
+                className={`group flex h-full flex-col overflow-hidden border transition duration-300 ${
+                  embedded
+                    ? flashing
+                      ? "border-amber bg-white/[0.06]"
+                      : "border-white/10 bg-white/[0.03] hover:border-white/25"
+                    : flashing
+                      ? "border-amber bg-white shadow-[0_0_0_1px_rgba(212,160,23,0.45)]"
+                      : "border-ink/10 bg-white hover:border-ink/25"
                 }`}
               >
                 <div className="relative aspect-[16/10] shrink-0 overflow-hidden">
-                  <Link href={`/tours/${lot.tourSlug}?date=${today}`} className="absolute inset-0 z-[1]">
+                  <Link
+                    href={`/tours/${lot.tourSlug}?date=${today}`}
+                    className="absolute inset-0 z-[1]"
+                  >
                     <span className="sr-only">View {lot.title}</span>
                   </Link>
                   <Image
@@ -178,45 +208,85 @@ export function TourRushBoard() {
                 </div>
 
                 <div className="flex flex-1 flex-col p-4 sm:p-5">
-                  <h3 className="min-h-[2.75rem] font-display text-lg leading-snug text-ink line-clamp-2 sm:text-xl">
+                  <h3
+                    className={`min-h-[2.75rem] font-display text-lg leading-snug line-clamp-2 sm:text-xl ${
+                      embedded ? "text-white" : "text-ink"
+                    }`}
+                  >
                     <Link
                       href={`/tours/${lot.tourSlug}?date=${today}`}
-                      className="transition hover:text-skyline"
+                      className={
+                        embedded
+                          ? "transition hover:text-amber"
+                          : "transition hover:text-skyline"
+                      }
                     >
                       {lot.title}
                     </Link>
                   </h3>
-                  <p className="mt-1 truncate text-sm text-ink-soft">
+                  <p
+                    className={`mt-1 truncate text-sm ${
+                      embedded ? "text-white/55" : "text-ink-soft"
+                    }`}
+                  >
                     Meet at {lot.meetup}
                   </p>
 
-                  <div className="mt-3 grid grid-cols-3 gap-2 border-y border-ink/10 py-2">
+                  <div
+                    className={`mt-3 grid grid-cols-3 gap-2 border-y py-2 ${
+                      embedded ? "border-white/10" : "border-ink/10"
+                    }`}
+                  >
                     <div className="min-w-0">
-                      <p className="truncate text-[9px] font-medium uppercase leading-none tracking-[0.08em] text-ink/45">
+                      <p
+                        className={`truncate text-[9px] font-medium uppercase leading-none tracking-[0.08em] ${
+                          embedded ? "text-white/40" : "text-ink/45"
+                        }`}
+                      >
                         Interested
                       </p>
-                      <p className="mt-1 font-mono text-sm tabular-nums leading-none text-ink">
+                      <p
+                        className={`mt-1 font-mono text-sm tabular-nums leading-none ${
+                          embedded ? "text-white" : "text-ink"
+                        }`}
+                      >
                         {lot.interested}
                         {lot.justClaimed ? (
-                          <span className="ml-1 text-amber-deep">+1</span>
+                          <span className="ml-1 text-amber">+1</span>
                         ) : null}
                       </p>
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-[9px] font-medium uppercase leading-none tracking-[0.08em] text-ink/45">
+                      <p
+                        className={`truncate text-[9px] font-medium uppercase leading-none tracking-[0.08em] ${
+                          embedded ? "text-white/40" : "text-ink/45"
+                        }`}
+                      >
                         Watching
                       </p>
-                      <p className="mt-1 font-mono text-sm tabular-nums leading-none text-ink">
+                      <p
+                        className={`mt-1 font-mono text-sm tabular-nums leading-none ${
+                          embedded ? "text-white" : "text-ink"
+                        }`}
+                      >
                         {lot.watching}
                       </p>
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-[9px] font-medium uppercase leading-none tracking-[0.08em] text-ink/45">
+                      <p
+                        className={`truncate text-[9px] font-medium uppercase leading-none tracking-[0.08em] ${
+                          embedded ? "text-white/40" : "text-ink/45"
+                        }`}
+                      >
                         Seats left
                       </p>
                       <p
                         className={`mt-1 font-mono text-sm tabular-nums leading-none ${
-                          lot.spacesLeft <= 2 ? "text-rose-700" : "text-ink"
+                          lot.spacesLeft <= 2
+                            ? "text-rose-400"
+                            : embedded
+                              ? "text-white"
+                              : "text-ink"
                         }`}
                       >
                         {lot.spacesLeft}
@@ -225,40 +295,54 @@ export function TourRushBoard() {
                   </div>
 
                   <div className="mt-3">
-                    <div className="mb-1 flex justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+                    <div
+                      className={`mb-1 flex justify-between font-mono text-[10px] uppercase tracking-[0.12em] ${
+                        embedded ? "text-white/45" : "text-ink-soft"
+                      }`}
+                    >
                       <span>Seat fill</span>
                       <span>{Math.round(filled)}%</span>
                     </div>
-                    <div className="h-1.5 overflow-hidden bg-paper-deep">
+                    <div
+                      className={`h-1.5 overflow-hidden ${
+                        embedded ? "bg-white/10" : "bg-paper-deep"
+                      }`}
+                    >
                       <div
                         className={`h-full transition-all duration-700 ${
-                          filled > 70 ? "bg-rose-600" : "bg-amber"
+                          filled > 70 ? "bg-rose-500" : "bg-amber"
                         }`}
                         style={{ width: `${filled}%` }}
                       />
                     </div>
                   </div>
 
-              <Link
-                href={`/tours/${lot.tourSlug}?date=${today}`}
-                className={`mt-auto flex w-full items-center justify-center px-4 py-3 text-sm font-semibold tracking-wide transition ${
-                  critical
-                    ? "bg-rose-700 text-white hover:bg-rose-800"
-                    : "bg-ink text-white hover:bg-ink-soft"
-                }`}
-              >
-                {lot.spacesLeft <= 1 ? "View & claim last seat" : "View tour details"}
-              </Link>
+                  <Link
+                    href={`/tours/${lot.tourSlug}?date=${today}`}
+                    className={`mt-auto flex w-full items-center justify-center px-4 py-3 text-sm font-semibold tracking-wide transition ${
+                      critical
+                        ? "bg-rose-700 text-white hover:bg-rose-800"
+                        : embedded
+                          ? "bg-amber text-ink hover:bg-amber-deep"
+                          : "bg-ink text-white hover:bg-ink-soft"
+                    }`}
+                  >
+                    {lot.spacesLeft <= 1
+                      ? "View & claim last seat"
+                      : "View tour details"}
+                  </Link>
                 </div>
               </article>
             );
           })}
         </div>
 
-        <p className="mt-6 text-sm text-ink-soft">
-          Live rush floor for New York. Timers and interest counts will connect
-          to real traveller activity as operators go live.
-        </p>
+        {!embedded ? (
+          <p className="mt-6 text-sm text-ink-soft">
+            Live rush floor for New York. Timers and interest counts will connect
+            to real traveller activity as operators go live.
+          </p>
+        ) : null}
       </div>
     </section>
   );

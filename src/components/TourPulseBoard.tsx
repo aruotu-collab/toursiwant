@@ -64,7 +64,11 @@ function dominantCategory(activities: PulseActivity[]): PulseCategory {
   return best;
 }
 
-export function TourPulseBoard() {
+export function TourPulseBoard({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const today = toDateKey(new Date());
   const [filter, setFilter] = useState<FilterId>("all");
   const [activities, setActivities] = useState(seedPulseActivities);
@@ -154,31 +158,48 @@ export function TourPulseBoard() {
 
   return (
     <section
-      id="pulse"
-      className="scroll-mt-0 border-b border-ink/10 bg-ink text-white"
+      id={embedded ? undefined : "pulse"}
+      className={
+        embedded
+          ? "text-white"
+          : "scroll-mt-0 border-b border-ink/10 bg-ink text-white"
+      }
     >
-      <div className="mx-auto w-full max-w-[90rem] px-5 py-10 sm:px-8 sm:py-12 md:py-14">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-amber">
-              Tour Pulse · New York
-            </p>
-            <h2 className="mt-2 font-display text-3xl text-white sm:text-4xl">
-              Where tours are happening now
-            </h2>
-            <p className="mt-2 max-w-xl text-sm text-white/70 sm:text-base">
-              Live rhythm along the city spine — harbor to airports. Tap a pulse
-              for zone activity, then join or request nearby.
+      <div
+        className={
+          embedded
+            ? "w-full"
+            : "mx-auto w-full max-w-[90rem] px-5 py-10 sm:px-8 sm:py-12 md:py-14"
+        }
+      >
+        {!embedded ? (
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-amber">
+                Tour Pulse · New York
+              </p>
+              <h2 className="mt-2 font-display text-3xl text-white sm:text-4xl">
+                Where tours are happening now
+              </h2>
+              <p className="mt-2 max-w-xl text-sm text-white/70 sm:text-base">
+                Live rhythm along the city spine — harbor to airports. Tap a
+                pulse for zone activity, then join or request nearby.
+              </p>
+            </div>
+            <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
+              <span className="live-dot" aria-hidden />
+              {filtered.length} signals · public zones only
             </p>
           </div>
-          <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
+        ) : (
+          <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
             <span className="live-dot" aria-hidden />
             {filtered.length} signals · public zones only
           </p>
-        </div>
+        )}
 
         {/* Filters */}
-        <div className="mt-6 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className={`${embedded ? "" : "mt-6 "}flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
           {pulseFilterTabs.map((tab) => {
             const active = filter === tab.id;
             const count = filterCounts[tab.id] ?? 0;

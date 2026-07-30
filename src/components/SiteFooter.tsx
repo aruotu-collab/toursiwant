@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-ink/10 bg-ink text-white">
+    <footer className="border-t border-white/10 bg-[#070f18] text-white">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 py-10 sm:flex-row sm:items-end sm:justify-between sm:px-8">
         <div>
           <p className="font-display text-2xl tracking-tight">
@@ -14,20 +14,23 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-white/75">
-          <Link href="/account" className="hover:text-white">
-            My account
-          </Link>
           <Link href="/#pulse" className="hover:text-white">
-            Tour Pulse
+            Pulse
           </Link>
-          <Link href="/tours" className="hover:text-white">
+          <Link href="/#rush" className="hover:text-white">
+            Live seats
+          </Link>
+          <Link href="/#tours" className="hover:text-white">
             Find tours
           </Link>
-          <Link href="/events" className="hover:text-white">
-            Events this week
+          <Link href="/#events" className="hover:text-white">
+            Events
           </Link>
-          <Link href="/request?intent=stay" className="hover:text-white">
-            Stay near tour
+          <Link href="/#request" className="hover:text-white">
+            Request
+          </Link>
+          <Link href="/#account" className="hover:text-white">
+            Account
           </Link>
           <Link href="/operator" className="hover:text-white">
             Operator inbox
