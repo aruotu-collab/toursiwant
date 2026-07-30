@@ -105,58 +105,61 @@ export function HomeCommandCenter() {
 
   return (
     <div className="min-h-full bg-ink text-white">
-      {/* Slim top bar */}
-      <div className="border-b border-white/10 bg-[#0a1520]/">
-        <div className="mx-auto flex w-full max-w-[90rem] flex-wrap items-center gap-x-4 gap-y-3 px-5 py-3.5 sm:px-8">
-          <div className="min-w-0 shrink-0">
-            <p className="font-display text-xl tracking-tight text-white sm:text-2xl">
+      {/* Slim top bar — single row on mobile */}
+      <div className="sticky top-0 z-30 border-b border-white/10 bg-[#0a1520]/supports-[backdrop-filter]:bg-[#0a1520]/95 supports-[backdrop-filter]:backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-[90rem] items-center gap-3 px-4 py-3 sm:px-8 sm:py-3.5">
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-lg leading-tight tracking-tight text-white sm:text-2xl">
               Tours<span className="text-amber">I</span>Want
             </p>
             <AuthGreeting variant="dark" />
           </div>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <AuthNav variant="dark" />
           </div>
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[90rem] px-5 py-8 sm:px-8 sm:py-10">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-amber">
-              {copy.eyebrow}
-            </p>
-            <h1 className="mt-2 font-display text-3xl text-white sm:text-4xl">
-              {copy.title}
-            </h1>
-            <p className="mt-2 max-w-xl text-sm text-white/70 sm:text-base">
-              {copy.blurb}
-            </p>
+      <div className="mx-auto w-full max-w-[90rem] px-4 py-5 sm:px-8 sm:py-10">
+        <div className="max-w-2xl">
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-amber sm:text-[11px] sm:tracking-[0.2em]">
+            {copy.eyebrow}
+          </p>
+          <h1 className="mt-1.5 font-display text-[1.65rem] leading-tight text-white sm:mt-2 sm:text-4xl">
+            {copy.title}
+          </h1>
+          <p className="mt-2 hidden max-w-xl text-sm text-white/70 sm:block sm:text-base">
+            {copy.blurb}
+          </p>
+        </div>
+
+        {/* Feature menus — sticky swipe chips */}
+        <div className="sticky top-[3.25rem] z-20 -mx-4 mt-4 border-b border-white/10 bg-ink/95 px-4 py-2.5 backdrop-blur-md sm:static sm:mx-0 sm:mt-6 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+          <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {MENU.map((item) => {
+              const active = tab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => selectTab(item.id)}
+                  className={`shrink-0 border px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] transition active:scale-[0.98] ${
+                    active
+                      ? "border-amber bg-amber text-ink"
+                      : "border-white/20 bg-white/5 text-white/70 hover:border-white/40 hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
+          <p className="mt-1.5 font-mono text-[10px] uppercase tracking-wider text-white/40 sm:hidden">
+            Swipe menus →
+          </p>
         </div>
 
-        {/* Feature menus */}
-        <div className="mt-6 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {MENU.map((item) => {
-            const active = tab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => selectTab(item.id)}
-                className={`shrink-0 border px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
-                  active
-                    ? "border-amber bg-amber text-ink"
-                    : "border-white/20 bg-white/5 text-white/70 hover:border-white/40 hover:text-white"
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-6">
+        <div className="mt-4 sm:mt-6">
           {tab === "pulse" ? <TourPulseBoard embedded /> : null}
           {tab === "seats" ? <TourRushBoard embedded /> : null}
           {tab === "tours" ? <ToursPanel /> : null}
@@ -228,10 +231,10 @@ function ToursPanel() {
 function EventsPanel() {
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
+      <div className="flex justify-stretch sm:justify-end">
         <Link
           href="/events/ride"
-          className="bg-amber px-4 py-2 text-sm font-semibold text-ink hover:bg-amber-deep"
+          className="w-full bg-amber px-4 py-3 text-center text-sm font-semibold text-ink hover:bg-amber-deep sm:w-auto sm:py-2"
         >
           Request Event Pickup & Return
         </Link>

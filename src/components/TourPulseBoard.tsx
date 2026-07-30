@@ -208,7 +208,7 @@ export function TourPulseBoard({
                 key={tab.id}
                 type="button"
                 onClick={() => setFilter(tab.id)}
-                className={`shrink-0 border px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
+                className={`shrink-0 border px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] transition active:scale-[0.98] ${
                   active
                     ? "border-amber bg-amber text-ink"
                     : "border-white/20 bg-white/5 text-white/70 hover:border-white/40 hover:text-white"
@@ -221,9 +221,9 @@ export function TourPulseBoard({
           })}
         </div>
 
-        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
-          {/* Live list */}
-          <div className="border border-white/10 bg-white/[0.03]">
+        <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
+          {/* Live list — below map on mobile, left column on desktop */}
+          <div className="order-2 border border-white/10 bg-white/[0.03] lg:order-1">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
               <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
                 Live listing
@@ -232,7 +232,7 @@ export function TourPulseBoard({
                 {filtered.length} shown
               </p>
             </div>
-            <ul className="max-h-[34rem] divide-y divide-white/10 overflow-y-auto">
+            <ul className="max-h-[min(28rem,55vh)] divide-y divide-white/10 overflow-y-auto overscroll-contain lg:max-h-[34rem]">
               {filtered.map((activity) => {
                 const zone = pulseZones.find((z) => z.id === activity.zoneId);
                 const selected = selectedActivityId === activity.id;
@@ -242,7 +242,7 @@ export function TourPulseBoard({
                     <button
                       type="button"
                       onClick={() => selectActivity(activity)}
-                      className={`flex w-full gap-3 px-4 py-3.5 text-left transition ${
+                      className={`flex w-full gap-3 px-4 py-3.5 text-left transition active:bg-white/10 ${
                         selected
                           ? "bg-amber/15"
                           : flashed
@@ -267,10 +267,10 @@ export function TourPulseBoard({
                             {pulseStatusLabel[activity.status]}
                           </span>
                         </span>
-                        <span className="mt-0.5 block truncate font-semibold text-white">
+                        <span className="mt-0.5 block font-semibold text-white [overflow-wrap:anywhere]">
                           {activity.title}
                         </span>
-                        <span className="mt-0.5 block truncate text-sm text-white/55">
+                        <span className="mt-0.5 block text-sm text-white/55 [overflow-wrap:anywhere]">
                           {activity.detail}
                           {activity.joinable ? " · open to join" : ""}
                           {" · "}
@@ -294,8 +294,8 @@ export function TourPulseBoard({
             </ul>
           </div>
 
-          {/* Corridor map + panel */}
-          <div className="space-y-4">
+          {/* Corridor map — first on mobile (truckerslikeme pattern) */}
+          <div className="order-1 space-y-4 lg:order-2">
             <div className="border border-white/10 bg-[#0a1520]">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
                 <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
@@ -400,10 +400,10 @@ function CorridorMap({
   onSelectZone: (id: PulseZoneId) => void;
 }) {
   return (
-    <div className="relative px-2 py-4 sm:px-4">
+    <div className="relative px-1 py-2 sm:px-4 sm:py-4">
       <svg
         viewBox="0 0 400 520"
-        className="mx-auto h-auto w-full max-w-md"
+        className="mx-auto h-auto w-full max-h-[min(58vh,420px)] max-w-md lg:max-h-none"
         role="img"
         aria-label="New York tour corridor from harbor to airports"
       >

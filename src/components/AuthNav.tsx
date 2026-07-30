@@ -64,7 +64,7 @@ export function AuthGreeting({ variant = "light" }: { variant?: Variant }) {
       href="/#account"
       className={
         dark
-          ? "mt-0.5 block text-xs font-medium text-white/70 transition hover:text-white"
+          ? "mt-0.5 block truncate text-[11px] font-medium text-white/70 transition hover:text-white sm:text-xs"
           : "mt-0.5 block text-xs font-medium text-ink-soft transition hover:text-ink sm:text-sm"
       }
     >
@@ -90,13 +90,13 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
 
   const dark = variant === "dark";
   const linkClass = dark
-    ? "text-xs font-medium text-white/75 transition hover:text-white sm:text-sm"
+    ? "px-2 py-2 text-xs font-medium text-white/75 transition hover:text-white sm:px-0 sm:text-sm"
     : "transition hover:text-ink";
   const buttonClass = dark
-    ? "border border-white/35 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:text-sm"
+    ? "border border-white/35 bg-white/10 px-2.5 py-2 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 sm:px-3 sm:py-1.5 sm:text-sm"
     : "border border-ink/20 px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-white";
   const accountClass = dark
-    ? "bg-amber px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-amber-deep sm:text-sm"
+    ? "bg-amber px-2.5 py-2 text-xs font-semibold text-ink transition hover:bg-amber-deep sm:px-3 sm:py-1.5 sm:text-sm"
     : "rounded-sm bg-ink px-3 py-2 text-sm text-white transition hover:bg-ink-soft";
 
   if (user === undefined) {
@@ -104,7 +104,7 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
       <span
         className={
           dark
-            ? "h-8 w-24 animate-pulse bg-white/10"
+            ? "h-9 w-16 animate-pulse bg-white/10 sm:w-24"
             : "h-8 w-24 animate-pulse bg-ink/10"
         }
         aria-hidden
@@ -115,12 +115,13 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
   if (!user) {
     return (
       <>
-        <Link href="/join" className={`hidden lg:inline ${linkClass}`}>
-          Sign in
+        <Link href="/join" className={accountClass}>
+          <span className="sm:hidden">Sign in</span>
+          <span className="hidden sm:inline">Sign in</span>
         </Link>
         <Link
           href="/join?role=operator&next=/operator"
-          className={accountClass}
+          className={`hidden sm:inline-flex ${buttonClass}`}
         >
           Operators
         </Link>
@@ -131,10 +132,11 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
   return (
     <>
       <Link href="/#account" className={accountClass}>
-        My account
+        <span className="sm:hidden">Account</span>
+        <span className="hidden sm:inline">My account</span>
       </Link>
       {user.role === "operator" || user.role === "admin" ? (
-        <Link href="/operator" className={linkClass}>
+        <Link href="/operator" className={`hidden sm:inline ${linkClass}`}>
           Inbox
         </Link>
       ) : null}
