@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AuthNav } from "@/components/AuthNav";
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -41,18 +42,7 @@ export function SiteHeader() {
           <Link href="/request" className="transition hover:text-ink">
             Request
           </Link>
-          <Link
-            href="/join"
-            className="hidden transition hover:text-ink lg:inline"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/join?role=operator&next=/operator"
-            className="rounded-sm bg-ink px-3 py-2 text-white transition hover:bg-ink-soft"
-          >
-            Operators
-          </Link>
+          <AuthNav />
         </nav>
       </div>
     </header>

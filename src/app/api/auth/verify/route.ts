@@ -21,10 +21,16 @@ export async function GET(request: Request) {
 
   await createSessionCookie(result.sessionToken, result.sessionExpires);
 
-  const next =
+  let next =
     result.nextPath.startsWith("/") && !result.nextPath.startsWith("//")
       ? result.nextPath
-      : "/";
+      : "/account?welcome=1";
+
+  if (result.user.role === "operator" || result.user.role === "admin") {
+    if (!next.startsWith("/operator")) next = "/operator";
+  } else {
+    next = "/account?welcome=1";
+  }
 
   return NextResponse.redirect(`${site}${next}`);
 }

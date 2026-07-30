@@ -75,6 +75,17 @@ export async function listRequests(): Promise<CapturedRequest[]> {
   );
 }
 
+export async function listRequestsForEmail(
+  email: string,
+): Promise<CapturedRequest[]> {
+  const normalized = email.trim().toLowerCase();
+  const all = await listRequests();
+  return all.filter(
+    (item) =>
+      item.email.trim().toLowerCase() === normalized && item.source === "live",
+  );
+}
+
 export async function createRequest(
   input: NewRequestInput,
 ): Promise<CapturedRequest> {

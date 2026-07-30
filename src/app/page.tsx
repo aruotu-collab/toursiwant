@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { AuthNav } from "@/components/AuthNav";
 import { TourMarketBoard } from "@/components/TourMarketBoard";
 import { TourPulseBoard } from "@/components/TourPulseBoard";
 import { TourRushBoard } from "@/components/TourRushBoard";
@@ -57,16 +58,13 @@ export default function HomePage() {
             </Link>
             <Link
               href="/events"
-              className="hidden items-center justify-center px-2 py-2 text-xs font-medium text-white/75 transition hover:text-white md:inline-flex"
+              className="hidden items-center justify-center px-2 py-2 text-xs font-medium text-white/75 transition hover:text-white lg:inline-flex"
             >
               Events
             </Link>
-            <Link
-              href="/join?role=operator&next=/operator"
-              className="hidden items-center justify-center px-2 py-2 text-xs font-medium text-white/75 transition hover:text-white lg:inline-flex"
-            >
-              Operators
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <AuthNav variant="dark" />
+            </div>
           </div>
         </div>
       </section>

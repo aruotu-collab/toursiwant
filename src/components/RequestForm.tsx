@@ -116,9 +116,7 @@ export default function RequestForm() {
             email,
             name,
             role: "traveller",
-            nextPath: selectedTour
-              ? `/tours/${selectedTour.slug}?date=${travelDate}`
-              : "/tours",
+            nextPath: "/account?welcome=1",
           }),
         });
         if (authRes.ok) {

@@ -35,7 +35,7 @@ function JoinContent() {
           email,
           name: name || undefined,
           role: isOperator ? "operator" : "traveller",
-          nextPath: nextPath || (isOperator ? "/operator" : "/"),
+          nextPath: nextPath || (isOperator ? "/operator" : "/account?welcome=1"),
         }),
       });
       const payload = (await response.json()) as {
