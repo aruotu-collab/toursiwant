@@ -225,7 +225,8 @@ export async function getCurrentUser(): Promise<AppUser | null> {
 export async function sendMagicEmail(email: string, magicUrl: string) {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from =
-    process.env.RESEND_FROM_EMAIL?.trim() || "ToursIWant <onboarding@resend.dev>";
+    process.env.RESEND_FROM_EMAIL?.trim() ||
+    "ToursIWant <login@toursiwant.com>";
 
   if (!apiKey) {
     return { sent: false as const, reason: "RESEND_API_KEY not configured" };
@@ -240,8 +241,33 @@ export async function sendMagicEmail(email: string, magicUrl: string) {
     body: JSON.stringify({
       from,
       to: [email],
-      subject: "Your ToursIWant sign-in link",
-      html: `<p>Click to join ToursIWant and continue your request:</p><p><a href="${magicUrl}">${magicUrl}</a></p><p>This link expires in 30 minutes.</p>`,
+      reply_to: "hello@toursiwant.com",
+      subject: "Sign in to ToursIWant",
+      text: [
+        "Sign in to ToursIWant",
+        "",
+        "Use this link to sign in (expires in 30 minutes):",
+        magicUrl,
+        "",
+        "If you did not request this, you can ignore this email.",
+        "",
+        "ToursIWant · https://www.toursiwant.com",
+      ].join("\n"),
+      html: `
+        <div style="font-family:Georgia,serif;line-height:1.5;color:#0c1b2a;max-width:520px">
+          <p style="margin:0 0 12px;font-size:18px"><strong>Sign in to ToursIWant</strong></p>
+          <p style="margin:0 0 16px;color:#243447">Use the button below to open your live board. This link expires in 30 minutes.</p>
+          <p style="margin:0 0 20px">
+            <a href="${magicUrl}" style="display:inline-block;background:#d4a017;color:#0c1b2a;text-decoration:none;padding:12px 18px;font-weight:600">
+              Sign in to ToursIWant
+            </a>
+          </p>
+          <p style="margin:0 0 8px;font-size:13px;color:#6b7280">Or paste this link into your browser:</p>
+          <p style="margin:0 0 20px;font-size:13px;word-break:break-all"><a href="${magicUrl}" style="color:#1f4e79">${magicUrl}</a></p>
+          <p style="margin:0;font-size:12px;color:#6b7280">If you did not request this email, you can ignore it.</p>
+          <p style="margin:16px 0 0;font-size:12px;color:#6b7280">ToursIWant · <a href="https://www.toursiwant.com" style="color:#1f4e79">www.toursiwant.com</a></p>
+        </div>
+      `.trim(),
     }),
   });
 
