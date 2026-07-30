@@ -30,6 +30,14 @@ type NewRequestInput = {
   joinGroup?: boolean;
   businessName?: string;
   citySlug?: string;
+  userId?: string;
+  needAccommodation?: boolean;
+  accommodationNotes?: string;
+  eventSlug?: string;
+  eventName?: string;
+  returnAddress?: string;
+  eventStart?: string;
+  eventEnd?: string;
 };
 
 async function readFileLiveRequests(): Promise<CapturedRequest[]> {
@@ -87,6 +95,14 @@ export async function createRequest(
     joinGroup: input.joinGroup,
     businessName: input.businessName?.trim() || undefined,
     source: "live",
+    userId: input.userId,
+    needAccommodation: input.needAccommodation,
+    accommodationNotes: input.accommodationNotes?.trim() || undefined,
+    eventSlug: input.eventSlug,
+    eventName: input.eventName,
+    returnAddress: input.returnAddress?.trim() || undefined,
+    eventStart: input.eventStart,
+    eventEnd: input.eventEnd,
   };
 
   if (hasDatabase()) {

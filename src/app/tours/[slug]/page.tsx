@@ -110,6 +110,26 @@ export default async function TourDetailPage({
               </ul>
             </div>
           </div>
+
+          <div className="border border-skyline/20 bg-mist/50 p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-skyline">
+              Stay Near Your Tour
+            </p>
+            <h3 className="mt-2 font-display text-2xl text-ink">
+              Sleep close to {tour.meetup}
+            </h3>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">
+              Pair this experience with a hotel or short stay near the meetup.
+              Add Stay Near Your Tour when you send interest — partners quote
+              nights that match your date.
+            </p>
+            <Link
+              href={`${requestHref}&intent=stay`}
+              className="mt-5 inline-flex text-sm font-semibold text-skyline underline-offset-2 hover:underline"
+            >
+              Request stay near this tour →
+            </Link>
+          </div>
         </div>
 
         <aside className="h-fit border border-ink/10 bg-white/80 p-5 sm:p-6 lg:sticky lg:top-8">
@@ -175,8 +195,14 @@ export default async function TourDetailPage({
             <span aria-hidden>→</span>
           </Link>
           <Link
-            href={`/request?date=${travelDate}`}
+            href={`/request?tour=${tour.slug}&date=${travelDate}&intent=stay`}
             className="mt-3 flex w-full items-center justify-center border border-ink/15 px-5 py-3 text-sm font-medium text-ink transition hover:bg-paper"
+          >
+            Stay Near Your Tour
+          </Link>
+          <Link
+            href={`/request?date=${travelDate}`}
+            className="mt-3 flex w-full items-center justify-center px-5 py-2 text-sm font-medium text-ink-soft transition hover:text-ink"
           >
             Request something custom instead
           </Link>

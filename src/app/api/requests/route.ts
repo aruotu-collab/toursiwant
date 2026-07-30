@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 import { createRequest, listRequests, storageMode } from "@/lib/requests-store";
 import { requestToActivity } from "@/lib/seed-requests";
 import type { CapturedRequestType } from "@/lib/seed-requests";
 
 export const runtime = "nodejs";
+
+const ALLOWED_TYPES: CapturedRequestType[] = [
+  "tour_interest",
+  "custom_request",
+  "operator_interest",
+  "event_ride",
+  "accommodation_request",
+];
 
 export async function GET() {
   const requests = await listRequests();
@@ -33,6 +42,13 @@ export async function POST(request: Request) {
     details?: string;
     joinGroup?: boolean | string;
     businessName?: string;
+    needAccommodation?: boolean | string;
+    accommodationNotes?: string;
+    eventSlug?: string;
+    eventName?: string;
+    returnAddress?: string;
+    eventStart?: string;
+    eventEnd?: string;
   };
 
   if (!body.name?.trim() || !body.email?.trim()) {
@@ -42,15 +58,24 @@ export async function POST(request: Request) {
     );
   }
 
-  const type: CapturedRequestType =
-    body.type === "operator_interest" ||
-    body.type === "tour_interest" ||
-    body.type === "custom_request"
-      ? body.type
-      : "custom_request";
+  const type: CapturedRequestType = ALLOWED_TYPES.includes(
+    body.type as CapturedRequestType,
+  )
+    ? (body.type as CapturedRequestType)
+    : "custom_request";
+
+  const user = await getCurrentUser().catch(() => null);
+
+  const needAccommodation =
+    body.needAccommodation === true ||
+    body.needAccommodation === "true" ||
+    body.needAccommodation === "on";
 
   const saved = await createRequest({
-    type,
+    type:
+      needAccommodation && type === "custom_request"
+        ? "custom_request"
+        : type,
     name: body.name,
     email: body.email,
     phone: body.phone,
@@ -68,6 +93,14 @@ export async function POST(request: Request) {
       body.joinGroup === "true" ||
       body.joinGroup === "on",
     businessName: body.businessName,
+    userId: user?.id,
+    needAccommodation,
+    accommodationNotes: body.accommodationNotes,
+    eventSlug: body.eventSlug,
+    eventName: body.eventName,
+    returnAddress: body.returnAddress,
+    eventStart: body.eventStart,
+    eventEnd: body.eventEnd,
   });
 
   return NextResponse.json({ ok: true, request: saved }, { status: 201 });

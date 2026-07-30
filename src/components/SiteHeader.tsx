@@ -19,27 +19,33 @@ export function SiteHeader() {
         >
           Tours<span className="text-amber">I</span>Want
         </Link>
-        <nav className="flex items-center gap-4 text-sm text-ink-soft sm:gap-6">
-          <Link
-            href="/#rush"
-            className="hidden transition hover:text-ink sm:inline"
-          >
-            Tour Rush
-          </Link>
+        <nav className="flex items-center gap-3 text-sm text-ink-soft sm:gap-5">
           <Link
             href="/tours"
             className="hidden transition hover:text-ink md:inline"
           >
             Find tours
           </Link>
+          <Link
+            href="/events"
+            className="hidden transition hover:text-ink sm:inline"
+          >
+            Events
+          </Link>
           <Link href="/request" className="transition hover:text-ink">
-            Request a tour
+            Request
           </Link>
           <Link
-            href="/request?intent=operator"
+            href="/join"
+            className="hidden transition hover:text-ink lg:inline"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/join?role=operator&next=/operator"
             className="rounded-sm bg-ink px-3 py-2 text-white transition hover:bg-ink-soft"
           >
-            For operators
+            Operators
           </Link>
         </nav>
       </div>

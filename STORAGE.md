@@ -3,7 +3,8 @@
 ## What this does
 - Mock/seed demand stays in code (so the board looks full on day one)
 - Real traveller/operator submissions save to Postgres forever
-- Without DATABASE_URL, the app falls back to temporary file storage
+- Auth tables (`users`, `magic_tokens`, `sessions`) auto-create on first use
+- Without DATABASE_URL, the app falls back to temporary file storage (accounts need Postgres)
 
 ## Create the database (pick one)
 

@@ -49,7 +49,13 @@ export default function HomePage() {
               Find tours
             </Link>
             <Link
-              href="/request?intent=operator"
+              href="/events"
+              className="hidden items-center justify-center px-2 py-2 text-xs font-medium text-white/75 transition hover:text-white md:inline-flex"
+            >
+              Events
+            </Link>
+            <Link
+              href="/join?role=operator&next=/operator"
               className="hidden items-center justify-center px-2 py-2 text-xs font-medium text-white/75 transition hover:text-white lg:inline-flex"
             >
               Operators
@@ -63,6 +69,38 @@ export default function HomePage() {
       <div id="market">
         <TourMarketBoard />
       </div>
+
+      <section className="border-b border-ink/10 bg-[linear-gradient(180deg,var(--mist)_0%,var(--paper)_100%)]">
+        <div className="mx-auto grid w-full max-w-6xl gap-8 px-5 py-16 sm:px-8 md:grid-cols-2 md:py-20">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-skyline">
+              Beyond the tour
+            </p>
+            <h2 className="mt-3 font-display text-3xl text-ink sm:text-4xl">
+              Events & stays that fit the night
+            </h2>
+            <p className="mt-4 max-w-md text-ink-soft">
+              Concerts, games, and Broadway — then sleep near the meetup.
+              Same request loop operators already know.
+            </p>
+          </div>
+          <div className="flex flex-col justify-center gap-3 sm:flex-row sm:items-center md:justify-end">
+            <Link
+              href="/events"
+              className="inline-flex items-center justify-center bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
+            >
+              Events This Week
+            </Link>
+            <Link
+              href="/request?intent=stay"
+              className="inline-flex items-center justify-center border border-ink/20 bg-white/70 px-5 py-3 text-sm font-semibold text-ink hover:bg-white"
+            >
+              Stay Near Your Tour
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section className="border-b border-ink/10 bg-paper">
         <div className="mx-auto grid w-full max-w-6xl gap-10 px-5 py-16 sm:px-8 md:grid-cols-[1.1fr_0.9fr] md:py-20">
           <div>
@@ -177,12 +215,20 @@ export default function HomePage() {
               operators help shape the board.
             </p>
           </div>
-          <Link
-            href="/request?intent=operator"
-            className="inline-flex items-center justify-center bg-amber px-6 py-3.5 text-sm font-semibold tracking-wide text-ink transition hover:bg-amber-deep"
-          >
-            Join as an operator
-          </Link>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/request?intent=operator"
+              className="inline-flex items-center justify-center bg-amber px-6 py-3.5 text-sm font-semibold tracking-wide text-ink transition hover:bg-amber-deep"
+            >
+              Join as an operator
+            </Link>
+            <Link
+              href="/join?role=operator&next=/operator"
+              className="inline-flex items-center justify-center border border-white/30 px-6 py-3.5 text-sm font-semibold tracking-wide text-white transition hover:bg-white/10"
+            >
+              Open lead inbox
+            </Link>
+          </div>
         </div>
       </section>
     </main>

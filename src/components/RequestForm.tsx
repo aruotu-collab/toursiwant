@@ -15,6 +15,7 @@ import { tourInterests, type TourInterest } from "@/lib/tour-types";
 export default function RequestForm() {
   const searchParams = useSearchParams();
   const isOperator = searchParams.get("intent") === "operator";
+  const stayIntent = searchParams.get("intent") === "stay";
   const tourSlug = searchParams.get("tour");
   const dateParam = searchParams.get("date");
   const travelDate = dateParam || toDateKey(new Date());
@@ -32,13 +33,18 @@ export default function RequestForm() {
     selectedTour ? [selectedTour.interest] : [],
   );
   const [joinGroup, setJoinGroup] = useState(selectedTour?.joinable ?? true);
+  const [needStay, setNeedStay] = useState(stayIntent);
+  const [saveAccount, setSaveAccount] = useState(true);
+  const [magicUrl, setMagicUrl] = useState<string | null>(null);
+  const [submittedEmail, setSubmittedEmail] = useState("");
 
   const title = useMemo(() => {
     if (isOperator) return "Join ToursIWant as a New York operator";
+    if (stayIntent && !selectedTour) return "Stay Near Your Tour";
     if (selectedTour) return `I want: ${selectedTour.title}`;
     if (hasAdvanceDate) return `Request a tour for ${formatDisplayDate(travelDate)}`;
     return "Request the New York tour you want";
-  }, [hasAdvanceDate, isOperator, selectedTour, travelDate]);
+  }, [hasAdvanceDate, isOperator, selectedTour, stayIntent, travelDate]);
 
   function toggleInterest(interest: TourInterest) {
     setInterests((current) =>
@@ -55,16 +61,21 @@ export default function RequestForm() {
 
     const form = event.currentTarget;
     const data = new FormData(form);
+    const name = String(data.get("name") || "");
+    const email = String(data.get("email") || "");
 
     const type = isOperator
       ? "operator_interest"
-      : isSpecificTour
-        ? "tour_interest"
-        : "custom_request";
+      : stayIntent && !isSpecificTour
+        ? "accommodation_request"
+        : isSpecificTour
+          ? "tour_interest"
+          : "custom_request";
 
     const interestNote =
       interests.length > 0 ? `Interests: ${interests.join(", ")}. ` : "";
     const detailsFromForm = String(data.get("details") || "");
+    const accommodationNotes = String(data.get("accommodationNotes") || "");
 
     try {
       const response = await fetch("/api/requests", {
@@ -72,8 +83,8 @@ export default function RequestForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
-          name: String(data.get("name") || ""),
-          email: String(data.get("email") || ""),
+          name,
+          email,
           phone: String(data.get("phone") || ""),
           travelDate: String(data.get("date") || travelDate || ""),
           tourSlug: selectedTour?.slug,
@@ -83,6 +94,8 @@ export default function RequestForm() {
           details: `${interestNote}${detailsFromForm}`.trim(),
           joinGroup,
           businessName: String(data.get("business") || ""),
+          needAccommodation: needStay || type === "accommodation_request",
+          accommodationNotes,
         }),
       });
 
@@ -91,6 +104,47 @@ export default function RequestForm() {
           error?: string;
         } | null;
         throw new Error(payload?.error || "Could not save your request.");
+      }
+
+      setSubmittedEmail(email);
+
+      if (!isOperator && saveAccount && email) {
+        const authRes = await fetch("/api/auth/magic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            name,
+            role: "traveller",
+            nextPath: selectedTour
+              ? `/tours/${selectedTour.slug}?date=${travelDate}`
+              : "/tours",
+          }),
+        });
+        if (authRes.ok) {
+          const authPayload = (await authRes.json()) as {
+            magicUrl?: string;
+            emailed?: boolean;
+          };
+          if (authPayload.magicUrl) setMagicUrl(authPayload.magicUrl);
+        }
+      }
+
+      if (isOperator && email) {
+        const authRes = await fetch("/api/auth/magic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            name,
+            role: "operator",
+            nextPath: "/operator",
+          }),
+        });
+        if (authRes.ok) {
+          const authPayload = (await authRes.json()) as { magicUrl?: string };
+          if (authPayload.magicUrl) setMagicUrl(authPayload.magicUrl);
+        }
       }
 
       setSubmitted(true);
@@ -129,15 +183,46 @@ export default function RequestForm() {
               ? "Operator interest received"
               : selectedTour
                 ? `Interest sent for ${selectedTour.title}`
-                : "Your request is in"}
+                : stayIntent
+                  ? "Stay request received"
+                  : "Your request is in"}
           </h1>
           <p className="mt-4 text-ink-soft">
             {isOperator
-              ? "Your operator interest is saved. We'll follow up about verification and New York listings."
+              ? "Your operator interest is saved. Use the magic link below (or your email) to open the lead inbox."
               : selectedTour
-                ? `Your interest is captured for ${formatDisplayDate(travelDate)}. It now feeds the live demand board as real traveller activity.`
-                : `Your request for ${formatDisplayDate(travelDate)} is captured and will show up in live demand as travellers keep adding requests.`}
+                ? `Your interest is captured for ${formatDisplayDate(travelDate)}.${needStay ? " We also noted that you need a stay near the tour." : ""}`
+                : `Your request for ${formatDisplayDate(travelDate)} is captured.${needStay ? " Accommodation interest is included." : ""}`}
           </p>
+
+          {saveAccount || isOperator ? (
+            <div className="mt-6 border border-ink/10 bg-white/70 p-5">
+              <p className="font-display text-xl text-ink">
+                {isOperator ? "Open your operator inbox" : "Save & track this request"}
+              </p>
+              <p className="mt-2 text-sm text-ink-soft">
+                {magicUrl
+                  ? `Click to activate your account for ${submittedEmail}.`
+                  : `If email is configured, check ${submittedEmail || "your inbox"} for a magic link.`}
+              </p>
+              {magicUrl ? (
+                <a
+                  href={magicUrl}
+                  className="mt-4 inline-flex bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
+                >
+                  {isOperator ? "Enter operator dashboard →" : "Activate account →"}
+                </a>
+              ) : (
+                <Link
+                  href={isOperator ? "/join?role=operator" : "/join"}
+                  className="mt-4 inline-flex border border-ink/20 px-5 py-3 text-sm font-semibold text-ink hover:bg-white"
+                >
+                  Get a new sign-in link
+                </Link>
+              )}
+            </div>
+          ) : null}
+
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
               href="/tours"
@@ -165,19 +250,23 @@ export default function RequestForm() {
             {launchCity.name} ·{" "}
             {isSpecificTour
               ? "Join this tour"
-              : hasAdvanceDate
-                ? "Plan ahead"
-                : "Live"}
+              : stayIntent
+                ? "Stay near"
+                : hasAdvanceDate
+                  ? "Plan ahead"
+                  : "Live"}
           </p>
           <h1 className="mt-3 font-display text-4xl leading-tight text-ink sm:text-5xl">
             {title}
           </h1>
           <p className="mt-4 max-w-md text-ink-soft">
             {isOperator
-              ? "Tell us about your tours, transfers, or shore excursions. We'll open operator onboarding as we verify New York providers."
-              : isSpecificTour
-                ? "Leave your details to claim a spot or get a quote for this listing on your chosen date."
-                : "Planning months ahead is fine. Pick your date, describe what you want, and operators quote you."}
+              ? "Tell us about your tours, transfers, or shore excursions. After you submit, open the lead inbox with a magic link."
+              : stayIntent
+                ? "Need a hotel or short stay close to your meetup point? Tell us dates and neighbourhood — partners quote stays near the experience."
+                : isSpecificTour
+                  ? "Leave your details to claim a spot or get a quote. Optionally add Stay Near Your Tour in one step."
+                  : "Planning months ahead is fine. Pick your date, describe what you want, and operators quote you."}
           </p>
 
           {selectedTour ? (
@@ -275,6 +364,12 @@ export default function RequestForm() {
                 </label>
               ) : null}
 
+              <StayNearFields
+                needStay={needStay}
+                setNeedStay={setNeedStay}
+                meetup={selectedTour.meetup}
+              />
+
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-ink">
                   Anything the operator should know?
@@ -285,6 +380,60 @@ export default function RequestForm() {
                   defaultValue={`I'd like to join: ${selectedTour.title} on ${formatDisplayDate(travelDate)}. ${selectedTour.summary}`}
                   className="w-full border border-ink/15 bg-paper/60 px-3 py-2.5 text-ink outline-none transition focus:border-skyline"
                   placeholder="Accessibility needs, luggage, preferred language…"
+                />
+              </label>
+            </>
+          ) : stayIntent ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Your name" name="name" required />
+                <Field label="Email" name="email" type="email" required />
+              </div>
+              <Field label="Phone / WhatsApp" name="phone" type="tel" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Check-in / tour date"
+                  name="date"
+                  type="date"
+                  defaultValue={travelDate}
+                  required
+                />
+                <Field
+                  label="Guests"
+                  name="groupSize"
+                  type="number"
+                  min={1}
+                  defaultValue={2}
+                  required
+                />
+              </div>
+              <Field
+                label="Preferred neighbourhood / meetup"
+                name="pickup"
+                placeholder="Near Battery Park, Midtown, Brooklyn Bridge…"
+                required
+              />
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-ink">
+                  Stay preferences
+                </span>
+                <textarea
+                  name="accommodationNotes"
+                  required
+                  rows={4}
+                  className="w-full border border-ink/15 bg-paper/60 px-3 py-2.5 text-ink outline-none transition focus:border-skyline"
+                  placeholder="Hotel vs apartment, budget, nights, walk to meetup…"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-ink">
+                  Related tour (optional)
+                </span>
+                <textarea
+                  name="details"
+                  rows={3}
+                  className="w-full border border-ink/15 bg-paper/60 px-3 py-2.5 text-ink outline-none transition focus:border-skyline"
+                  placeholder="Which tour or experience you’re pairing with the stay…"
                 />
               </label>
             </>
@@ -370,6 +519,8 @@ export default function RequestForm() {
                 </span>
               </label>
 
+              <StayNearFields needStay={needStay} setNeedStay={setNeedStay} />
+
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-ink">
                   Describe the tour you want
@@ -385,6 +536,24 @@ export default function RequestForm() {
             </>
           )}
 
+          {!isOperator ? (
+            <label className="flex items-start gap-3 border-t border-ink/10 pt-5 text-sm text-ink-soft">
+              <input
+                type="checkbox"
+                checked={saveAccount}
+                onChange={(e) => setSaveAccount(e.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <strong className="font-semibold text-ink">
+                  Save with email magic link
+                </strong>{" "}
+                — track quotes without a password. Browse stays free; sign in
+                after you send the request.
+              </span>
+            </label>
+          ) : null}
+
           {submitError ? (
             <p className="text-sm text-rose-700">{submitError}</p>
           ) : null}
@@ -399,9 +568,11 @@ export default function RequestForm() {
                 ? "Saving your request…"
                 : isOperator
                   ? "Submit operator interest"
-                  : isSpecificTour
-                    ? "Send interest for this tour"
-                    : "Send my tour request"}
+                  : stayIntent
+                    ? "Request stay near tour"
+                    : isSpecificTour
+                      ? "Send interest for this tour"
+                      : "Send my tour request"}
             </span>
             {!submitting ? (
               <span
@@ -415,6 +586,50 @@ export default function RequestForm() {
         </form>
       </div>
     </main>
+  );
+}
+
+function StayNearFields({
+  needStay,
+  setNeedStay,
+  meetup,
+}: {
+  needStay: boolean;
+  setNeedStay: (value: boolean) => void;
+  meetup?: string;
+}) {
+  return (
+    <div className="space-y-3 border border-dashed border-skyline/30 bg-mist/40 p-4">
+      <label className="flex items-start gap-3 text-sm text-ink">
+        <input
+          type="checkbox"
+          checked={needStay}
+          onChange={(event) => setNeedStay(event.target.checked)}
+          className="mt-1"
+        />
+        <span>
+          <span className="font-semibold">Stay Near Your Tour</span>
+          <span className="block text-ink-soft">
+            Also get quotes for a hotel or short stay near{" "}
+            {meetup || "the meetup point"}.
+          </span>
+        </span>
+      </label>
+      {needStay ? (
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-ink">
+            Stay notes
+          </span>
+          <textarea
+            name="accommodationNotes"
+            rows={3}
+            required
+            className="w-full border border-ink/15 bg-paper/60 px-3 py-2.5 text-ink outline-none transition focus:border-skyline"
+            placeholder="Nights needed, budget, hotel vs apartment, walkable to meetup…"
+          />
+        </label>
+      ) : null}
+    </div>
   );
 }
 

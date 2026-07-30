@@ -18,7 +18,7 @@ export function getDatabaseUrl() {
   );
 }
 
-function getSql() {
+export function getSql() {
   const url = getDatabaseUrl();
   if (!url) {
     throw new Error("DATABASE_URL is not configured.");
@@ -29,11 +29,45 @@ function getSql() {
   return sqlClient;
 }
 
-export async function ensureRequestsSchema() {
+export async function ensureAppSchema() {
   if (!hasDatabase()) return;
   if (!schemaReady) {
     schemaReady = (async () => {
       const sql = getSql();
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL UNIQUE,
+          name TEXT,
+          phone TEXT,
+          role TEXT NOT NULL DEFAULT 'traveller',
+          business_name TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS magic_tokens (
+          token TEXT PRIMARY KEY,
+          email TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'traveller',
+          name TEXT,
+          next_path TEXT,
+          expires_at TIMESTAMPTZ NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS sessions (
+          token TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          expires_at TIMESTAMPTZ NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+
       await sql`
         CREATE TABLE IF NOT EXISTS tour_requests (
           id TEXT PRIMARY KEY,
@@ -51,16 +85,43 @@ export async function ensureRequestsSchema() {
           details TEXT,
           join_group BOOLEAN,
           business_name TEXT,
-          source TEXT NOT NULL DEFAULT 'live'
+          source TEXT NOT NULL DEFAULT 'live',
+          user_id TEXT,
+          need_accommodation BOOLEAN,
+          accommodation_notes TEXT,
+          event_slug TEXT,
+          event_name TEXT,
+          return_address TEXT,
+          event_start TEXT,
+          event_end TEXT
         )
       `;
+
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS user_id TEXT`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS need_accommodation BOOLEAN`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS accommodation_notes TEXT`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS event_slug TEXT`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS event_name TEXT`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS return_address TEXT`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS event_start TEXT`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS event_end TEXT`;
+
       await sql`
         CREATE INDEX IF NOT EXISTS tour_requests_created_at_idx
         ON tour_requests (created_at DESC)
       `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS tour_requests_email_idx
+        ON tour_requests (email)
+      `;
     })();
   }
   await schemaReady;
+}
+
+/** @deprecated use ensureAppSchema */
+export async function ensureRequestsSchema() {
+  await ensureAppSchema();
 }
 
 type RequestRow = {
@@ -80,6 +141,14 @@ type RequestRow = {
   join_group: boolean | null;
   business_name: string | null;
   source: "mock" | "live";
+  user_id?: string | null;
+  need_accommodation?: boolean | null;
+  accommodation_notes?: string | null;
+  event_slug?: string | null;
+  event_name?: string | null;
+  return_address?: string | null;
+  event_start?: string | null;
+  event_end?: string | null;
 };
 
 function rowToRequest(row: RequestRow): CapturedRequest {
@@ -105,17 +174,22 @@ function rowToRequest(row: RequestRow): CapturedRequest {
     joinGroup: row.join_group ?? undefined,
     businessName: row.business_name || undefined,
     source: row.source,
+    userId: row.user_id || undefined,
+    needAccommodation: row.need_accommodation ?? undefined,
+    accommodationNotes: row.accommodation_notes || undefined,
+    eventSlug: row.event_slug || undefined,
+    eventName: row.event_name || undefined,
+    returnAddress: row.return_address || undefined,
+    eventStart: row.event_start || undefined,
+    eventEnd: row.event_end || undefined,
   };
 }
 
 export async function dbListLiveRequests(): Promise<CapturedRequest[]> {
-  await ensureRequestsSchema();
+  await ensureAppSchema();
   const sql = getSql();
   const rows = (await sql`
-    SELECT
-      id, type, created_at, city_slug, name, email, phone,
-      travel_date, tour_slug, tour_title, group_size, pickup,
-      details, join_group, business_name, source
+    SELECT *
     FROM tour_requests
     ORDER BY created_at DESC
     LIMIT 500
@@ -127,14 +201,16 @@ export async function dbListLiveRequests(): Promise<CapturedRequest[]> {
 export async function dbInsertRequest(
   request: CapturedRequest,
 ): Promise<CapturedRequest> {
-  await ensureRequestsSchema();
+  await ensureAppSchema();
   const sql = getSql();
 
   await sql`
     INSERT INTO tour_requests (
       id, type, created_at, city_slug, name, email, phone,
       travel_date, tour_slug, tour_title, group_size, pickup,
-      details, join_group, business_name, source
+      details, join_group, business_name, source,
+      user_id, need_accommodation, accommodation_notes,
+      event_slug, event_name, return_address, event_start, event_end
     ) VALUES (
       ${request.id},
       ${request.type},
@@ -151,7 +227,15 @@ export async function dbInsertRequest(
       ${request.details ?? null},
       ${request.joinGroup ?? null},
       ${request.businessName ?? null},
-      ${request.source}
+      ${request.source},
+      ${request.userId ?? null},
+      ${request.needAccommodation ?? null},
+      ${request.accommodationNotes ?? null},
+      ${request.eventSlug ?? null},
+      ${request.eventName ?? null},
+      ${request.returnAddress ?? null},
+      ${request.eventStart ?? null},
+      ${request.eventEnd ?? null}
     )
   `;
 

@@ -14,11 +14,17 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-white/75">
-          <Link href="/request" className="hover:text-white">
-            Request a tour
-          </Link>
           <Link href="/tours" className="hover:text-white">
             Find tours
+          </Link>
+          <Link href="/events" className="hover:text-white">
+            Events this week
+          </Link>
+          <Link href="/request?intent=stay" className="hover:text-white">
+            Stay near tour
+          </Link>
+          <Link href="/operator" className="hover:text-white">
+            Operator inbox
           </Link>
           <a href="mailto:hello@toursiwant.com" className="hover:text-white">
             hello@toursiwant.com

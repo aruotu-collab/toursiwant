@@ -1,7 +1,9 @@
 export type CapturedRequestType =
   | "tour_interest"
   | "custom_request"
-  | "operator_interest";
+  | "operator_interest"
+  | "event_ride"
+  | "accommodation_request";
 
 export type CapturedRequest = {
   id: string;
@@ -20,6 +22,14 @@ export type CapturedRequest = {
   joinGroup?: boolean;
   businessName?: string;
   source: "mock" | "live";
+  userId?: string;
+  needAccommodation?: boolean;
+  accommodationNotes?: string;
+  eventSlug?: string;
+  eventName?: string;
+  returnAddress?: string;
+  eventStart?: string;
+  eventEnd?: string;
 };
 
 /** Seeded “already happening” demand so the board feels full from day one. */
@@ -334,6 +344,29 @@ export function requestToActivity(request: CapturedRequest) {
       kind: "quote" as const,
       destination: request.businessName || "New operator",
       detail: `${request.name} applied to list New York tours`,
+      minutesAgo,
+      source: request.source,
+    };
+  }
+
+  if (request.type === "event_ride") {
+    return {
+      id: request.id,
+      kind: "planned" as const,
+      destination: request.eventName || "Event pickup & return",
+      detail: `${request.groupSize || 1} traveller${(request.groupSize || 1) > 1 ? "s" : ""} booked event transport`,
+      minutesAgo,
+      source: request.source,
+    };
+  }
+
+  if (request.type === "accommodation_request" || request.needAccommodation) {
+    return {
+      id: request.id,
+      kind: "enquiry" as const,
+      destination: "Stay near your tour",
+      detail: request.accommodationNotes?.slice(0, 80) ||
+        `${request.name} needs accommodation near a tour`,
       minutesAgo,
       source: request.source,
     };
