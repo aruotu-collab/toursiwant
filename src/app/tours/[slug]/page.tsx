@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { TourDatePicker } from "@/components/TourDatePicker";
 import {
   formatDisplayDate,
   getTourDeparture,
@@ -133,16 +134,14 @@ export default async function TourDetailPage({
         </div>
 
         <aside className="h-fit border border-ink/10 bg-white/80 p-5 sm:p-6 lg:sticky lg:top-8">
-          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-skyline">
-            Selected date
-          </p>
-          <p className="mt-2 font-display text-2xl text-ink">
-            {formatDisplayDate(travelDate)}
-          </p>
-          <p className="mt-2 text-sm text-ink-soft">
-            {departure?.departsLabel ||
-              `${tour.timeLabel} · ${weekdayLabels(tour.weekdays)}`}
-          </p>
+          <TourDatePicker
+            slug={tour.slug}
+            travelDate={travelDate}
+            departsLabel={
+              departure?.departsLabel ||
+              `${tour.timeLabel} · ${weekdayLabels(tour.weekdays)}`
+            }
+          />
 
           <dl className="mt-6 space-y-3 border-y border-ink/10 py-5 text-sm">
             <div className="flex justify-between gap-4">
@@ -186,6 +185,10 @@ export default async function TourDetailPage({
           <p className="mt-4 text-xs leading-relaxed text-ink-soft">
             {tour.cancellation}
           </p>
+          <p className="mt-3 text-xs text-ink-soft">
+            You can change the date above before sending interest — operators
+            quote for the day you choose.
+          </p>
 
           <Link
             href={requestHref}
@@ -194,6 +197,9 @@ export default async function TourDetailPage({
             {tour.joinable ? "I want this tour" : "Request a quote"}
             <span aria-hidden>→</span>
           </Link>
+          <p className="mt-2 text-center text-[11px] text-ink-soft">
+            Continues for {formatDisplayDate(travelDate)}
+          </p>
           <Link
             href={`/request?tour=${tour.slug}&date=${travelDate}&intent=stay`}
             className="mt-3 flex w-full items-center justify-center border border-ink/15 px-5 py-3 text-sm font-medium text-ink transition hover:bg-paper"
