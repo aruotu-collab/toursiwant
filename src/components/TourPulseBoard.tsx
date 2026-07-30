@@ -148,13 +148,37 @@ export function TourPulseBoard({
 
   function selectZone(zoneId: PulseZoneId) {
     setSelectedZoneId(zoneId);
-    setSelectedActivityId(null);
+    const inZone = activities.filter(
+      (a) => a.zoneId === zoneId && matchesPulseFilter(a, filter),
+    );
+    setSelectedActivityId(inZone[0]?.id ?? null);
   }
 
   function selectActivity(activity: PulseActivity) {
     setSelectedZoneId(activity.zoneId);
     setSelectedActivityId(activity.id);
   }
+
+  const spotlight = useMemo(() => {
+    if (selectedZoneId) {
+      const inZone = filtered.filter((a) => a.zoneId === selectedZoneId);
+      return {
+        zone: pulseZones.find((z) => z.id === selectedZoneId) || null,
+        activity: selectedActivity?.zoneId === selectedZoneId
+          ? selectedActivity
+          : inZone[0] || null,
+        count: inZone.length,
+      };
+    }
+    if (nextUp) {
+      return {
+        zone: pulseZones.find((z) => z.id === nextUp.zoneId) || null,
+        activity: nextUp,
+        count: filtered.filter((a) => a.zoneId === nextUp.zoneId).length,
+      };
+    }
+    return { zone: null, activity: null, count: 0 };
+  }, [selectedZoneId, selectedActivity, filtered, nextUp]);
 
   return (
     <section
@@ -197,29 +221,6 @@ export function TourPulseBoard({
             {filtered.length} signals · public zones only
           </p>
         )}
-
-        {/* Filters */}
-        <div className={`${embedded ? "" : "mt-6 "}flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
-          {pulseFilterTabs.map((tab) => {
-            const active = filter === tab.id;
-            const count = filterCounts[tab.id] ?? 0;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setFilter(tab.id)}
-                className={`shrink-0 border px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] transition active:scale-[0.98] ${
-                  active
-                    ? "border-amber bg-amber text-ink"
-                    : "border-white/20 bg-white/5 text-white/70 hover:border-white/40 hover:text-white"
-                }`}
-              >
-                {tab.label}
-                <span className="ml-1.5 opacity-70">({count})</span>
-              </button>
-            );
-          })}
-        </div>
 
         <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
           {/* Live list — below map on mobile, left column on desktop */}
@@ -294,55 +295,96 @@ export function TourPulseBoard({
             </ul>
           </div>
 
-          {/* Corridor map — first on mobile (truckerslikeme pattern) */}
+          {/* Corridor map — first on mobile */}
           <div className="order-1 space-y-4 lg:order-2">
             <div className="border border-white/10 bg-[#0a1520]">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
-                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
+              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">
                   Corridor map
                 </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {(
-                    [
-                      ["tour", "Tours"],
-                      ["pickup", "Pickups"],
-                      ["cruise", "Cruise"],
-                      ["event", "Events"],
-                    ] as const
-                  ).map(([id, label]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setFilter(id)}
-                      className={`px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider transition ${
-                        filter === id
-                          ? "bg-white/15 text-white"
-                          : "text-white/45 hover:text-white/80"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                <p className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                  {filtered.length} of {activities.length} · by zone
+                </p>
+              </div>
+
+              {/* Swipe filters — truckerslikeme style */}
+              <div className="border-b border-white/10 px-4 py-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                  Swipe filters →
+                </p>
+                <div className="mt-2 flex gap-4 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {pulseFilterTabs.map((tab) => {
+                    const active = filter === tab.id;
+                    const count = filterCounts[tab.id] ?? 0;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setFilter(tab.id)}
+                        className={`shrink-0 border-b-2 pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
+                          active
+                            ? "border-amber text-amber"
+                            : "border-transparent text-white/45 hover:text-white/80"
+                        }`}
+                      >
+                        {tab.label}
+                        <span className="ml-1 opacity-70">({count})</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {nextUp ? (
+              {/* Tap a pulse → info card (like fuel stop detail) */}
+              {spotlight.zone && spotlight.activity ? (
                 <div className="flex gap-3 border-b border-white/10 px-4 py-3">
                   <span className="w-1 shrink-0 bg-amber" aria-hidden />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-amber">
-                      Next up ·{" "}
-                      {pulseZones.find((z) => z.id === nextUp.zoneId)?.shortLabel}
+                      {selectedZoneId ? "Selected" : "Next up"} ·{" "}
+                      {spotlight.zone.shortLabel}
+                      {spotlight.count > 1 ? ` · ${spotlight.count} signals` : ""}
                     </p>
-                    <p className="mt-0.5 truncate text-sm font-semibold text-white">
-                      {nextUp.title}
+                    <p className="mt-0.5 text-sm font-semibold text-white [overflow-wrap:anywhere]">
+                      <span className="uppercase tracking-wide text-white/50">
+                        {spotlight.activity.category}{" "}
+                      </span>
+                      {spotlight.activity.title}
                     </p>
-                    <p className="truncate text-xs text-white/50">
-                      {pulseStatusLabel[nextUp.status]} · {nextUp.detail}
+                    <p className="mt-0.5 text-xs text-white/50 [overflow-wrap:anywhere]">
+                      {pulseStatusLabel[spotlight.activity.status]} ·{" "}
+                      {spotlight.activity.detail}
+                      {spotlight.activity.joinable ? " · open to join" : ""}
                     </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Link
+                        href={activityHref(spotlight.activity, today)}
+                        className="bg-amber px-3 py-1.5 text-xs font-semibold text-ink hover:bg-amber-deep"
+                      >
+                        {spotlight.activity.joinable
+                          ? "View / join"
+                          : "View details"}
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById("pulse-zone-detail");
+                          el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                        }}
+                        className="border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+                      >
+                        More in this zone
+                      </button>
+                    </div>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="border-b border-white/10 px-4 py-3">
+                  <p className="text-sm text-white/50">
+                    Tap a glowing circle on the corridor for zone details.
+                  </p>
+                </div>
+              )}
 
               <CorridorMap
                 filter={filter}
@@ -370,16 +412,19 @@ export function TourPulseBoard({
               </div>
             </div>
 
-            {/* Drill-down panel */}
             {selectedZone ? (
-              <ZonePanel
-                zone={selectedZone}
-                items={zoneItems}
-                allInZone={activities.filter((a) => a.zoneId === selectedZone.id)}
-                selectedActivity={selectedActivity}
-                today={today}
-                onSelectActivity={selectActivity}
-              />
+              <div id="pulse-zone-detail">
+                <ZonePanel
+                  zone={selectedZone}
+                  items={zoneItems}
+                  allInZone={activities.filter(
+                    (a) => a.zoneId === selectedZone.id,
+                  )}
+                  selectedActivity={selectedActivity}
+                  today={today}
+                  onSelectActivity={selectActivity}
+                />
+              </div>
             ) : null}
           </div>
         </div>
@@ -500,14 +545,15 @@ function CorridorMap({
                 }
               }}
             >
-              {/* Breathing pulse rings */}
+              {/* Larger invisible hit area for mobile taps */}
+              <circle r={Math.max(size + 16, 22)} fill="transparent" />
               {!dimmed && stats.total > 0 ? (
                 <>
                   <circle
                     r={size + 14}
                     fill={color}
                     opacity="0.12"
-                    className="pulse-ring"
+                    className="pulse-ring pointer-events-none"
                   />
                   <circle
                     r={size + 7}
@@ -515,7 +561,7 @@ function CorridorMap({
                     stroke={color}
                     strokeWidth="1.5"
                     opacity="0.55"
-                    className="pulse-ring-delay"
+                    className="pulse-ring-delay pointer-events-none"
                   />
                 </>
               ) : null}
@@ -525,6 +571,7 @@ function CorridorMap({
                 stroke={selected ? "#fffdf8" : "rgba(255,255,255,0.35)"}
                 strokeWidth={selected ? 3 : 1.5}
                 filter="url(#softGlow)"
+                className="pointer-events-none"
               />
               {stats.total > 0 ? (
                 <text
@@ -534,6 +581,7 @@ function CorridorMap({
                   fontSize="9"
                   fontWeight="700"
                   fontFamily="ui-monospace, monospace"
+                  className="pointer-events-none"
                 >
                   {stats.total}
                 </text>
@@ -545,6 +593,7 @@ function CorridorMap({
                 fontSize="9"
                 fontFamily="ui-monospace, monospace"
                 fontWeight="600"
+                className="pointer-events-none"
               >
                 {zone.shortLabel.toUpperCase()}
               </text>
