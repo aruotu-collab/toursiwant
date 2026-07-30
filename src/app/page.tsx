@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { AuthNav } from "@/components/AuthNav";
+import { AuthGreeting, AuthNav } from "@/components/AuthNav";
 import { TourMarketBoard } from "@/components/TourMarketBoard";
 import { TourPulseBoard } from "@/components/TourPulseBoard";
 import { TourRushBoard } from "@/components/TourRushBoard";
@@ -27,9 +27,12 @@ export default function HomePage() {
         </div>
 
         <div className="relative mx-auto flex w-full max-w-[90rem] flex-wrap items-center gap-x-4 gap-y-3 px-5 py-3.5 sm:px-8">
-          <p className="shrink-0 font-display text-xl tracking-tight text-white sm:text-2xl">
-            Tours<span className="text-amber">I</span>Want
-          </p>
+          <div className="min-w-0 shrink-0">
+            <p className="font-display text-xl tracking-tight text-white sm:text-2xl">
+              Tours<span className="text-amber">I</span>Want
+            </p>
+            <AuthGreeting variant="dark" />
+          </div>
 
           <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:flex-nowrap">
             <a

@@ -11,15 +11,11 @@ type AuthUser = {
   role: string;
 };
 
-type AuthNavProps = {
-  variant?: "light" | "dark";
-};
+type Variant = "light" | "dark";
 
-export function AuthNav({ variant = "light" }: AuthNavProps) {
+function useAuthUser() {
   const pathname = usePathname();
-  const router = useRouter();
   const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +31,53 @@ export function AuthNav({ variant = "light" }: AuthNavProps) {
       cancelled = true;
     };
   }, [pathname]);
+
+  return { user, setUser };
+}
+
+function firstName(user: AuthUser) {
+  return user.name?.split(" ")[0] || user.email.split("@")[0];
+}
+
+/** Greeting shown under the ToursIWant logo when signed in. */
+export function AuthGreeting({ variant = "light" }: { variant?: Variant }) {
+  const { user } = useAuthUser();
+  const dark = variant === "dark";
+
+  if (user === undefined) {
+    return (
+      <span
+        className={
+          dark
+            ? "mt-0.5 block h-3 w-16 animate-pulse bg-white/10"
+            : "mt-0.5 block h-3 w-16 animate-pulse bg-ink/10"
+        }
+        aria-hidden
+      />
+    );
+  }
+
+  if (!user) return null;
+
+  return (
+    <Link
+      href="/account"
+      className={
+        dark
+          ? "mt-0.5 block text-xs font-medium text-white/70 transition hover:text-white"
+          : "mt-0.5 block text-xs font-medium text-ink-soft transition hover:text-ink sm:text-sm"
+      }
+    >
+      Hi, {firstName(user)}
+    </Link>
+  );
+}
+
+/** Account actions for the right side of the nav (no greeting). */
+export function AuthNav({ variant = "light" }: { variant?: Variant }) {
+  const router = useRouter();
+  const { user, setUser } = useAuthUser();
+  const [busy, setBusy] = useState(false);
 
   async function logout() {
     setBusy(true);
@@ -60,7 +103,9 @@ export function AuthNav({ variant = "light" }: AuthNavProps) {
     return (
       <span
         className={
-          dark ? "h-8 w-24 animate-pulse bg-white/10" : "h-8 w-24 animate-pulse bg-ink/10"
+          dark
+            ? "h-8 w-24 animate-pulse bg-white/10"
+            : "h-8 w-24 animate-pulse bg-ink/10"
         }
         aria-hidden
       />
@@ -83,13 +128,8 @@ export function AuthNav({ variant = "light" }: AuthNavProps) {
     );
   }
 
-  const label = user.name?.split(" ")[0] || user.email.split("@")[0];
-
   return (
     <>
-      <Link href="/account" className={`hidden sm:inline ${linkClass}`}>
-        Hi, {label}
-      </Link>
       <Link href="/account" className={accountClass}>
         My account
       </Link>

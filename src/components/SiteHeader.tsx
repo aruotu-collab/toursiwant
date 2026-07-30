@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AuthNav } from "@/components/AuthNav";
+import { AuthGreeting, AuthNav } from "@/components/AuthNav";
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -14,12 +14,15 @@ export function SiteHeader() {
   return (
     <header className="absolute inset-x-0 top-0 z-20 border-b border-ink/10 bg-paper/90 backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
-        <Link
-          href="/"
-          className="font-display text-xl tracking-tight text-ink sm:text-2xl"
-        >
-          Tours<span className="text-amber">I</span>Want
-        </Link>
+        <div className="min-w-0">
+          <Link
+            href="/"
+            className="font-display text-xl tracking-tight text-ink sm:text-2xl"
+          >
+            Tours<span className="text-amber">I</span>Want
+          </Link>
+          <AuthGreeting />
+        </div>
         <nav className="flex items-center gap-3 text-sm text-ink-soft sm:gap-5">
           <Link
             href="/#pulse"
