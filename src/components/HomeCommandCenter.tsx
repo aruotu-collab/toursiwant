@@ -436,7 +436,7 @@ function AccountPanel({
             href="/account"
             className="border border-white/25 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Full request history
+            Requests & operator replies
           </Link>
           {user.role === "operator" || user.role === "admin" ? (
             <Link

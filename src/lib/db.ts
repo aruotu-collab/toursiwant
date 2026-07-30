@@ -105,6 +105,12 @@ export async function ensureAppSchema() {
       await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS return_address TEXT`;
       await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS event_start TEXT`;
       await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS event_end TEXT`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'open'`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS operator_reply TEXT`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS operator_quote TEXT`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS operator_reply_at TIMESTAMPTZ`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS operator_name TEXT`;
+      await sql`ALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS operator_business_name TEXT`;
 
       await sql`
         CREATE INDEX IF NOT EXISTS tour_requests_created_at_idx
@@ -149,6 +155,12 @@ type RequestRow = {
   return_address?: string | null;
   event_start?: string | null;
   event_end?: string | null;
+  status?: string | null;
+  operator_reply?: string | null;
+  operator_quote?: string | null;
+  operator_reply_at?: string | Date | null;
+  operator_name?: string | null;
+  operator_business_name?: string | null;
 };
 
 function rowToRequest(row: RequestRow): CapturedRequest {
@@ -156,6 +168,12 @@ function rowToRequest(row: RequestRow): CapturedRequest {
     row.created_at instanceof Date
       ? row.created_at.toISOString()
       : new Date(row.created_at).toISOString();
+
+  const replyAt = row.operator_reply_at
+    ? row.operator_reply_at instanceof Date
+      ? row.operator_reply_at.toISOString()
+      : new Date(row.operator_reply_at).toISOString()
+    : undefined;
 
   return {
     id: row.id,
@@ -182,6 +200,12 @@ function rowToRequest(row: RequestRow): CapturedRequest {
     returnAddress: row.return_address || undefined,
     eventStart: row.event_start || undefined,
     eventEnd: row.event_end || undefined,
+    status: row.status === "responded" ? "responded" : "open",
+    operatorReply: row.operator_reply || undefined,
+    operatorQuote: row.operator_quote || undefined,
+    operatorReplyAt: replyAt,
+    operatorName: row.operator_name || undefined,
+    operatorBusinessName: row.operator_business_name || undefined,
   };
 }
 
@@ -210,7 +234,8 @@ export async function dbInsertRequest(
       travel_date, tour_slug, tour_title, group_size, pickup,
       details, join_group, business_name, source,
       user_id, need_accommodation, accommodation_notes,
-      event_slug, event_name, return_address, event_start, event_end
+      event_slug, event_name, return_address, event_start, event_end,
+      status
     ) VALUES (
       ${request.id},
       ${request.type},
@@ -235,9 +260,40 @@ export async function dbInsertRequest(
       ${request.eventName ?? null},
       ${request.returnAddress ?? null},
       ${request.eventStart ?? null},
-      ${request.eventEnd ?? null}
+      ${request.eventEnd ?? null},
+      ${request.status ?? "open"}
     )
   `;
 
   return request;
+}
+
+export async function dbUpdateRequestReply(input: {
+  id: string;
+  operatorReply: string;
+  operatorQuote?: string;
+  operatorName?: string;
+  operatorBusinessName?: string;
+}): Promise<CapturedRequest | null> {
+  await ensureAppSchema();
+  const sql = getSql();
+  const repliedAt = new Date().toISOString();
+
+  await sql`
+    UPDATE tour_requests
+    SET
+      status = 'responded',
+      operator_reply = ${input.operatorReply},
+      operator_quote = ${input.operatorQuote ?? null},
+      operator_reply_at = ${repliedAt},
+      operator_name = ${input.operatorName ?? null},
+      operator_business_name = ${input.operatorBusinessName ?? null}
+    WHERE id = ${input.id} AND source = 'live'
+  `;
+
+  const rows = (await sql`
+    SELECT * FROM tour_requests WHERE id = ${input.id} LIMIT 1
+  `) as RequestRow[];
+
+  return rows[0] ? rowToRequest(rows[0]) : null;
 }

@@ -3,6 +3,7 @@ import path from "path";
 import {
   dbInsertRequest,
   dbListLiveRequests,
+  dbUpdateRequestReply,
   hasDatabase,
 } from "@/lib/db";
 import {
@@ -114,6 +115,7 @@ export async function createRequest(
     returnAddress: input.returnAddress?.trim() || undefined,
     eventStart: input.eventStart,
     eventEnd: input.eventEnd,
+    status: "open",
   };
 
   if (hasDatabase()) {
@@ -125,4 +127,49 @@ export async function createRequest(
   const next = [request, ...live].slice(0, 500);
   await writeFileLiveRequests(next);
   return request;
+}
+
+export async function getRequestById(
+  id: string,
+): Promise<CapturedRequest | null> {
+  const all = await listRequests();
+  return all.find((item) => item.id === id) || null;
+}
+
+export async function updateRequestReply(input: {
+  id: string;
+  operatorReply: string;
+  operatorQuote?: string;
+  operatorName?: string;
+  operatorBusinessName?: string;
+}): Promise<CapturedRequest | null> {
+  const reply = input.operatorReply.trim();
+  if (!reply) return null;
+
+  if (hasDatabase()) {
+    return dbUpdateRequestReply({
+      id: input.id,
+      operatorReply: reply,
+      operatorQuote: input.operatorQuote?.trim() || undefined,
+      operatorName: input.operatorName?.trim() || undefined,
+      operatorBusinessName: input.operatorBusinessName?.trim() || undefined,
+    });
+  }
+
+  const live = await readFileLiveRequests();
+  const index = live.findIndex((item) => item.id === input.id);
+  if (index < 0) return null;
+
+  const updated: CapturedRequest = {
+    ...live[index],
+    status: "responded",
+    operatorReply: reply,
+    operatorQuote: input.operatorQuote?.trim() || undefined,
+    operatorReplyAt: new Date().toISOString(),
+    operatorName: input.operatorName?.trim() || undefined,
+    operatorBusinessName: input.operatorBusinessName?.trim() || undefined,
+  };
+  live[index] = updated;
+  await writeFileLiveRequests(live);
+  return updated;
 }

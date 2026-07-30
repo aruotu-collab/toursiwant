@@ -189,8 +189,8 @@ export default function RequestForm() {
             {isOperator
               ? "Your operator interest is saved. Use the magic link below (or your email) to open the lead inbox."
               : selectedTour
-                ? `Your interest is captured for ${formatDisplayDate(travelDate)}.${needStay ? " We also noted that you need a stay near the tour." : ""}`
-                : `Your request for ${formatDisplayDate(travelDate)} is captured.${needStay ? " Accommodation interest is included." : ""}`}
+                ? `Your interest is captured for ${formatDisplayDate(travelDate)}.${needStay ? " We also noted that you need a stay near the tour." : ""} When an operator replies, you’ll get an email — and you’ll see it in Account.`
+                : `Your request for ${formatDisplayDate(travelDate)} is captured.${needStay ? " Accommodation interest is included." : ""} When an operator replies, you’ll get an email — and you’ll see it in Account.`}
           </p>
 
           {saveAccount || isOperator ? (

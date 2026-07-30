@@ -5,6 +5,8 @@ export type CapturedRequestType =
   | "event_ride"
   | "accommodation_request";
 
+export type RequestStatus = "open" | "responded";
+
 export type CapturedRequest = {
   id: string;
   type: CapturedRequestType;
@@ -30,6 +32,13 @@ export type CapturedRequest = {
   returnAddress?: string;
   eventStart?: string;
   eventEnd?: string;
+  /** Traveller-facing reply loop */
+  status?: RequestStatus;
+  operatorReply?: string;
+  operatorQuote?: string;
+  operatorReplyAt?: string;
+  operatorName?: string;
+  operatorBusinessName?: string;
 };
 
 /** Seeded “already happening” demand so the board feels full from day one. */

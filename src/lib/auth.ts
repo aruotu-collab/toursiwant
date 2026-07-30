@@ -278,3 +278,98 @@ export async function sendMagicEmail(email: string, magicUrl: string) {
 
   return { sent: true as const };
 }
+
+export async function sendOperatorReplyEmail(input: {
+  to: string;
+  travellerName: string;
+  tourLabel: string;
+  travelDate?: string;
+  operatorLabel: string;
+  quote?: string;
+  message: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from =
+    process.env.RESEND_FROM_EMAIL?.trim() ||
+    "ToursIWant <login@toursiwant.com>";
+  const site =
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://www.toursiwant.com";
+  const accountUrl = `${site.replace(/\/$/, "")}/account`;
+
+  if (!apiKey) {
+    return { sent: false as const, reason: "RESEND_API_KEY not configured" };
+  }
+
+  const firstName =
+    input.travellerName.split(" ")[0] || input.travellerName || "there";
+  const quoteLine = input.quote?.trim()
+    ? `Quoted price: ${input.quote.trim()}`
+    : null;
+
+  const subject = `Operator reply: ${input.tourLabel}`;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [input.to],
+      reply_to: "hello@toursiwant.com",
+      subject,
+      text: [
+        `Hi ${firstName},`,
+        "",
+        `${input.operatorLabel} responded to your ToursIWant request.`,
+        "",
+        `Request: ${input.tourLabel}`,
+        input.travelDate ? `Date: ${input.travelDate}` : null,
+        quoteLine,
+        "",
+        "Message:",
+        input.message,
+        "",
+        `View it in your account: ${accountUrl}`,
+        "",
+        "ToursIWant · https://www.toursiwant.com",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      html: `
+        <div style="font-family:Georgia,serif;line-height:1.5;color:#0c1b2a;max-width:520px">
+          <p style="margin:0 0 12px;font-size:18px"><strong>You have an operator reply</strong></p>
+          <p style="margin:0 0 16px;color:#243447">Hi ${escapeHtml(firstName)}, ${escapeHtml(input.operatorLabel)} responded to your ToursIWant request.</p>
+          <p style="margin:0 0 8px"><strong>${escapeHtml(input.tourLabel)}</strong></p>
+          ${input.travelDate ? `<p style="margin:0 0 8px;color:#243447">Date: ${escapeHtml(input.travelDate)}</p>` : ""}
+          ${quoteLine ? `<p style="margin:0 0 16px;color:#243447">${escapeHtml(quoteLine)}</p>` : "<p style=\"margin:0 0 16px\"></p>"}
+          <div style="margin:0 0 20px;padding:14px 16px;background:#f4f1ea;border-left:3px solid #d4a017">
+            <p style="margin:0;white-space:pre-wrap">${escapeHtml(input.message)}</p>
+          </div>
+          <p style="margin:0 0 20px">
+            <a href="${accountUrl}" style="display:inline-block;background:#d4a017;color:#0c1b2a;text-decoration:none;padding:12px 18px;font-weight:600">
+              View in your account
+            </a>
+          </p>
+          <p style="margin:0;font-size:12px;color:#6b7280">ToursIWant · <a href="https://www.toursiwant.com" style="color:#1f4e79">www.toursiwant.com</a></p>
+        </div>
+      `.trim(),
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    return { sent: false as const, reason: text };
+  }
+
+  return { sent: true as const };
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
