@@ -24,12 +24,12 @@ export async function GET(request: Request) {
   let next =
     result.nextPath.startsWith("/") && !result.nextPath.startsWith("//")
       ? result.nextPath
-      : "/account?welcome=1";
+      : "/?menu=account";
 
   if (result.user.role === "operator" || result.user.role === "admin") {
     if (!next.startsWith("/operator")) next = "/operator";
   } else {
-    next = "/account?welcome=1";
+    next = "/?menu=account";
   }
 
   return NextResponse.redirect(`${site}${next}`);

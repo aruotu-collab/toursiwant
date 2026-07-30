@@ -110,7 +110,7 @@ export async function createMagicLink(input: {
       ${input.email.trim().toLowerCase()},
       ${input.role || "traveller"},
       ${input.name ?? null},
-      ${input.nextPath ?? "/account?welcome=1"},
+      ${input.nextPath ?? "/?menu=account"},
       ${expiresAt}
     )
   `;
@@ -162,7 +162,7 @@ export async function consumeMagicToken(token: string) {
     user,
     sessionToken,
     sessionExpires,
-    nextPath: row.next_path ? String(row.next_path) : "/account?welcome=1",
+    nextPath: row.next_path ? String(row.next_path) : "/?menu=account",
   };
 }
 

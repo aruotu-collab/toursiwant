@@ -61,7 +61,7 @@ export function AuthGreeting({ variant = "light" }: { variant?: Variant }) {
 
   return (
     <Link
-      href="/#account"
+      href="/?menu=account"
       className={
         dark
           ? "mt-0.5 block truncate text-[11px] font-medium text-white/70 transition hover:text-white sm:text-xs"
@@ -131,7 +131,7 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
 
   return (
     <>
-      <Link href="/#account" className={accountClass}>
+      <Link href="/?menu=account" className={accountClass}>
         <span className="sm:hidden">Account</span>
         <span className="hidden sm:inline">My account</span>
       </Link>

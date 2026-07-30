@@ -14,22 +14,22 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-white/75">
-          <Link href="/#pulse" className="hover:text-white">
-            Pulse
+          <Link href="/?menu=pulse" className="hover:text-white">
+            Live board
           </Link>
-          <Link href="/#rush" className="hover:text-white">
+          <Link href="/?menu=rush" className="hover:text-white">
             Live seats
           </Link>
-          <Link href="/#tours" className="hover:text-white">
+          <Link href="/?menu=tours" className="hover:text-white">
             Find tours
           </Link>
-          <Link href="/#events" className="hover:text-white">
+          <Link href="/?menu=events" className="hover:text-white">
             Events
           </Link>
-          <Link href="/#request" className="hover:text-white">
+          <Link href="/?menu=request" className="hover:text-white">
             Request
           </Link>
-          <Link href="/#account" className="hover:text-white">
+          <Link href="/?menu=account" className="hover:text-white">
             Account
           </Link>
           <Link href="/operator" className="hover:text-white">

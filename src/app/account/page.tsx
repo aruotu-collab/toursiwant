@@ -30,24 +30,30 @@ function typeLabel(type: string) {
 export default async function AccountPage({ searchParams }: AccountPageProps) {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/join?next=/account");
+    redirect(`/join?next=${encodeURIComponent("/?menu=account")}`);
   }
 
   const { welcome } = await searchParams;
+
+  // Prefer the live board after fresh sign-in
+  if (welcome) {
+    redirect("/?menu=account");
+  }
+
   const requests = await listRequestsForEmail(user.email);
   const firstName = user.name?.split(" ")[0] || user.email.split("@")[0];
 
   return (
     <main className="flex-1 bg-[linear-gradient(180deg,var(--mist)_0%,var(--paper)_40%)]">
       <div className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8 lg:py-28">
-        {welcome ? (
-          <p className="mb-6 border border-amber/40 bg-amber/15 px-4 py-3 text-sm text-ink">
-            You&apos;re signed in. Welcome to your ToursIWant member area.
-          </p>
-        ) : null}
-
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
+            <Link
+              href="/?menu=pulse"
+              className="mb-4 inline-flex text-sm font-semibold text-skyline underline-offset-2 hover:underline"
+            >
+              ← Back to live board
+            </Link>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-skyline">
               Member area
             </p>

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AuthGreeting, AuthNav } from "@/components/AuthNav";
 import { TourPulseBoard } from "@/components/TourPulseBoard";
@@ -21,13 +22,13 @@ export type CommandTab =
   | "request"
   | "account";
 
-const MENU: { id: CommandTab; label: string; hash: string }[] = [
-  { id: "pulse", label: "Pulse", hash: "pulse" },
-  { id: "seats", label: "Live seats", hash: "rush" },
-  { id: "tours", label: "Find tours", hash: "tours" },
-  { id: "events", label: "Events", hash: "events" },
-  { id: "request", label: "Request", hash: "request" },
-  { id: "account", label: "Account", hash: "account" },
+const MENU: { id: CommandTab; label: string; param: string }[] = [
+  { id: "pulse", label: "Pulse", param: "pulse" },
+  { id: "seats", label: "Live seats", param: "rush" },
+  { id: "tours", label: "Find tours", param: "tours" },
+  { id: "events", label: "Events", param: "events" },
+  { id: "request", label: "Request", param: "request" },
+  { id: "account", label: "Account", param: "account" },
 ];
 
 const TAB_COPY: Record<
@@ -68,50 +69,55 @@ const TAB_COPY: Record<
     eyebrow: "Member area",
     title: "Your ToursIWant account",
     blurb:
-      "Sign in with email to track requests, or open your full account page.",
+      "Signed-in home for your requests. Use the menus above anytime — Pulse, seats, tours, events.",
   },
 };
 
-function tabFromHash(hash: string): CommandTab | null {
-  const raw = hash.replace(/^#/, "").toLowerCase();
+function tabFromMenuParam(value: string | null | undefined): CommandTab | null {
+  if (!value) return null;
+  const raw = value.toLowerCase();
   if (raw === "rush" || raw === "seats") return "seats";
   if (raw === "market") return "pulse";
-  const match = MENU.find((m) => m.hash === raw || m.id === raw);
+  const match = MENU.find((m) => m.param === raw || m.id === raw);
   return match?.id ?? null;
 }
 
 export function HomeCommandCenter() {
-  const [tab, setTabState] = useState<CommandTab>("pulse");
-
-  const selectTab = useCallback((next: CommandTab) => {
-    setTabState(next);
-    const hash = MENU.find((m) => m.id === next)?.hash || next;
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", `#${hash}`);
-    }
-  }, []);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const menuParam = searchParams.get("menu");
+  const [tab, setTabState] = useState<CommandTab>(
+    () => tabFromMenuParam(menuParam) || "pulse",
+  );
 
   useEffect(() => {
-    const sync = () => {
-      const fromHash = tabFromHash(window.location.hash);
-      if (fromHash) setTabState(fromHash);
-    };
-    sync();
-    window.addEventListener("hashchange", sync);
-    return () => window.removeEventListener("hashchange", sync);
-  }, []);
+    const next = tabFromMenuParam(menuParam);
+    if (next) setTabState(next);
+  }, [menuParam]);
+
+  const selectTab = useCallback(
+    (next: CommandTab) => {
+      setTabState(next);
+      const menu = next === "seats" ? "rush" : next;
+      router.replace(`/?menu=${menu}`, { scroll: false });
+    },
+    [router],
+  );
 
   const copy = TAB_COPY[tab];
 
   return (
     <div className="min-h-full bg-ink text-white">
-      {/* Slim top bar — single row on mobile */}
       <div className="sticky top-0 z-30 border-b border-white/10 bg-[#0a1520]/supports-[backdrop-filter]:bg-[#0a1520]/95 supports-[backdrop-filter]:backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-[90rem] items-center gap-3 px-4 py-3 sm:px-8 sm:py-3.5">
           <div className="min-w-0 flex-1">
-            <p className="font-display text-lg leading-tight tracking-tight text-white sm:text-2xl">
+            <button
+              type="button"
+              onClick={() => selectTab("pulse")}
+              className="text-left font-display text-lg leading-tight tracking-tight text-white sm:text-2xl"
+            >
               Tours<span className="text-amber">I</span>Want
-            </p>
+            </button>
             <AuthGreeting variant="dark" />
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -133,7 +139,6 @@ export function HomeCommandCenter() {
           </p>
         </div>
 
-        {/* Feature menus — sticky swipe chips */}
         <div className="sticky top-[3.25rem] z-20 -mx-4 mt-4 border-b border-white/10 bg-ink/95 px-4 py-2.5 backdrop-blur-md sm:static sm:mx-0 sm:mt-6 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
           <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {MENU.map((item) => {
@@ -164,8 +169,8 @@ export function HomeCommandCenter() {
           {tab === "seats" ? <TourRushBoard embedded /> : null}
           {tab === "tours" ? <ToursPanel /> : null}
           {tab === "events" ? <EventsPanel /> : null}
-          {tab === "request" ? <RequestPanel /> : null}
-          {tab === "account" ? <AccountPanel /> : null}
+          {tab === "request" ? <RequestPanel onSelectTab={selectTab} /> : null}
+          {tab === "account" ? <AccountPanel onSelectTab={selectTab} /> : null}
         </div>
       </div>
     </div>
@@ -278,7 +283,11 @@ function EventsPanel() {
   );
 }
 
-function RequestPanel() {
+function RequestPanel({
+  onSelectTab,
+}: {
+  onSelectTab: (tab: CommandTab) => void;
+}) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {[
@@ -297,7 +306,7 @@ function RequestPanel() {
         {
           title: "Join a listed tour",
           copy: "Browse by date, then send interest on a listing.",
-          href: "/#tours",
+          menu: "tours" as CommandTab,
           cta: "Find tours menu",
         },
         {
@@ -315,31 +324,42 @@ function RequestPanel() {
         {
           title: "Tour Pulse",
           copy: "See where activity is building, then join nearby.",
-          href: "/#pulse",
+          menu: "pulse" as CommandTab,
           cta: "Back to pulse",
         },
-      ].map((card) => (
-        <Link
-          key={card.href + card.title}
-          href={card.href}
-          onClick={(e) => {
-            if (card.href.startsWith("/#")) {
-              e.preventDefault();
-              window.location.hash = card.href.slice(2);
-            }
-          }}
-          className="border border-white/10 bg-white/[0.03] p-5 transition hover:border-amber/40 hover:bg-white/[0.06]"
-        >
-          <h3 className="font-display text-xl text-white">{card.title}</h3>
-          <p className="mt-2 text-sm text-white/60">{card.copy}</p>
-          <p className="mt-4 text-sm font-semibold text-amber">{card.cta} →</p>
-        </Link>
-      ))}
+      ].map((card) =>
+        "menu" in card && card.menu ? (
+          <button
+            key={card.title}
+            type="button"
+            onClick={() => onSelectTab(card.menu)}
+            className="border border-white/10 bg-white/[0.03] p-5 text-left transition hover:border-amber/40 hover:bg-white/[0.06]"
+          >
+            <h3 className="font-display text-xl text-white">{card.title}</h3>
+            <p className="mt-2 text-sm text-white/60">{card.copy}</p>
+            <p className="mt-4 text-sm font-semibold text-amber">{card.cta} →</p>
+          </button>
+        ) : (
+          <Link
+            key={card.title}
+            href={"href" in card && card.href ? card.href : "/"}
+            className="border border-white/10 bg-white/[0.03] p-5 transition hover:border-amber/40 hover:bg-white/[0.06]"
+          >
+            <h3 className="font-display text-xl text-white">{card.title}</h3>
+            <p className="mt-2 text-sm text-white/60">{card.copy}</p>
+            <p className="mt-4 text-sm font-semibold text-amber">{card.cta} →</p>
+          </Link>
+        ),
+      )}
     </div>
   );
 }
 
-function AccountPanel() {
+function AccountPanel({
+  onSelectTab,
+}: {
+  onSelectTab: (tab: CommandTab) => void;
+}) {
   const [user, setUser] = useState<{
     email: string;
     name?: string;
@@ -371,7 +391,7 @@ function AccountPanel() {
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            href="/join?next=/account"
+            href={`/join?next=${encodeURIComponent("/?menu=account")}`}
             className="bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
           >
             Continue with email
@@ -390,35 +410,48 @@ function AccountPanel() {
   const label = user.name?.split(" ")[0] || user.email.split("@")[0];
 
   return (
-    <div className="border border-white/10 bg-white/[0.03] p-6 sm:p-8">
-      <p className="font-mono text-[10px] uppercase tracking-wider text-amber">
-        Signed in
-      </p>
-      <h3 className="mt-2 font-display text-3xl text-white">
-        Welcome, {label}
-      </h3>
-      <p className="mt-2 text-white/65">
-        {user.email}
-        {user.role === "operator" || user.role === "admin"
-          ? " · Operator"
-          : " · Traveller"}
-      </p>
-      <div className="mt-6 flex flex-wrap gap-3">
-        <Link
-          href="/account"
-          className="bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
-        >
-          Open full account
-        </Link>
-        {user.role === "operator" || user.role === "admin" ? (
+    <div className="space-y-4">
+      <div className="border border-white/10 bg-white/[0.03] p-6 sm:p-8">
+        <p className="font-mono text-[10px] uppercase tracking-wider text-amber">
+          Signed in
+        </p>
+        <h3 className="mt-2 font-display text-3xl text-white">
+          Welcome, {label}
+        </h3>
+        <p className="mt-2 text-white/65">
+          {user.email}
+          {user.role === "operator" || user.role === "admin"
+            ? " · Operator"
+            : " · Traveller"}
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => onSelectTab("pulse")}
+            className="bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
+          >
+            Open live board
+          </button>
           <Link
-            href="/operator"
+            href="/account"
             className="border border-white/25 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Lead inbox
+            Full request history
           </Link>
-        ) : null}
+          {user.role === "operator" || user.role === "admin" ? (
+            <Link
+              href="/operator"
+              className="border border-white/25 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
+            >
+              Lead inbox
+            </Link>
+          ) : null}
+        </div>
       </div>
+      <p className="text-sm text-white/50">
+        Tip: the menus above (Pulse, Live seats, Find tours…) stay with you on
+        this board — tap ToursIWant anytime to jump back to Pulse.
+      </p>
     </div>
   );
 }

@@ -73,7 +73,7 @@ export function EventRideForm() {
             email,
             name,
             role: "traveller",
-            nextPath: "/account?welcome=1",
+            nextPath: "/?menu=account",
           }),
         });
         if (authRes.ok) {

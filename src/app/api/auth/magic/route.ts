@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       ? body.nextPath
       : role === "operator"
         ? "/operator"
-        : "/account?welcome=1";
+        : "/?menu=account";
 
   const { magicUrl, expiresAt } = await createMagicLink({
     email,
