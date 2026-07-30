@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { TourMarketBoard } from "@/components/TourMarketBoard";
+import { TourPulseBoard } from "@/components/TourPulseBoard";
 import { TourRushBoard } from "@/components/TourRushBoard";
 import { cities, launchCity } from "@/lib/cities";
 
@@ -31,14 +32,20 @@ export default function HomePage() {
 
           <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:flex-nowrap">
             <a
-              href="#rush"
+              href="#pulse"
               className="inline-flex items-center justify-center bg-amber px-4 py-2 text-xs font-semibold tracking-wide text-ink transition hover:bg-amber-deep sm:text-sm"
             >
-              Jump to live seats
+              Tour Pulse
+            </a>
+            <a
+              href="#rush"
+              className="inline-flex items-center justify-center border border-white/35 bg-white/10 px-4 py-2 text-xs font-semibold tracking-wide text-white backdrop-blur-sm transition hover:bg-white/20 sm:text-sm"
+            >
+              Live seats
             </a>
             <Link
               href="/request"
-              className="inline-flex items-center justify-center border border-white/35 bg-white/10 px-4 py-2 text-xs font-semibold tracking-wide text-white backdrop-blur-sm transition hover:bg-white/20 sm:text-sm"
+              className="hidden items-center justify-center border border-white/35 bg-white/10 px-4 py-2 text-xs font-semibold tracking-wide text-white backdrop-blur-sm transition hover:bg-white/20 sm:inline-flex sm:text-sm"
             >
               Request a custom tour
             </Link>
@@ -63,6 +70,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <TourPulseBoard />
 
       <TourRushBoard />
 

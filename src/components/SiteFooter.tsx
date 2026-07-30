@@ -14,6 +14,9 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-white/75">
+          <Link href="/#pulse" className="hover:text-white">
+            Tour Pulse
+          </Link>
           <Link href="/tours" className="hover:text-white">
             Find tours
           </Link>

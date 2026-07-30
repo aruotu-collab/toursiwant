@@ -21,6 +21,12 @@ export function SiteHeader() {
         </Link>
         <nav className="flex items-center gap-3 text-sm text-ink-soft sm:gap-5">
           <Link
+            href="/#pulse"
+            className="hidden transition hover:text-ink sm:inline"
+          >
+            Tour Pulse
+          </Link>
+          <Link
             href="/tours"
             className="hidden transition hover:text-ink md:inline"
           >

@@ -1,0 +1,642 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { toDateKey } from "@/lib/sample-tours";
+import {
+  activityHref,
+  matchesPulseFilter,
+  pulseCategoryColor,
+  pulseFilterTabs,
+  pulseStatusLabel,
+  pulseZones,
+  seedPulseActivities,
+  zoneActivityStats,
+  type PulseActivity,
+  type PulseCategory,
+  type PulseZone,
+  type PulseZoneId,
+} from "@/lib/tour-pulse";
+
+type FilterId = "all" | PulseCategory;
+
+/** Cubic path Harbor (SW) → Airports (NE) in viewBox 0 0 400 520 */
+const CORRIDOR_D =
+  "M 48 470 C 90 400, 70 340, 110 290 C 160 230, 200 210, 230 160 C 265 105, 300 80, 350 42";
+
+function pointOnCorridor(t: number): { x: number; y: number } {
+  // Sample the path with a hidden SVG path for accuracy isn't available in SSR;
+  // use piecewise lerp along control-ish waypoints matching the curve.
+  const pts = [
+    { x: 48, y: 470 },
+    { x: 70, y: 400 },
+    { x: 95, y: 330 },
+    { x: 130, y: 270 },
+    { x: 180, y: 210 },
+    { x: 230, y: 160 },
+    { x: 290, y: 95 },
+    { x: 350, y: 42 },
+  ];
+  const scaled = Math.max(0, Math.min(1, t)) * (pts.length - 1);
+  const i = Math.floor(scaled);
+  const f = scaled - i;
+  const a = pts[i];
+  const b = pts[Math.min(i + 1, pts.length - 1)];
+  return {
+    x: a.x + (b.x - a.x) * f,
+    y: a.y + (b.y - a.y) * f,
+  };
+}
+
+function dominantCategory(activities: PulseActivity[]): PulseCategory {
+  const counts: Partial<Record<PulseCategory, number>> = {};
+  for (const a of activities) {
+    counts[a.category] = (counts[a.category] || 0) + 1;
+  }
+  let best: PulseCategory = "tour";
+  let n = 0;
+  for (const [cat, c] of Object.entries(counts) as [PulseCategory, number][]) {
+    if (c > n) {
+      n = c;
+      best = cat;
+    }
+  }
+  return best;
+}
+
+export function TourPulseBoard() {
+  const today = toDateKey(new Date());
+  const [filter, setFilter] = useState<FilterId>("all");
+  const [activities, setActivities] = useState(seedPulseActivities);
+  const [selectedZoneId, setSelectedZoneId] = useState<PulseZoneId | null>(
+    "midtown",
+  );
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(
+    null,
+  );
+  const [tickFlash, setTickFlash] = useState<string | null>(null);
+
+  const filtered = useMemo(
+    () => activities.filter((a) => matchesPulseFilter(a, filter)),
+    [activities, filter],
+  );
+
+  const selectedZone = pulseZones.find((z) => z.id === selectedZoneId) || null;
+  const zoneItems = useMemo(
+    () =>
+      selectedZoneId
+        ? filtered.filter((a) => a.zoneId === selectedZoneId)
+        : [],
+    [filtered, selectedZoneId],
+  );
+
+  const selectedActivity =
+    activities.find((a) => a.id === selectedActivityId) || null;
+
+  const nextUp = useMemo(() => {
+    const soon = filtered
+      .filter((a) =>
+        ["preparing", "departing_soon", "en_route"].includes(a.status),
+      )
+      .sort((a, b) => a.minutesAgo - b.minutesAgo)[0];
+    return soon || filtered[0] || null;
+  }, [filtered]);
+
+  const filterCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: activities.length };
+    for (const tab of pulseFilterTabs) {
+      if (tab.id === "all") continue;
+      counts[tab.id] = activities.filter((a) =>
+        matchesPulseFilter(a, tab.id),
+      ).length;
+    }
+    return counts;
+  }, [activities]);
+
+  // Soft live tick — bump travellers / freshness like Tour Rush
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setActivities((current) => {
+        const idx = Math.floor(Math.random() * current.length);
+        const target = current[idx];
+        setTickFlash(target.id);
+        return current.map((a, i) => {
+          if (i !== idx) {
+            return { ...a, minutesAgo: a.minutesAgo + 1 };
+          }
+          return {
+            ...a,
+            minutesAgo: 0,
+            travellers:
+              a.travellers + (Math.random() > 0.45 && a.joinable ? 1 : 0),
+          };
+        });
+      });
+    }, 6800);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!tickFlash) return;
+    const t = window.setTimeout(() => setTickFlash(null), 900);
+    return () => window.clearTimeout(t);
+  }, [tickFlash]);
+
+  function selectZone(zoneId: PulseZoneId) {
+    setSelectedZoneId(zoneId);
+    setSelectedActivityId(null);
+  }
+
+  function selectActivity(activity: PulseActivity) {
+    setSelectedZoneId(activity.zoneId);
+    setSelectedActivityId(activity.id);
+  }
+
+  return (
+    <section
+      id="pulse"
+      className="scroll-mt-0 border-b border-ink/10 bg-ink text-white"
+    >
+      <div className="mx-auto w-full max-w-[90rem] px-5 py-10 sm:px-8 sm:py-12 md:py-14">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-amber">
+              Tour Pulse · New York
+            </p>
+            <h2 className="mt-2 font-display text-3xl text-white sm:text-4xl">
+              Where tours are happening now
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-white/70 sm:text-base">
+              Live rhythm along the city spine — harbor to airports. Tap a pulse
+              for zone activity, then join or request nearby.
+            </p>
+          </div>
+          <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
+            <span className="live-dot" aria-hidden />
+            {filtered.length} signals · public zones only
+          </p>
+        </div>
+
+        {/* Filters */}
+        <div className="mt-6 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {pulseFilterTabs.map((tab) => {
+            const active = filter === tab.id;
+            const count = filterCounts[tab.id] ?? 0;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setFilter(tab.id)}
+                className={`shrink-0 border px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
+                  active
+                    ? "border-amber bg-amber text-ink"
+                    : "border-white/20 bg-white/5 text-white/70 hover:border-white/40 hover:text-white"
+                }`}
+              >
+                {tab.label}
+                <span className="ml-1.5 opacity-70">({count})</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
+          {/* Live list */}
+          <div className="border border-white/10 bg-white/[0.03]">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                Live listing
+              </p>
+              <p className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                {filtered.length} shown
+              </p>
+            </div>
+            <ul className="max-h-[34rem] divide-y divide-white/10 overflow-y-auto">
+              {filtered.map((activity) => {
+                const zone = pulseZones.find((z) => z.id === activity.zoneId);
+                const selected = selectedActivityId === activity.id;
+                const flashed = tickFlash === activity.id;
+                return (
+                  <li key={activity.id}>
+                    <button
+                      type="button"
+                      onClick={() => selectActivity(activity)}
+                      className={`flex w-full gap-3 px-4 py-3.5 text-left transition ${
+                        selected
+                          ? "bg-amber/15"
+                          : flashed
+                            ? "bg-white/10"
+                            : "hover:bg-white/[0.06]"
+                      }`}
+                    >
+                      <span
+                        className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{
+                          background: pulseCategoryColor[activity.category],
+                          boxShadow: `0 0 10px ${pulseCategoryColor[activity.category]}88`,
+                        }}
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-amber">
+                            {zone?.shortLabel}
+                          </span>
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                            {pulseStatusLabel[activity.status]}
+                          </span>
+                        </span>
+                        <span className="mt-0.5 block truncate font-semibold text-white">
+                          {activity.title}
+                        </span>
+                        <span className="mt-0.5 block truncate text-sm text-white/55">
+                          {activity.detail}
+                          {activity.joinable ? " · open to join" : ""}
+                          {" · "}
+                          {activity.travellers} travellers
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px] text-white/35">
+                        {activity.minutesAgo === 0
+                          ? "now"
+                          : `${activity.minutesAgo}m`}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+              {filtered.length === 0 ? (
+                <li className="px-4 py-10 text-center text-sm text-white/50">
+                  No signals for this filter. Try All or Tours.
+                </li>
+              ) : null}
+            </ul>
+          </div>
+
+          {/* Corridor map + panel */}
+          <div className="space-y-4">
+            <div className="border border-white/10 bg-[#0a1520]">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                  Corridor map
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      ["tour", "Tours"],
+                      ["pickup", "Pickups"],
+                      ["cruise", "Cruise"],
+                      ["event", "Events"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setFilter(id)}
+                      className={`px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider transition ${
+                        filter === id
+                          ? "bg-white/15 text-white"
+                          : "text-white/45 hover:text-white/80"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {nextUp ? (
+                <div className="flex gap-3 border-b border-white/10 px-4 py-3">
+                  <span className="w-1 shrink-0 bg-amber" aria-hidden />
+                  <div className="min-w-0">
+                    <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-amber">
+                      Next up ·{" "}
+                      {pulseZones.find((z) => z.id === nextUp.zoneId)?.shortLabel}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm font-semibold text-white">
+                      {nextUp.title}
+                    </p>
+                    <p className="truncate text-xs text-white/50">
+                      {pulseStatusLabel[nextUp.status]} · {nextUp.detail}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              <CorridorMap
+                filter={filter}
+                activities={filtered}
+                selectedZoneId={selectedZoneId}
+                onSelectZone={selectZone}
+              />
+
+              <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-white/10 px-4 py-3">
+                {(
+                  Object.entries(pulseCategoryColor) as [PulseCategory, string][]
+                ).map(([cat, color]) => (
+                  <span
+                    key={cat}
+                    className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-white/50"
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ background: color }}
+                      aria-hidden
+                    />
+                    {cat}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Drill-down panel */}
+            {selectedZone ? (
+              <ZonePanel
+                zone={selectedZone}
+                items={zoneItems}
+                allInZone={activities.filter((a) => a.zoneId === selectedZone.id)}
+                selectedActivity={selectedActivity}
+                today={today}
+                onSelectActivity={selectActivity}
+              />
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CorridorMap({
+  filter,
+  activities,
+  selectedZoneId,
+  onSelectZone,
+}: {
+  filter: FilterId;
+  activities: PulseActivity[];
+  selectedZoneId: PulseZoneId | null;
+  onSelectZone: (id: PulseZoneId) => void;
+}) {
+  return (
+    <div className="relative px-2 py-4 sm:px-4">
+      <svg
+        viewBox="0 0 400 520"
+        className="mx-auto h-auto w-full max-w-md"
+        role="img"
+        aria-label="New York tour corridor from harbor to airports"
+      >
+        <defs>
+          <linearGradient id="corridorGlow" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0%" stopColor="#d4a017" stopOpacity="0.35" />
+            <stop offset="55%" stopColor="#5b9bd5" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#7dd3c0" stopOpacity="0.3" />
+          </linearGradient>
+          <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Atmosphere */}
+        <rect width="400" height="520" fill="#0a1520" />
+        <circle cx="320" cy="80" r="90" fill="#1f4e79" opacity="0.12" />
+        <circle cx="80" cy="420" r="70" fill="#d4a017" opacity="0.08" />
+
+        {/* Corridor path */}
+        <path
+          d={CORRIDOR_D}
+          fill="none"
+          stroke="url(#corridorGlow)"
+          strokeWidth="10"
+          strokeLinecap="round"
+          opacity="0.45"
+        />
+        <path
+          d={CORRIDOR_D}
+          fill="none"
+          stroke="#d4a017"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray="7 9"
+          className="corridor-dash"
+        />
+
+        {/* End labels */}
+        <text
+          x="36"
+          y="498"
+          fill="#d4a017"
+          fontSize="11"
+          fontFamily="ui-monospace, monospace"
+          fontWeight="600"
+        >
+          HARBOR
+        </text>
+        <text
+          x="300"
+          y="28"
+          fill="#7dd3c0"
+          fontSize="11"
+          fontFamily="ui-monospace, monospace"
+          fontWeight="600"
+        >
+          AIRPORTS
+        </text>
+
+        {pulseZones.map((zone) => {
+          const pt = pointOnCorridor(zone.t);
+          const inFilter = activities.filter((a) => a.zoneId === zone.id);
+          const stats = zoneActivityStats(
+            // Use filtered list already passed as activities
+            activities,
+            zone.id,
+          );
+          const dimmed = filter !== "all" && inFilter.length === 0;
+          const selected = selectedZoneId === zone.id;
+          const color =
+            pulseCategoryColor[
+              inFilter.length > 0 ? dominantCategory(inFilter) : "tour"
+            ];
+          const size = 6 + Math.min(stats.total, 5) * 2.2;
+
+          return (
+            <g
+              key={zone.id}
+              transform={`translate(${pt.x}, ${pt.y})`}
+              opacity={dimmed ? 0.28 : 1}
+              className="cursor-pointer"
+              onClick={() => onSelectZone(zone.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectZone(zone.id);
+                }
+              }}
+            >
+              {/* Breathing pulse rings */}
+              {!dimmed && stats.total > 0 ? (
+                <>
+                  <circle
+                    r={size + 14}
+                    fill={color}
+                    opacity="0.12"
+                    className="pulse-ring"
+                  />
+                  <circle
+                    r={size + 7}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="1.5"
+                    opacity="0.55"
+                    className="pulse-ring-delay"
+                  />
+                </>
+              ) : null}
+              <circle
+                r={selected ? size + 3 : size}
+                fill={color}
+                stroke={selected ? "#fffdf8" : "rgba(255,255,255,0.35)"}
+                strokeWidth={selected ? 3 : 1.5}
+                filter="url(#softGlow)"
+              />
+              {stats.total > 0 ? (
+                <text
+                  y={1.5}
+                  textAnchor="middle"
+                  fill="#0c1b2a"
+                  fontSize="9"
+                  fontWeight="700"
+                  fontFamily="ui-monospace, monospace"
+                >
+                  {stats.total}
+                </text>
+              ) : null}
+              <text
+                y={size + 16}
+                textAnchor="middle"
+                fill={selected ? "#d4a017" : "rgba(255,253,248,0.65)"}
+                fontSize="9"
+                fontFamily="ui-monospace, monospace"
+                fontWeight="600"
+              >
+                {zone.shortLabel.toUpperCase()}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function ZonePanel({
+  zone,
+  items,
+  allInZone,
+  selectedActivity,
+  today,
+  onSelectActivity,
+}: {
+  zone: PulseZone;
+  items: PulseActivity[];
+  allInZone: PulseActivity[];
+  selectedActivity: PulseActivity | null;
+  today: string;
+  onSelectActivity: (a: PulseActivity) => void;
+}) {
+  const stats = zoneActivityStats(allInZone, zone.id);
+  const focus = selectedActivity?.zoneId === zone.id ? selectedActivity : null;
+
+  return (
+    <div className="border border-white/10 bg-white/[0.04] p-4 sm:p-5">
+      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
+        Zone detail
+      </p>
+      <h3 className="mt-1 font-display text-2xl text-white">{zone.label}</h3>
+      <p className="mt-1 text-sm text-white/60">{zone.blurb}</p>
+
+      <div className="mt-4 flex flex-wrap gap-3 font-mono text-[11px] uppercase tracking-wider text-white/55">
+        <span>{stats.active} active</span>
+        <span className="text-white/25">·</span>
+        <span>{stats.forming} forming</span>
+        <span className="text-white/25">·</span>
+        <span>{stats.joinable} joinable</span>
+        <span className="text-white/25">·</span>
+        <span>{stats.travellers} travellers</span>
+      </div>
+
+      {focus ? (
+        <div className="mt-4 border border-amber/30 bg-amber/10 p-3">
+          <p className="font-mono text-[10px] uppercase tracking-wider text-amber">
+            Selected · {pulseStatusLabel[focus.status]}
+          </p>
+          <p className="mt-1 font-semibold text-white">{focus.title}</p>
+          <p className="mt-1 text-sm text-white/65">{focus.detail}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={activityHref(focus, today)}
+              className="bg-amber px-3 py-2 text-xs font-semibold text-ink hover:bg-amber-deep"
+            >
+              {focus.joinable ? "View / join" : "View details"} →
+            </Link>
+            <Link
+              href={`/request?date=${today}`}
+              className="border border-white/25 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
+            >
+              Request similar
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      <ul className="mt-4 max-h-48 space-y-2 overflow-y-auto">
+        {(items.length ? items : allInZone).slice(0, 8).map((item) => (
+          <li key={item.id}>
+            <button
+              type="button"
+              onClick={() => onSelectActivity(item)}
+              className={`flex w-full items-start justify-between gap-3 border px-3 py-2 text-left text-sm transition ${
+                focus?.id === item.id
+                  ? "border-amber/40 bg-amber/10"
+                  : "border-white/10 hover:border-white/25"
+              }`}
+            >
+              <span>
+                <span className="block font-medium text-white">{item.title}</span>
+                <span className="text-xs text-white/50">
+                  {pulseStatusLabel[item.status]} · {item.travellers} travellers
+                </span>
+              </span>
+              <span
+                className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                style={{ background: pulseCategoryColor[item.category] }}
+                aria-hidden
+              />
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          href="/tours"
+          className="text-xs font-semibold text-amber underline-offset-2 hover:underline"
+        >
+          Browse tours in this city →
+        </Link>
+        <Link
+          href="/events"
+          className="text-xs font-semibold text-white/60 underline-offset-2 hover:underline hover:text-white"
+        >
+          Events this week
+        </Link>
+      </div>
+    </div>
+  );
+}
