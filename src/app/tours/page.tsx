@@ -6,7 +6,7 @@ const stats = catalogStats();
 export const metadata = {
   title: "Find tours across the USA",
   description:
-    "Browse starter tours in New York, Los Angeles, Las Vegas, Miami, Orlando, Chicago, and more — then request quotes from local operators.",
+    "Search religious, museum, beach, and more — filter by state or city, then request a quote from anywhere in the world.",
 };
 
 export default function ToursPage() {
@@ -18,12 +18,12 @@ export default function ToursPage() {
             Find tours · USA
           </p>
           <h1 className="mt-1.5 font-display text-[1.65rem] leading-tight text-white sm:mt-2 sm:text-4xl">
-            Pick a city and a date.
+            Theme, state, then the tour.
           </h1>
           <p className="mt-2 max-w-xl text-sm text-white/70 sm:text-base">
-            {stats.total} starter experiences in {stats.cities} US cities —
-            same live-board feel as Pulse. Filter by city, date, and type, then
-            open a listing or request a custom quote.
+            {stats.total} starter experiences in {stats.cities} US cities.
+            Searching from abroad? Pick Religious → New York → type
+            &quot;Patterson&quot; — then request the tour.
           </p>
         </div>
 

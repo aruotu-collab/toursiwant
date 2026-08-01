@@ -6,26 +6,20 @@ import { ToursCityMap } from "@/components/ToursCityMap";
 import {
   BROWSE_MONTHS_AHEAD,
   formatDisplayDate,
-  getToursForDate,
   listTourMetros,
   toDateKey,
   type TourDeparture,
 } from "@/lib/sample-tours";
 import { catalogStats } from "@/lib/us-tour-catalog";
-import type { TourInterest } from "@/lib/tour-types";
-
-const interestColor: Record<TourInterest | "all", string> = {
-  all: "#f5c542",
-  "City highlights": "#5b9bd5",
-  "Food & markets": "#fb7185",
-  "Museums & culture": "#60a5fa",
-  Nightlife: "#c084fc",
-  "Neighborhood walk": "#86efac",
-  "Private driver": "#d4a017",
-  "Cruise shore excursion": "#7dd3c0",
-  "Airport / hotel transfer": "#f97316",
-  "Something custom": "#f59e0b",
-};
+import {
+  citiesInState,
+  deriveThemes,
+  listTourStates,
+  searchToursForTraveller,
+  themeColor,
+  tourThemeDefs,
+  type TourThemeId,
+} from "@/lib/tour-themes";
 
 function addMonths(date: Date, months: number) {
   const next = new Date(date);
@@ -64,10 +58,6 @@ function quickOffsets() {
   ];
 }
 
-function colorFor(interest: string) {
-  return interestColor[interest as TourInterest] || "#5b9bd5";
-}
-
 export function ToursBrowser({
   embedded = false,
 }: {
@@ -76,111 +66,108 @@ export function ToursBrowser({
   const todayKey = toDateKey(new Date());
   const maxDate = toDateKey(addMonths(new Date(), BROWSE_MONTHS_AHEAD));
   const metros = listTourMetros();
+  const states = listTourStates();
   const stats = catalogStats();
-  const [citySlug, setCitySlug] = useState("new-york");
+  const [theme, setTheme] = useState<TourThemeId>("all");
+  const [stateCode, setStateCode] = useState("all");
+  const [citySlug, setCitySlug] = useState("all");
   const [selectedDate, setSelectedDate] = useState(todayKey);
-  const [interest, setInterest] = useState<string>("all");
+  const [query, setQuery] = useState("");
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
 
-  const tours = useMemo(() => {
-    const list = getToursForDate(selectedDate, citySlug);
-    if (interest === "all") return list;
-    return list.filter((tour) => tour.interest === interest);
-  }, [selectedDate, citySlug, interest]);
+  const citiesForState = useMemo(
+    () => citiesInState(stateCode),
+    [stateCode],
+  );
 
-  const interests = useMemo(() => {
-    const set = new Set(
-      getToursForDate(selectedDate, citySlug).map((t) => t.interest),
-    );
-    return ["all", ...Array.from(set)] as string[];
-  }, [selectedDate, citySlug]);
+  const tours = useMemo(
+    () =>
+      searchToursForTraveller({
+        dateKey: selectedDate,
+        theme,
+        stateCode,
+        citySlug,
+        query,
+      }),
+    [selectedDate, theme, stateCode, citySlug, query],
+  );
 
   const shortcuts = quickOffsets();
   const activeMetro = metros.find((m) => m.slug === citySlug);
-  const cityCounts = stats.byCity.filter((c) => c.count > 0);
+  const activeState = states.find((s) => s.code === stateCode);
 
   const mapPins = useMemo(() => {
-    if (citySlug === "all") {
-      return cityCounts.map((metro) => ({
+    if (citySlug === "all" && stateCode === "all" && theme === "all" && !query) {
+      return citiesForState.slice(0, 18).map((metro) => ({
         id: metro.slug,
         label: metro.name,
-        color: metro.slug === citySlug ? "#f5c542" : "#5b9bd5",
+        color: "#5b9bd5",
         selected: false,
       }));
     }
-    return tours.map((tour) => ({
+    return tours.slice(0, 18).map((tour) => ({
       id: tour.slug,
       label: tour.title,
-      color: colorFor(tour.interest),
+      color: themeColor(deriveThemes(tour)[0] || "city"),
       selected: selectedSlug === tour.slug,
     }));
-  }, [citySlug, cityCounts, tours, selectedSlug]);
+  }, [citySlug, stateCode, theme, query, citiesForState, tours, selectedSlug]);
 
   function selectTour(tour: TourDeparture) {
     setSelectedSlug(tour.slug);
   }
 
   function onMapSelect(id: string) {
-    if (citySlug === "all") {
-      setCitySlug(id);
-      setSelectedSlug(null);
+    if (citySlug === "all" && stateCode === "all" && theme === "all" && !query) {
+      const metro = metros.find((m) => m.slug === id);
+      if (metro) {
+        setStateCode(metro.stateCode);
+        setCitySlug(metro.slug);
+      }
       return;
     }
     setSelectedSlug(id);
   }
 
   const list = embedded ? tours.slice(0, 16) : tours;
-  const cityLabel =
-    citySlug === "all" ? "All USA" : activeMetro?.name || "City";
+  const placeLabel =
+    citySlug !== "all"
+      ? activeMetro?.name || "City"
+      : stateCode !== "all"
+        ? activeState?.name || stateCode
+        : "All USA";
 
   return (
     <section className="overflow-x-hidden text-white">
       {!embedded ? (
         <p className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
           <span className="live-dot mr-2 align-middle" aria-hidden />
-          {stats.total} starter tours · {stats.cities} cities ·{" "}
-          {formatDisplayDate(selectedDate)}
+          Search from anywhere · {stats.total} tours · {stats.cities} cities
         </p>
       ) : (
         <p className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
-          {cityLabel} · {tours.length} tours · {formatDisplayDate(selectedDate)}
+          {placeLabel} · {tours.length} tours · {formatDisplayDate(selectedDate)}
         </p>
       )}
 
-      {/* 1 · Where */}
+      {/* 1 · Theme */}
       <div className="border border-amber/30 bg-amber/5 p-4 sm:p-5">
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
-          1 · Where are you going?
+          1 · What kind of tour? (theme)
         </p>
         <p className="mt-1 text-sm text-white/55">
-          Pick a US city — the map and list update together.
+          Religious, museum, beach, food… — search even if you&apos;re not in
+          that city yet.
         </p>
         <div className="mt-3 flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <button
-            type="button"
-            onClick={() => {
-              setCitySlug("all");
-              setSelectedSlug(null);
-            }}
-            className={`shrink-0 border px-3 py-2.5 text-left transition ${
-              citySlug === "all"
-                ? "border-amber bg-amber text-ink"
-                : "border-white/15 text-white hover:border-white/35"
-            }`}
-          >
-            <span className="block text-sm font-semibold">All USA</span>
-            <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wider opacity-70">
-              {stats.total} tours
-            </span>
-          </button>
-          {cityCounts.map((metro) => {
-            const active = citySlug === metro.slug;
+          {tourThemeDefs.map((item) => {
+            const active = theme === item.id;
             return (
               <button
-                key={metro.slug}
+                key={item.id}
                 type="button"
                 onClick={() => {
-                  setCitySlug(metro.slug);
+                  setTheme(item.id);
                   setSelectedSlug(null);
                 }}
                 className={`shrink-0 border px-3 py-2.5 text-left transition ${
@@ -189,9 +176,13 @@ export function ToursBrowser({
                     : "border-white/15 text-white hover:border-white/35"
                 }`}
               >
-                <span className="block text-sm font-semibold">{metro.name}</span>
-                <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wider opacity-70">
-                  {metro.stateCode} · {metro.count}
+                <span
+                  className="mb-1.5 block h-1.5 w-6"
+                  style={{ background: item.color }}
+                  aria-hidden
+                />
+                <span className="block text-xs font-semibold uppercase tracking-wider">
+                  {item.label}
                 </span>
               </button>
             );
@@ -199,10 +190,96 @@ export function ToursBrowser({
         </div>
       </div>
 
-      {/* 2 · When */}
+      {/* 2 · State + city + keyword */}
       <div className="mt-4 border border-white/10 bg-white/[0.03] p-4 sm:p-5">
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
-          2 · When are you travelling?
+          2 · Where? (state → city → name search)
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="block">
+            <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
+              State
+            </span>
+            <select
+              value={stateCode}
+              onChange={(e) => {
+                setStateCode(e.target.value);
+                setCitySlug("all");
+                setSelectedSlug(null);
+              }}
+              className="w-full border border-white/15 bg-ink/70 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-amber/50"
+            >
+              <option value="all">All US states</option>
+              {states.map((state) => (
+                <option key={state.code} value={state.code}>
+                  {state.name} ({state.code}) · {state.count}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
+              City
+            </span>
+            <select
+              value={citySlug}
+              onChange={(e) => {
+                setCitySlug(e.target.value);
+                setSelectedSlug(null);
+              }}
+              className="w-full border border-white/15 bg-ink/70 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-amber/50"
+            >
+              <option value="all">All cities in scope</option>
+              {citiesForState.map((metro) => (
+                <option key={metro.slug} value={metro.slug}>
+                  {metro.name}, {metro.stateCode}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block sm:col-span-2 lg:col-span-1">
+            <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
+              Search by name
+            </span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="e.g. Patterson, Bethel, Jehovah…"
+              className="w-full border border-white/15 bg-ink/70 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-amber/50"
+            />
+          </label>
+        </div>
+        {stateCode !== "all" || citySlug !== "all" ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {citiesForState.map((metro) => {
+              const active = citySlug === metro.slug;
+              return (
+                <button
+                  key={metro.slug}
+                  type="button"
+                  onClick={() => {
+                    setCitySlug(metro.slug);
+                    setStateCode(metro.stateCode);
+                    setSelectedSlug(null);
+                  }}
+                  className={`border px-2.5 py-1.5 text-xs font-semibold transition ${
+                    active
+                      ? "border-amber bg-amber text-ink"
+                      : "border-white/15 text-white/70 hover:border-white/35"
+                  }`}
+                >
+                  {metro.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+
+      {/* 3 · When */}
+      <div className="mt-4 border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
+          3 · When are you travelling?
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {shortcuts.map((shortcut) => {
@@ -236,109 +313,88 @@ export function ToursBrowser({
         </div>
       </div>
 
-      {/* 3 · What */}
-      <div className="mt-4 border border-white/10 bg-white/[0.03] p-4 sm:p-5">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
-          3 · What kind of tour?
-        </p>
-        <div className="mt-3 flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [touch-action:pan-x] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {interests.map((item) => {
-            const active = interest === item;
-            return (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setInterest(item)}
-                className={`shrink-0 border px-3 py-2.5 text-left transition ${
-                  active
-                    ? "border-amber bg-amber text-ink"
-                    : "border-white/15 text-white hover:border-white/35"
-                }`}
-              >
-                <span
-                  className="mb-1.5 block h-1.5 w-6"
-                  style={{ background: colorFor(item) }}
-                  aria-hidden
-                />
-                <span className="block text-xs font-semibold uppercase tracking-wider">
-                  {item === "all" ? "All types" : item}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* List + map */}
       <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
         <div className="order-2 min-w-0 border border-white/10 bg-white/[0.03] lg:order-1">
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
-              Live listing
+              Matches
             </p>
             <p className="font-mono text-[10px] uppercase tracking-wider text-white/40">
-              {tours.length} shown
+              {tours.length} found
             </p>
           </div>
           <ul className="divide-y divide-white/10 lg:max-h-[34rem] lg:overflow-y-auto lg:overscroll-contain">
             {list.map((tour) => {
               const selected = selectedSlug === tour.slug;
+              const themes = deriveThemes(tour);
               return (
                 <li key={`${tour.slug}-${tour.date}`}>
-                  <Link
-                    href={`/tours/${tour.slug}?date=${tour.date}`}
-                    onClick={() => selectTour(tour)}
-                    onMouseEnter={() => setSelectedSlug(tour.slug)}
-                    onFocus={() => setSelectedSlug(tour.slug)}
-                    className={`flex w-full gap-3 px-4 py-3.5 text-left transition active:bg-white/10 ${
+                  <div
+                    className={`flex w-full gap-3 px-4 py-3.5 transition ${
                       selected ? "bg-amber/15" : "hover:bg-white/[0.06]"
                     }`}
+                    onMouseEnter={() => setSelectedSlug(tour.slug)}
                   >
                     <span
                       className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{
-                        background: colorFor(tour.interest),
-                        boxShadow: `0 0 10px ${colorFor(tour.interest)}88`,
+                        background: themeColor(themes[0] || "city"),
+                        boxShadow: `0 0 10px ${themeColor(themes[0] || "city")}88`,
                       }}
                       aria-hidden
                     />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-amber">
-                          {tour.cityName}
+                          {tour.cityName}, {tour.stateCode}
                         </span>
                         <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
-                          {tour.joinable
-                            ? "Joinable"
-                            : tour.schedule === "flexible"
-                              ? "On request"
-                              : tour.interest}
+                          {themes.slice(0, 2).join(" · ")}
                         </span>
-                      </span>
-                      <span className="mt-0.5 block font-semibold text-white [overflow-wrap:anywhere]">
+                      </p>
+                      <Link
+                        href={`/tours/${tour.slug}?date=${tour.date}`}
+                        onClick={() => selectTour(tour)}
+                        className="mt-0.5 block font-semibold text-white [overflow-wrap:anywhere] hover:text-amber"
+                      >
                         {tour.title}
-                      </span>
-                      <span className="mt-0.5 block text-sm text-white/55 [overflow-wrap:anywhere]">
+                      </Link>
+                      <p className="mt-0.5 text-sm text-white/55 [overflow-wrap:anywhere]">
                         {tour.departsLabel} · {tour.duration} · {tour.meetup}
-                        {tour.joinable ? " · open to join" : ""}
-                      </span>
-                    </span>
-                    <span className="shrink-0 self-center font-mono text-sm text-amber">
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Link
+                          href={`/tours/${tour.slug}?date=${tour.date}`}
+                          className="border border-white/20 px-2.5 py-1 text-xs font-semibold text-white hover:border-amber/50"
+                        >
+                          View
+                        </Link>
+                        <Link
+                          href={`/request?tour=${tour.slug}&date=${tour.date}`}
+                          className="bg-amber px-2.5 py-1 text-xs font-semibold text-ink hover:bg-amber-deep"
+                        >
+                          Request this tour
+                        </Link>
+                      </div>
+                    </div>
+                    <p className="shrink-0 self-start font-mono text-sm text-amber">
                       {tour.priceFrom}
-                    </span>
-                  </Link>
+                    </p>
+                  </div>
                 </li>
               );
             })}
             {list.length === 0 ? (
               <li className="px-4 py-10 text-center text-sm text-white/50">
-                No scheduled tours for this filter.{" "}
+                No matches. Try another theme/state, or{" "}
                 <Link
                   href={`/request?date=${selectedDate}`}
                   className="font-semibold text-amber hover:underline"
                 >
-                  Request a custom tour
+                  request a custom tour
                 </Link>
+                .
               </li>
             ) : null}
           </ul>
@@ -348,7 +404,7 @@ export function ToursBrowser({
                 href="/tours"
                 className="text-sm font-semibold text-amber hover:underline"
               >
-                See all {tours.length} tours →
+                See all {tours.length} matches →
               </Link>
             </div>
           ) : null}
@@ -358,30 +414,38 @@ export function ToursBrowser({
           <div className="overflow-visible border border-white/10 bg-[#0a1520]">
             <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
               <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">
-                {citySlug === "all" ? "USA map" : "City map"}
+                Discovery map
               </p>
               <p className="font-mono text-[10px] uppercase tracking-wider text-white/40">
-                {citySlug === "all" ? "Tap a city" : "Tap a pin"}
+                {placeLabel}
               </p>
             </div>
             <ToursCityMap
-              cityLabel={cityLabel}
+              cityLabel={placeLabel}
               stateCode={
-                citySlug === "all" ? "USA" : activeMetro?.stateCode
+                citySlug !== "all"
+                  ? activeMetro?.stateCode
+                  : stateCode !== "all"
+                    ? stateCode
+                    : "USA"
               }
               pins={mapPins}
-              mode={citySlug === "all" ? "cities" : "tours"}
+              mode={
+                citySlug === "all" && !query && theme === "all"
+                  ? "cities"
+                  : "tours"
+              }
               onSelect={onMapSelect}
             />
           </div>
 
           <div className="border border-dashed border-white/15 bg-white/[0.02] p-4">
             <p className="font-display text-lg text-white">
-              Don&apos;t see the exact day?
+              Found it? Request a seat.
             </p>
             <p className="mt-1 text-sm text-white/55">
-              Request a custom tour for {formatDisplayDate(selectedDate)} —
-              local operators quote as they join.
+              Example: Religious → New York → search &quot;Patterson&quot; →
+              request the Bethel visitor tour — from anywhere in the world.
             </p>
             <Link
               href={`/request?date=${selectedDate}`}

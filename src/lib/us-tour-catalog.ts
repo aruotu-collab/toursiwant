@@ -1,4 +1,5 @@
 import type { TourInterest } from "@/lib/tour-types";
+import type { TourTheme } from "@/lib/tour-themes";
 
 /** Starter + future operator-published tours across the USA. */
 export type CatalogTour = {
@@ -20,6 +21,8 @@ export type CatalogTour = {
   spacesDefault: number;
   /** starter = ToursIWant seed inventory; operator = live operator listing later */
   source: "starter" | "operator";
+  /** Optional discovery themes (religious, museum, beach…). Inferred if omitted. */
+  themes?: TourTheme[];
 };
 
 export type TourMetro = {
@@ -81,7 +84,12 @@ function t(
     Partial<
       Pick<
         CatalogTour,
-        "source" | "schedule" | "weekdays" | "spacesDefault" | "joinable"
+        | "source"
+        | "schedule"
+        | "weekdays"
+        | "spacesDefault"
+        | "joinable"
+        | "themes"
       >
     >,
 ): CatalogTour {
@@ -415,6 +423,42 @@ const newYorkTours: CatalogTour[] = [
     spacesDefault: 20,
   }),
   t({
+    slug: "patterson-bethel-visitor-tour",
+    citySlug: "new-york",
+    cityName: "New York",
+    stateCode: "NY",
+    title: "Patterson Bethel visitor tour",
+    time: "09:30",
+    timeLabel: "9:30 a.m.",
+    duration: "Half day",
+    meetup: "Patterson Educational Center, NY",
+    priceFrom: "Free / donation · transfer quote",
+    joinable: true,
+    interest: "Museums & culture",
+    themes: ["religious", "history", "museum"],
+    summary:
+      "Visitor experience at the Jehovah’s Witnesses Patterson Educational Center (Bethel) — grounds, exhibits, and guided highlights. Searchable worldwide; request a seat or hotel/airport transfer from NYC.",
+    weekdays: [1, 2, 3, 4, 5],
+    spacesDefault: 12,
+  }),
+  t({
+    slug: "st-patricks-cathedral-midtown",
+    citySlug: "new-york",
+    cityName: "New York",
+    stateCode: "NY",
+    title: "St. Patrick’s Cathedral & Midtown sacred sites",
+    time: "10:00",
+    timeLabel: "10:00 a.m.",
+    duration: "2.5 hours",
+    meetup: "Fifth Avenue / 50th Street",
+    priceFrom: "$55",
+    interest: "Museums & culture",
+    themes: ["religious", "history", "city"],
+    summary:
+      "Guided visit to St. Patrick’s Cathedral with nearby Midtown religious landmarks — paced for travellers searching religious tours in New York State.",
+    weekdays: daily,
+  }),
+  t({
     slug: "custom-nyc-request",
     citySlug: "new-york",
     cityName: "New York",
@@ -452,7 +496,12 @@ function cityBlock(
       Partial<
         Pick<
           CatalogTour,
-          "schedule" | "weekdays" | "spacesDefault" | "joinable" | "source"
+          | "schedule"
+          | "weekdays"
+          | "spacesDefault"
+          | "joinable"
+          | "source"
+          | "themes"
         >
       >
   >,
@@ -479,6 +528,20 @@ const usaCityTours: CatalogTour[] = [
       priceFrom: "$69",
       interest: "City highlights",
       summary: "Classic Hollywood photo stops, Walk of Fame, and sign viewpoints.",
+    },
+    {
+      slug: "la-mission-san-gabriel",
+      title: "Mission San Gabriel religious heritage tour",
+      time: "10:00",
+      timeLabel: "10:00 a.m.",
+      duration: "3 hours",
+      meetup: "Mission San Gabriel Arcángel",
+      priceFrom: "$58",
+      interest: "Museums & culture",
+      themes: ["religious", "history"],
+      summary:
+        "California mission heritage — grounds, chapel, and visitor highlights. Findable under Religious + California.",
+      weekdays: [1, 2, 3, 4, 5, 6],
     },
     {
       slug: "la-studio-backlot-day",

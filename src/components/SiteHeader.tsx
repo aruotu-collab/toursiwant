@@ -8,17 +8,19 @@ export function SiteHeader() {
   const pathname = usePathname();
   const onHome = pathname === "/";
   const onDarkTours = pathname === "/tours";
+  const onDarkEvents = pathname === "/events";
+  const onDarkBoardPage = onDarkTours || onDarkEvents;
 
   // Homepage has its own command-center chrome.
   if (onHome) return null;
 
-  if (onDarkTours) {
+  if (onDarkBoardPage) {
     return (
       <header className="absolute inset-x-0 top-0 z-20 border-b border-white/10 bg-[#0a1520]/95 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-[90rem] items-center justify-between gap-3 px-4 py-4 sm:px-8 sm:py-5">
           <div className="min-w-0">
             <Link
-              href="/?menu=tours"
+              href={onDarkEvents ? "/?menu=events" : "/?menu=tours"}
               className="font-display text-xl tracking-tight text-white sm:text-2xl"
             >
               Tours<span className="text-amber">I</span>Want

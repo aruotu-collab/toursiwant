@@ -1,14 +1,14 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AuthGreeting, AuthNav } from "@/components/AuthNav";
+import { EventsBoard } from "@/components/EventsBoard";
+import { RequestDesk } from "@/components/RequestDesk";
 import { TourPulseBoard } from "@/components/TourPulseBoard";
 import { TourRushBoard } from "@/components/TourRushBoard";
 import { ToursBrowser } from "@/components/ToursBrowser";
-import { formatEventWhen, nycEventsThisWeek } from "@/lib/events";
 
 export type CommandTab =
   | "pulse"
@@ -48,25 +48,25 @@ const TAB_COPY: Record<
     eyebrow: "Tour Rush · live now",
     title: "Seats are filling. Timers are running.",
     blurb:
-      "Countdown, scarcity, and live interest — claim a New York seat before someone else does.",
+      "Filter ending-soon lots, pick a seat, then claim or request — same live-board feel as Pulse.",
   },
   tours: {
     eyebrow: "Find tours · USA",
-    title: "Pick a city and a date.",
+    title: "Theme, state, then the tour.",
     blurb:
-      "Browse starter tours across America — New York, LA, Vegas, Miami, Chicago, and more — then open a listing or request something custom.",
+      "Religious, museum, beach… pick a state or city, search by name (e.g. Patterson), then request — from anywhere in the world.",
   },
   events: {
     eyebrow: "Events This Week",
     title: "Home → event → home again",
     blurb:
-      "Concerts, games, and Broadway — request Event Pickup & Return without leaving the board.",
+      "Filter by concert, sports, or Broadway — then request Event Pickup & Return from the board.",
   },
   request: {
     eyebrow: "Request desk",
     title: "Tell us what you want",
     blurb:
-      "Custom tours, stay-near lodging, or operator interest — same capture loop, opened as menus on this board.",
+      "Custom tours, stays, event rides, or operator interest — stepped desk on the same dark board.",
   },
   account: {
     eyebrow: "Member area",
@@ -206,8 +206,10 @@ export function HomeCommandCenter() {
           {tab === "pulse" ? <TourPulseBoard embedded /> : null}
           {tab === "seats" ? <TourRushBoard embedded /> : null}
           {tab === "tours" ? <ToursPanel /> : null}
-          {tab === "events" ? <EventsPanel /> : null}
-          {tab === "request" ? <RequestPanel onSelectTab={selectTab} /> : null}
+          {tab === "events" ? <EventsBoard embedded /> : null}
+          {tab === "request" ? (
+            <RequestDesk onSelectTab={(t) => selectTab(t)} />
+          ) : null}
           {tab === "account" ? <AccountPanel onSelectTab={selectTab} /> : null}
           {tab === "admin" && isAdmin ? <AdminBoardPanel /> : null}
         </div>
@@ -218,128 +220,6 @@ export function HomeCommandCenter() {
 
 function ToursPanel() {
   return <ToursBrowser embedded />;
-}
-
-function EventsPanel() {
-  return (
-    <div className="space-y-5">
-      <div className="flex justify-stretch sm:justify-end">
-        <Link
-          href="/events/ride"
-          className="w-full bg-amber px-4 py-3 text-center text-sm font-semibold text-ink hover:bg-amber-deep sm:w-auto sm:py-2"
-        >
-          Request Event Pickup & Return
-        </Link>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {nycEventsThisWeek.map((event) => (
-          <article
-            key={event.slug}
-            className="overflow-hidden border border-white/10 bg-white/[0.03]"
-          >
-            <div className="relative h-36">
-              <Image
-                src={event.image}
-                alt={event.imageAlt}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 50vw"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/80 to-transparent" />
-              <p className="absolute bottom-2 left-3 font-mono text-[10px] uppercase tracking-wider text-amber">
-                {event.category}
-              </p>
-            </div>
-            <div className="p-4">
-              <h3 className="font-display text-xl text-white">{event.name}</h3>
-              <p className="mt-1 text-sm text-white/55">
-                {event.venue} · {formatEventWhen(event.startsAt)}
-              </p>
-              <p className="mt-2 text-sm text-white/65">{event.summary}</p>
-              <Link
-                href={`/events/ride?event=${event.slug}`}
-                className="mt-3 inline-flex text-sm font-semibold text-amber hover:underline"
-              >
-                Book pickup & return →
-              </Link>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function RequestPanel({
-  onSelectTab,
-}: {
-  onSelectTab: (tab: CommandTab) => void;
-}) {
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {[
-        {
-          title: "Custom tour request",
-          copy: "Describe the day you want — operators quote you.",
-          href: "/request",
-          cta: "Open request form",
-        },
-        {
-          title: "Stay Near Your Tour",
-          copy: "Hotel or short stay close to the meetup point.",
-          href: "/request?intent=stay",
-          cta: "Request a stay",
-        },
-        {
-          title: "Join a listed tour",
-          copy: "Browse by date, then send interest on a listing.",
-          menu: "tours" as CommandTab,
-          cta: "Find tours menu",
-        },
-        {
-          title: "Event Pickup & Return",
-          copy: "Door-to-door for concerts, games, and Broadway.",
-          href: "/events/ride",
-          cta: "Book event transport",
-        },
-        {
-          title: "Operator interest",
-          copy: "List US tours and receive the lead inbox.",
-          href: "/request?intent=operator",
-          cta: "Apply as operator",
-        },
-        {
-          title: "Tour Pulse",
-          copy: "See where activity is building, then join nearby.",
-          menu: "pulse" as CommandTab,
-          cta: "Back to pulse",
-        },
-      ].map((card) =>
-        "menu" in card && card.menu ? (
-          <button
-            key={card.title}
-            type="button"
-            onClick={() => onSelectTab(card.menu)}
-            className="border border-white/10 bg-white/[0.03] p-5 text-left transition hover:border-amber/40 hover:bg-white/[0.06]"
-          >
-            <h3 className="font-display text-xl text-white">{card.title}</h3>
-            <p className="mt-2 text-sm text-white/60">{card.copy}</p>
-            <p className="mt-4 text-sm font-semibold text-amber">{card.cta} →</p>
-          </button>
-        ) : (
-          <Link
-            key={card.title}
-            href={"href" in card && card.href ? card.href : "/"}
-            className="border border-white/10 bg-white/[0.03] p-5 transition hover:border-amber/40 hover:bg-white/[0.06]"
-          >
-            <h3 className="font-display text-xl text-white">{card.title}</h3>
-            <p className="mt-2 text-sm text-white/60">{card.copy}</p>
-            <p className="mt-4 text-sm font-semibold text-amber">{card.cta} →</p>
-          </Link>
-        ),
-      )}
-    </div>
-  );
 }
 
 function AccountPanel({
