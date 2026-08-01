@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TourDatePicker } from "@/components/TourDatePicker";
 import {
-  formatDisplayDate,
   getTourDeparture,
   toDateKey,
 } from "@/lib/sample-tours";
@@ -35,7 +34,7 @@ export default async function TourDetailPage({
 
   const travelDate = dateParam || toDateKey(new Date());
   const departure = getTourDeparture(slug, travelDate);
-  const requestHref = `/request?tour=${tour.slug}&date=${travelDate}`;
+  const requestHref = `/request?tour=${tour.slug}&suggested=${travelDate}`;
 
   return (
     <main className="flex-1 bg-paper">
@@ -198,16 +197,17 @@ export default async function TourDetailPage({
             <span aria-hidden>→</span>
           </Link>
           <p className="mt-2 text-center text-[11px] text-ink-soft">
-            Continues for {formatDisplayDate(travelDate)}
+            Browse date shown above — you pick your travel day on the request
+            form
           </p>
           <Link
-            href={`/request?tour=${tour.slug}&date=${travelDate}&intent=stay`}
+            href={`/request?tour=${tour.slug}&suggested=${travelDate}&intent=stay`}
             className="mt-3 flex w-full items-center justify-center border border-ink/15 px-5 py-3 text-sm font-medium text-ink transition hover:bg-paper"
           >
             Stay Near Your Tour
           </Link>
           <Link
-            href={`/request?date=${travelDate}`}
+            href="/request"
             className="mt-3 flex w-full items-center justify-center px-5 py-2 text-sm font-medium text-ink-soft transition hover:text-ink"
           >
             Request something custom instead

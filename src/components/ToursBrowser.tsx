@@ -279,7 +279,11 @@ export function ToursBrowser({
       {/* 3 · When */}
       <div className="mt-4 border border-white/10 bg-white/[0.03] p-4 sm:p-5">
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
-          3 · When are you travelling?
+          3 · Browse a date (optional)
+        </p>
+        <p className="mt-1 text-sm text-white/55">
+          This only previews what&apos;s listed that day. When you request a tour,
+          you choose your own travel date on the next screen.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {shortcuts.map((shortcut) => {
@@ -363,7 +367,7 @@ export function ToursBrowser({
                       <p className="mt-0.5 text-sm text-white/55 [overflow-wrap:anywhere]">
                         {tour.departsLabel} · {tour.duration} · {tour.meetup}
                       </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
                         <Link
                           href={`/tours/${tour.slug}?date=${tour.date}`}
                           className="border border-white/20 px-2.5 py-1 text-xs font-semibold text-white hover:border-amber/50"
@@ -371,10 +375,10 @@ export function ToursBrowser({
                           View
                         </Link>
                         <Link
-                          href={`/request?tour=${tour.slug}&date=${tour.date}`}
+                          href={`/request?tour=${tour.slug}&suggested=${tour.date}`}
                           className="bg-amber px-2.5 py-1 text-xs font-semibold text-ink hover:bg-amber-deep"
                         >
-                          Request this tour
+                          Request · pick your date
                         </Link>
                       </div>
                     </div>

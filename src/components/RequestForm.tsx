@@ -18,14 +18,18 @@ export default function RequestForm() {
   const stayIntent = searchParams.get("intent") === "stay";
   const tourSlug = searchParams.get("tour");
   const dateParam = searchParams.get("date");
-  const travelDate = dateParam || toDateKey(new Date());
+  const suggestedParam = searchParams.get("suggested");
+  const todayKey = toDateKey(new Date());
+  const initialDate = dateParam || suggestedParam || todayKey;
 
   const selectedTour = tourSlug
-    ? getTourDeparture(tourSlug, travelDate) || getSampleTour(tourSlug)
+    ? getTourDeparture(tourSlug, initialDate) || getSampleTour(tourSlug)
     : undefined;
   const isSpecificTour = Boolean(selectedTour) && !isOperator;
-  const hasAdvanceDate = Boolean(dateParam);
+  const hasLockedBrowseDate = Boolean(dateParam) && !suggestedParam;
+  const suggestedFromBrowse = Boolean(suggestedParam) || Boolean(dateParam);
 
+  const [chosenDate, setChosenDate] = useState(initialDate);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -42,9 +46,16 @@ export default function RequestForm() {
     if (isOperator) return "Join ToursIWant as a US tour operator";
     if (stayIntent && !selectedTour) return "Stay Near Your Tour";
     if (selectedTour) return `I want: ${selectedTour.title}`;
-    if (hasAdvanceDate) return `Request a tour for ${formatDisplayDate(travelDate)}`;
+    if (hasLockedBrowseDate)
+      return `Request a tour for ${formatDisplayDate(chosenDate)}`;
     return "Request the tour you want";
-  }, [hasAdvanceDate, isOperator, selectedTour, stayIntent, travelDate]);
+  }, [
+    chosenDate,
+    hasLockedBrowseDate,
+    isOperator,
+    selectedTour,
+    stayIntent,
+  ]);
 
   function toggleInterest(interest: TourInterest) {
     setInterests((current) =>
@@ -86,7 +97,7 @@ export default function RequestForm() {
           name,
           email,
           phone: String(data.get("phone") || ""),
-          travelDate: String(data.get("date") || travelDate || ""),
+          travelDate: String(data.get("date") || chosenDate || ""),
           tourSlug: selectedTour?.slug,
           tourTitle: selectedTour?.title,
           groupSize: data.get("groupSize") || undefined,
@@ -165,8 +176,7 @@ export default function RequestForm() {
     ) {
       return selectedTour.departsLabel;
     }
-    if (hasAdvanceDate) return formatDisplayDate(travelDate);
-    return selectedTour?.timeLabel || "Date flexible";
+    return selectedTour?.timeLabel || "Schedule confirmed with operator";
   })();
 
   if (submitted) {
@@ -189,8 +199,8 @@ export default function RequestForm() {
             {isOperator
               ? "Your operator interest is saved. Use the magic link below (or your email) to open the lead inbox."
               : selectedTour
-                ? `Your interest is captured for ${formatDisplayDate(travelDate)}.${needStay ? " We also noted that you need a stay near the tour." : ""} When an operator replies, you’ll get an email — and you’ll see it in Account.`
-                : `Your request for ${formatDisplayDate(travelDate)} is captured.${needStay ? " Accommodation interest is included." : ""} When an operator replies, you’ll get an email — and you’ll see it in Account.`}
+                ? `Your interest is captured for ${formatDisplayDate(chosenDate)}.${needStay ? " We also noted that you need a stay near the tour." : ""} When an operator replies, you’ll get an email — and you’ll see it in Account.`
+                : `Your request for ${formatDisplayDate(chosenDate)} is captured.${needStay ? " Accommodation interest is included." : ""} When an operator replies, you’ll get an email — and you’ll see it in Account.`}
           </p>
 
           {saveAccount || isOperator ? (
@@ -250,7 +260,7 @@ export default function RequestForm() {
               ? "Join this tour"
               : stayIntent
                 ? "Stay near"
-                : hasAdvanceDate
+                : suggestedFromBrowse
                   ? "Plan ahead"
                   : "Live"}
           </p>
@@ -280,10 +290,10 @@ export default function RequestForm() {
                 {selectedTour.meetup} · From {selectedTour.priceFrom}
               </p>
               <Link
-                href={`/request?date=${travelDate}`}
+                href={`/request?tour=${tourSlug || ""}`}
                 className="mt-4 inline-block text-sm font-medium text-skyline underline-offset-2 hover:underline"
               >
-                Or request a different custom tour for this date
+                Or request a different custom tour
               </Link>
             </div>
           ) : null}
@@ -296,7 +306,7 @@ export default function RequestForm() {
           {selectedTour ? (
             <input type="hidden" name="tourSlug" value={selectedTour.slug} />
           ) : null}
-          <input type="hidden" name="travelDate" value={travelDate} />
+          <input type="hidden" name="travelDate" value={chosenDate} />
 
           {isOperator ? (
             <>
@@ -324,13 +334,25 @@ export default function RequestForm() {
                 <Field label="Email" name="email" type="email" required />
               </div>
               <Field label="Phone / WhatsApp" name="phone" type="tel" required />
-              <Field
-                label="Tour date"
-                name="date"
-                type="date"
-                defaultValue={travelDate}
-                required
-              />
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-ink">
+                  Your travel date
+                </span>
+                <span className="mb-2 block text-xs text-ink-soft">
+                  {suggestedFromBrowse
+                    ? `Suggested from browse (${formatDisplayDate(initialDate)}) — change freely to any day you want.`
+                    : "Pick the day you actually want to go. Not locked to the browse filter."}
+                </span>
+                <input
+                  name="date"
+                  type="date"
+                  required
+                  min={todayKey}
+                  value={chosenDate}
+                  onChange={(e) => setChosenDate(e.target.value)}
+                  className="w-full border border-amber/40 bg-amber/10 px-3 py-2.5 text-ink outline-none transition focus:border-amber-deep"
+                />
+              </label>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                   label="How many people?"
@@ -375,7 +397,8 @@ export default function RequestForm() {
                 <textarea
                   name="details"
                   rows={4}
-                  defaultValue={`I'd like to join: ${selectedTour.title} on ${formatDisplayDate(travelDate)}. ${selectedTour.summary}`}
+                  key={chosenDate}
+                  defaultValue={`I'd like to join: ${selectedTour.title} on ${formatDisplayDate(chosenDate)}. ${selectedTour.summary}`}
                   className="w-full border border-ink/15 bg-paper/60 px-3 py-2.5 text-ink outline-none transition focus:border-skyline"
                   placeholder="Accessibility needs, luggage, preferred language…"
                 />
@@ -393,7 +416,7 @@ export default function RequestForm() {
                   label="Check-in / tour date"
                   name="date"
                   type="date"
-                  defaultValue={travelDate}
+                  defaultValue={chosenDate}
                   required
                 />
                 <Field
@@ -447,7 +470,7 @@ export default function RequestForm() {
                   label="Preferred date"
                   name="date"
                   type="date"
-                  defaultValue={travelDate}
+                  defaultValue={chosenDate}
                   required
                 />
                 <Field

@@ -365,7 +365,7 @@ export function TourRushBoard({
                         : "View tour details"}
                     </Link>
                     <Link
-                      href={`/request?tour=${selected.tourSlug}&date=${today}`}
+                      href={`/request?tour=${selected.tourSlug}&suggested=${today}`}
                       className="inline-flex flex-1 items-center justify-center border border-white/20 px-4 py-3 text-sm font-semibold text-white hover:border-amber/50"
                     >
                       Request this tour
