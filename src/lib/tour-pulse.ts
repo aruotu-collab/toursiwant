@@ -1,6 +1,8 @@
 export type PulseCategory =
   | "tour"
   | "bus"
+  | "museum"
+  | "food"
   | "pickup"
   | "cruise"
   | "event"
@@ -98,6 +100,8 @@ export const pulseFilterTabs: {
 }[] = [
   { id: "all", label: "All" },
   { id: "bus", label: "Bus tours" },
+  { id: "museum", label: "Museums" },
+  { id: "food", label: "Food" },
   { id: "tour", label: "Tours" },
   { id: "pickup", label: "Pickups" },
   { id: "cruise", label: "Cruise" },
@@ -109,6 +113,8 @@ export const pulseFilterTabs: {
 export const pulseCategoryColor: Record<PulseCategory, string> = {
   tour: "#5b9bd5",
   bus: "#f97316",
+  museum: "#60a5fa",
+  food: "#fb7185",
   pickup: "#d4a017",
   cruise: "#7dd3c0",
   event: "#c084fc",
@@ -247,9 +253,57 @@ export const seedPulseActivities: PulseActivity[] = [
     minutesAgo: 16,
   },
   {
+    id: "p7e",
+    zoneId: "midtown",
+    category: "food",
+    status: "at_stop",
+    title: "Times Square pizza slice crawl",
+    detail: "Classic NYC pizza stops · walkable from Midtown hotels",
+    travellers: 5,
+    joinable: true,
+    href: "/request?details=Pizza%20crawl%20near%20my%20Midtown%20hotel",
+    minutesAgo: 8,
+  },
+  {
+    id: "p7f",
+    zoneId: "midtown",
+    category: "food",
+    status: "forming",
+    title: "Hell’s Kitchen pizza + bites",
+    detail: "Small group forming · evening slices near 9th Ave",
+    travellers: 3,
+    joinable: true,
+    href: "/request?details=Pizza%20near%20Aliz%20Hotel",
+    minutesAgo: 19,
+  },
+  {
+    id: "p7g",
+    zoneId: "lower-manhattan",
+    category: "food",
+    status: "departing_soon",
+    title: "Chinatown Chinese food walking tour",
+    detail: "Dumplings, roast meats, Canal Street restaurants",
+    travellers: 7,
+    joinable: true,
+    tourSlug: "chinatown-little-italy",
+    minutesAgo: 13,
+  },
+  {
+    id: "p7h",
+    zoneId: "midtown",
+    category: "museum",
+    status: "preparing",
+    title: "MoMA highlights · Midtown museum",
+    detail: "Gallery morning · meet at museum plaza",
+    travellers: 4,
+    joinable: true,
+    href: "/request?details=MoMA%20museum%20tour%20from%20Midtown%20hotel",
+    minutesAgo: 21,
+  },
+  {
     id: "p8",
     zoneId: "central-park",
-    category: "tour",
+    category: "museum",
     status: "at_stop",
     title: "The Met Museum highlights tour",
     detail: "Inside gallery stop · morning pace",

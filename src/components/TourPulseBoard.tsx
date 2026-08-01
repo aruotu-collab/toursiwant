@@ -5,19 +5,20 @@ import { useEffect, useMemo, useState } from "react";
 import {
   adjacentZones,
   boardingKindLabel,
+  experienceTypeColor,
+  experienceTypeTabs,
   getNearMePlace,
+  matchesExperienceType,
   searchNearMePlaces,
   stopsNearPlace,
-  type BoardingKind,
   type BoardingStop,
+  type ExperienceType,
   type NearMePlace,
 } from "@/lib/near-me";
 import { toDateKey } from "@/lib/sample-tours";
 import {
   activityHref,
-  matchesPulseFilter,
   pulseCategoryColor,
-  pulseFilterTabs,
   pulseStatusLabel,
   pulseZones,
   seedPulseActivities,
@@ -28,7 +29,7 @@ import {
   type PulseZoneId,
 } from "@/lib/tour-pulse";
 
-type FilterId = "all" | PulseCategory;
+type FilterId = ExperienceType;
 
 /** Cubic path Harbor (SW) → Airports (NE) in viewBox 0 0 400 520 */
 const CORRIDOR_D =
@@ -83,7 +84,7 @@ export function TourPulseBoard({
   const [filter, setFilter] = useState<FilterId>("all");
   const [activities, setActivities] = useState(seedPulseActivities);
   const [selectedZoneId, setSelectedZoneId] = useState<PulseZoneId | null>(
-    "midtown",
+    null,
   );
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(
     null,
@@ -92,7 +93,6 @@ export function TourPulseBoard({
   const [locationQuery, setLocationQuery] = useState("");
   const [placeId, setPlaceId] = useState<string | null>(null);
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
-  const [stopKind, setStopKind] = useState<BoardingKind | "all">("all");
 
   const nearPlace = placeId ? getNearMePlace(placeId) || null : null;
 
@@ -103,21 +103,22 @@ export function TourPulseBoard({
 
   const nearbyStops = useMemo(() => {
     if (!placeId) return [];
-    return stopsNearPlace(placeId, stopKind);
-  }, [placeId, stopKind]);
+    return stopsNearPlace(placeId, filter);
+  }, [placeId, filter]);
 
   const nearZones = useMemo(
     () => (nearPlace ? adjacentZones(nearPlace.zoneId) : null),
     [nearPlace],
   );
 
+  const localActivities = useMemo(() => {
+    if (!nearZones) return [];
+    return activities.filter((a) => nearZones.includes(a.zoneId));
+  }, [activities, nearZones]);
+
   const filtered = useMemo(() => {
-    let list = activities.filter((a) => matchesPulseFilter(a, filter));
-    if (nearZones) {
-      list = list.filter((a) => nearZones.includes(a.zoneId));
-    }
-    return list;
-  }, [activities, filter, nearZones]);
+    return localActivities.filter((a) => matchesExperienceType(a, filter));
+  }, [localActivities, filter]);
 
   const selectedZone = pulseZones.find((z) => z.id === selectedZoneId) || null;
   const zoneItems = useMemo(
@@ -141,15 +142,30 @@ export function TourPulseBoard({
   }, [filtered]);
 
   const filterCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: activities.length };
-    for (const tab of pulseFilterTabs) {
+    const counts: Record<string, number> = {
+      all: localActivities.length,
+    };
+    for (const tab of experienceTypeTabs) {
       if (tab.id === "all") continue;
-      counts[tab.id] = activities.filter((a) =>
-        matchesPulseFilter(a, tab.id),
+      counts[tab.id] = localActivities.filter((a) =>
+        matchesExperienceType(a, tab.id),
       ).length;
     }
     return counts;
-  }, [activities]);
+  }, [localActivities]);
+
+  const typeCards = useMemo(() => {
+    return experienceTypeTabs
+      .filter((tab) => tab.id !== "all")
+      .map((tab) => ({
+        ...tab,
+        count: filterCounts[tab.id] ?? 0,
+        stopCount: placeId
+          ? stopsNearPlace(placeId, tab.id).length
+          : 0,
+      }))
+      .filter((tab) => tab.count > 0 || tab.stopCount > 0);
+  }, [filterCounts, placeId]);
 
   // Soft live tick — bump travellers / freshness like Tour Rush
   useEffect(() => {
@@ -182,9 +198,7 @@ export function TourPulseBoard({
 
   function selectZone(zoneId: PulseZoneId) {
     setSelectedZoneId(zoneId);
-    const inZone = activities.filter(
-      (a) => a.zoneId === zoneId && matchesPulseFilter(a, filter),
-    );
+    const inZone = filtered.filter((a) => a.zoneId === zoneId);
     setSelectedActivityId(inZone[0]?.id ?? null);
     setSelectedStopId(null);
   }
@@ -200,10 +214,8 @@ export function TourPulseBoard({
     setLocationQuery(place.name);
     setSelectedZoneId(place.zoneId);
     setSelectedStopId(null);
-    const inZone = activities.filter(
-      (a) =>
-        a.zoneId === place.zoneId && matchesPulseFilter(a, filter),
-    );
+    setFilter("all");
+    const inZone = activities.filter((a) => a.zoneId === place.zoneId);
     setSelectedActivityId(inZone[0]?.id ?? null);
   }
 
@@ -211,7 +223,9 @@ export function TourPulseBoard({
     setPlaceId(null);
     setLocationQuery("");
     setSelectedStopId(null);
-    setStopKind("all");
+    setFilter("all");
+    setSelectedZoneId(null);
+    setSelectedActivityId(null);
   }
 
   const spotlight = useMemo(() => {
@@ -252,45 +266,41 @@ export function TourPulseBoard({
         }
       >
         {!embedded ? (
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-amber">
-                Tour Pulse · New York
-              </p>
-              <h2 className="mt-2 font-display text-3xl text-white sm:text-4xl">
-                Where tours are happening now
-              </h2>
-              <p className="mt-2 max-w-xl text-sm text-white/70 sm:text-base">
-                Live rhythm along the city spine — harbor to airports. Tap a
-                pulse for zone activity, then join or request nearby.
-              </p>
-            </div>
-            <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
-              <span className="live-dot" aria-hidden />
-              {filtered.length} signals · public zones only
+          <div className="max-w-2xl">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-amber">
+              Near you · New York
+            </p>
+            <h2 className="mt-2 font-display text-3xl text-white sm:text-4xl">
+              Start with where you’re staying
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-white/70 sm:text-base">
+              Enter your hotel — then pick what’s around you: bus tours,
+              museums, pizza, Chinese food, and more on the corridor map.
             </p>
           </div>
         ) : (
-          <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
-            <span className="live-dot" aria-hidden />
-            {filtered.length} signals
-            {nearPlace ? ` · near ${nearPlace.name}` : " · public zones only"}
+          <p className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
+            {nearPlace
+              ? `Staying near ${nearPlace.name} · ${filtered.length} nearby`
+              : "Step 1 · enter where you’re staying"}
           </p>
         )}
 
-        <div className="mt-4 border border-white/10 bg-white/[0.03] p-4 sm:mt-5">
-          <label className="block">
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
-              Where are you?
-            </span>
+        <div className="mt-4 border border-amber/30 bg-amber/5 p-4 sm:mt-5 sm:p-5">
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
+            1 · Where are you staying?
+          </p>
+          <label className="mt-2 block">
+            <span className="sr-only">Hotel or stay</span>
             <input
               value={locationQuery}
               onChange={(e) => {
                 setLocationQuery(e.target.value);
                 if (placeId) setPlaceId(null);
               }}
-              placeholder="e.g. Aliz Hotel, Times Square, Battery Park…"
-              className="mt-2 w-full border border-white/15 bg-ink/60 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-amber/50"
+              placeholder="e.g. Aliz Hotel Times Square…"
+              className="w-full border border-white/15 bg-ink/70 px-3 py-3 text-base text-white outline-none placeholder:text-white/35 focus:border-amber/50"
+              autoComplete="off"
             />
           </label>
           {!nearPlace && placeSuggestions.length > 0 ? (
@@ -314,25 +324,83 @@ export function TourPulseBoard({
           {nearPlace ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="border border-amber/40 bg-amber/15 px-2.5 py-1 text-xs font-semibold text-amber">
-                Near {nearPlace.name}
+                Staying · {nearPlace.name}
               </span>
               <button
                 type="button"
                 onClick={clearPlace}
                 className="text-xs font-semibold text-white/55 underline-offset-2 hover:text-white hover:underline"
               >
-                Clear
+                Change stay
               </button>
-              <p className="w-full text-sm text-white/60">{nearPlace.blurb}</p>
             </div>
           ) : (
             <p className="mt-2 text-xs text-white/45">
-              Enter your hotel or landmark to see hop-on bus stops and nearby
-              activities on the corridor map.
+              Try Aliz Hotel, Times Square, Chinatown, Battery Park, or The Met.
             </p>
           )}
         </div>
 
+        {nearPlace ? (
+          <div className="mt-4 border border-white/10 bg-white/[0.03] p-4">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
+              2 · What’s around you?
+            </p>
+            <p className="mt-1 text-sm text-white/55">
+              Tap a type — the corridor map and list update.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              <button
+                type="button"
+                onClick={() => setFilter("all")}
+                className={`border px-3 py-3 text-left transition ${
+                  filter === "all"
+                    ? "border-amber bg-amber text-ink"
+                    : "border-white/15 text-white hover:border-white/35"
+                }`}
+              >
+                <span className="block text-sm font-semibold">All nearby</span>
+                <span className="mt-0.5 block text-xs opacity-70">
+                  {localActivities.length} activities
+                </span>
+              </button>
+              {typeCards.map((tab) => {
+                const active = filter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setFilter(tab.id)}
+                    className={`border px-3 py-3 text-left transition ${
+                      active
+                        ? "border-amber bg-amber text-ink"
+                        : "border-white/15 text-white hover:border-white/35"
+                    }`}
+                  >
+                    <span
+                      className="mb-1.5 block h-1.5 w-6"
+                      style={{
+                        background: active
+                          ? "#0c1b2a"
+                          : experienceTypeColor[tab.id],
+                      }}
+                      aria-hidden
+                    />
+                    <span className="block text-sm font-semibold">
+                      {tab.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs opacity-70">
+                      {tab.count} live
+                      {tab.stopCount ? ` · ${tab.stopCount} spots` : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {nearPlace ? (
         <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
           {/* Live list — below map on mobile, left column on desktop */}
           <div className="order-2 border border-white/10 bg-white/[0.03] lg:order-1">
@@ -418,13 +486,13 @@ export function TourPulseBoard({
                 </p>
               </div>
 
-              {/* Swipe filters — truckerslikeme style */}
+              {/* Swipe filters — experience types around your stay */}
               <div className="border-b border-white/10 px-4 py-3">
                 <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-                  Swipe filters →
+                  3 · Corridor map · swipe filters →
                 </p>
                 <div className="mt-2 flex gap-4 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {pulseFilterTabs.map((tab) => {
+                  {experienceTypeTabs.map((tab) => {
                     const active = filter === tab.id;
                     const count = filterCounts[tab.id] ?? 0;
                     return (
@@ -539,37 +607,12 @@ export function TourPulseBoard({
 
             {nearPlace && nearbyStops.length > 0 ? (
               <div className="border border-amber/25 bg-amber/5 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-amber">
-                    Board near you
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {(
-                      [
-                        ["all", "All stops"],
-                        ["hop_on_bus", "Bus tours"],
-                        ["walking_meetup", "Walking"],
-                        ["hotel_pickup", "Pickups"],
-                      ] as const
-                    ).map(([id, label]) => (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => {
-                          setStopKind(id);
-                          if (id === "hop_on_bus") setFilter("bus");
-                        }}
-                        className={`border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${
-                          stopKind === id
-                            ? "border-amber bg-amber text-ink"
-                            : "border-white/20 text-white/55 hover:text-white"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-amber">
+                  Spots near your stay
+                  {filter !== "all"
+                    ? ` · ${experienceTypeTabs.find((t) => t.id === filter)?.label}`
+                    : ""}
+                </p>
                 <ul className="mt-3 space-y-2">
                   {nearbyStops.map((stop) => {
                     const selected = selectedStopId === stop.id;
@@ -617,11 +660,13 @@ export function TourPulseBoard({
                 </ul>
                 <Link
                   href={`/request?details=${encodeURIComponent(
-                    `I am at ${nearPlace.name}. Help me board a hop-on hop-off bus nearby.`,
+                    `I am staying at ${nearPlace.name}. Show me ${
+                      filter === "all" ? "nearby tours and food" : filter
+                    } and where to go.`,
                   )}`}
                   className="mt-3 inline-flex text-sm font-semibold text-amber underline-offset-2 hover:underline"
                 >
-                  Request help boarding from here →
+                  Request help from this stay →
                 </Link>
               </div>
             ) : null}
@@ -642,6 +687,7 @@ export function TourPulseBoard({
             ) : null}
           </div>
         </div>
+        ) : null}
       </div>
     </section>
   );
@@ -745,7 +791,11 @@ function CorridorMap({
                 ? pulseCategoryColor.pickup
                 : stop.kind === "cruise_terminal"
                   ? pulseCategoryColor.cruise
-                  : pulseCategoryColor.tour;
+                  : stop.kind === "food_spot"
+                    ? pulseCategoryColor.food
+                    : stop.kind === "museum_spot"
+                      ? pulseCategoryColor.museum
+                      : pulseCategoryColor.tour;
           return (
             <g
               key={stop.id}

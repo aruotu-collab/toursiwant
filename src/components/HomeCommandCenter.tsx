@@ -43,10 +43,10 @@ const TAB_COPY: Record<
   { eyebrow: string; title: string; blurb: string }
 > = {
   pulse: {
-    eyebrow: "Tour Pulse · New York",
-    title: "Where tours are happening now",
+    eyebrow: "Near you · New York",
+    title: "Start with where you’re staying",
     blurb:
-      "Enter your hotel or landmark — see hop-on bus stops and nearby activities on the corridor map, then filter by bus tours, walks, and more.",
+      "Enter your hotel, then choose what’s around you — bus tours, museums, pizza, Chinese food — and see it on the corridor map.",
   },
   seats: {
     eyebrow: "Tour Rush · live now",
