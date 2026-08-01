@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { launchCity } from "@/lib/cities";
 import {
@@ -9,8 +9,10 @@ import {
   getSampleTour,
   getTourDeparture,
   toDateKey,
+  type SampleTour,
 } from "@/lib/sample-tours";
 import { tourInterests, type TourInterest } from "@/lib/tour-types";
+import type { CatalogTour } from "@/lib/us-tour-catalog";
 
 export default function RequestForm() {
   const searchParams = useSearchParams();
@@ -22,9 +24,36 @@ export default function RequestForm() {
   const todayKey = toDateKey(new Date());
   const initialDate = dateParam || suggestedParam || todayKey;
 
-  const selectedTour = tourSlug
+  const starterTour = tourSlug
     ? getTourDeparture(tourSlug, initialDate) || getSampleTour(tourSlug)
     : undefined;
+
+  const [operatorTour, setOperatorTour] = useState<CatalogTour | null>(null);
+
+  useEffect(() => {
+    if (!tourSlug || starterTour) {
+      setOperatorTour(null);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/listings")
+      .then((r) => r.json())
+      .then((data: { tours?: CatalogTour[] }) => {
+        if (cancelled) return;
+        setOperatorTour(
+          (data.tours || []).find((tour) => tour.slug === tourSlug) || null,
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setOperatorTour(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tourSlug, starterTour]);
+
+  const selectedTour: SampleTour | CatalogTour | undefined =
+    starterTour || operatorTour || undefined;
   const isSpecificTour = Boolean(selectedTour) && !isOperator;
   const hasLockedBrowseDate = Boolean(dateParam) && !suggestedParam;
   const suggestedFromBrowse = Boolean(suggestedParam) || Boolean(dateParam);
@@ -34,13 +63,21 @@ export default function RequestForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [interests, setInterests] = useState<TourInterest[]>(
-    selectedTour ? [selectedTour.interest] : [],
+    starterTour ? [starterTour.interest] : [],
   );
-  const [joinGroup, setJoinGroup] = useState(selectedTour?.joinable ?? true);
+  const [joinGroup, setJoinGroup] = useState(starterTour?.joinable ?? true);
   const [needStay, setNeedStay] = useState(stayIntent);
   const [saveAccount, setSaveAccount] = useState(true);
   const [magicUrl, setMagicUrl] = useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState("");
+
+  useEffect(() => {
+    if (!selectedTour) return;
+    setInterests((current) =>
+      current.length ? current : [selectedTour.interest as TourInterest],
+    );
+    setJoinGroup(selectedTour.joinable);
+  }, [selectedTour]);
 
   const title = useMemo(() => {
     if (isOperator) return "Join ToursIWant as a US tour operator";

@@ -1,11 +1,12 @@
 import type { MetadataRoute } from "next";
+import { listPublishedCatalogTours } from "@/lib/listings-store";
 import { sampleTours } from "@/lib/sample-tours";
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
   "https://www.toursiwant.com";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -14,6 +15,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/events",
     "/events/ride",
     "/request",
+    "/operator",
   ].map((path) => ({
     url: `${siteUrl}${path}`,
     lastModified: now,
@@ -21,10 +23,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: path === "" ? 1 : path === "/tours" ? 0.9 : 0.7,
   }));
 
-  const tourRoutes: MetadataRoute.Sitemap = sampleTours.map((tour) => ({
+  const operatorTours = await listPublishedCatalogTours().catch(() => []);
+  const seen = new Set(sampleTours.map((tour) => tour.slug));
+  const allTours = [
+    ...sampleTours,
+    ...operatorTours.filter((tour) => !seen.has(tour.slug)),
+  ];
+
+  const tourRoutes: MetadataRoute.Sitemap = allTours.map((tour) => ({
     url: `${siteUrl}/tours/${tour.slug}`,
     lastModified: now,
-    changeFrequency: "weekly",
+    changeFrequency: "weekly" as const,
     priority: 0.8,
   }));
 

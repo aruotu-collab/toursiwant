@@ -129,6 +129,7 @@ export type TourSearchFilters = {
   stateCode?: string;
   citySlug?: string;
   query?: string;
+  extraTours?: CatalogTour[];
 };
 
 /** Theme → state → city → keyword discovery (usable from anywhere). */
@@ -140,7 +141,11 @@ export function searchToursForTraveller(
   const citySlug = filters.citySlug || "all";
   const query = (filters.query || "").trim().toLowerCase();
 
-  let list = getToursForDate(filters.dateKey, citySlug);
+  let list = getToursForDate(
+    filters.dateKey,
+    citySlug,
+    filters.extraTours || [],
+  );
 
   if (stateCode !== "all") {
     list = list.filter((tour) => tour.stateCode === stateCode);

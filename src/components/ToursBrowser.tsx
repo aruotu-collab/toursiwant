@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ToursCityMap } from "@/components/ToursCityMap";
 import {
   BROWSE_MONTHS_AHEAD,
@@ -10,7 +10,7 @@ import {
   toDateKey,
   type TourDeparture,
 } from "@/lib/sample-tours";
-import { catalogStats } from "@/lib/us-tour-catalog";
+import { catalogStats, type CatalogTour } from "@/lib/us-tour-catalog";
 import {
   citiesInState,
   deriveThemes,
@@ -74,6 +74,22 @@ export function ToursBrowser({
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [query, setQuery] = useState("");
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [operatorTours, setOperatorTours] = useState<CatalogTour[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/listings")
+      .then((r) => r.json())
+      .then((data: { tours?: CatalogTour[] }) => {
+        if (!cancelled) setOperatorTours(data.tours || []);
+      })
+      .catch(() => {
+        if (!cancelled) setOperatorTours([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const citiesForState = useMemo(
     () => citiesInState(stateCode),
@@ -88,8 +104,9 @@ export function ToursBrowser({
         stateCode,
         citySlug,
         query,
+        extraTours: operatorTours,
       }),
-    [selectedDate, theme, stateCode, citySlug, query],
+    [selectedDate, theme, stateCode, citySlug, query, operatorTours],
   );
 
   const shortcuts = quickOffsets();

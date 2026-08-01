@@ -2,11 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TourDatePicker } from "@/components/TourDatePicker";
-import {
-  getTourDeparture,
-  toDateKey,
-} from "@/lib/sample-tours";
-import { getTourDetails, weekdayLabels } from "@/lib/tour-details";
+import { getTourDetailsAsync, weekdayLabels } from "@/lib/tour-details";
+import { getTourDeparture, toDateKey } from "@/lib/sample-tours";
 
 type TourPageProps = {
   params: Promise<{ slug: string }>;
@@ -15,7 +12,7 @@ type TourPageProps = {
 
 export async function generateMetadata({ params }: TourPageProps) {
   const { slug } = await params;
-  const tour = getTourDetails(slug);
+  const tour = await getTourDetailsAsync(slug);
   if (!tour) return { title: "Tour not found" };
   return {
     title: tour.title,
@@ -29,11 +26,16 @@ export default async function TourDetailPage({
 }: TourPageProps) {
   const { slug } = await params;
   const { date: dateParam } = await searchParams;
-  const tour = getTourDetails(slug);
+  const tour = await getTourDetailsAsync(slug);
   if (!tour) notFound();
 
   const travelDate = dateParam || toDateKey(new Date());
-  const departure = getTourDeparture(slug, travelDate);
+  const departure = getTourDeparture(
+    slug,
+    travelDate,
+    "all",
+    tour.source === "operator" ? [tour] : [],
+  );
   const requestHref = `/request?tour=${tour.slug}&suggested=${travelDate}`;
 
   return (

@@ -134,6 +134,43 @@ export async function ensureAppSchema() {
         CREATE INDEX IF NOT EXISTS page_views_created_at_idx
         ON page_views (created_at DESC)
       `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS operator_listings (
+          id TEXT PRIMARY KEY,
+          slug TEXT NOT NULL UNIQUE,
+          operator_user_id TEXT NOT NULL,
+          operator_email TEXT NOT NULL,
+          operator_name TEXT,
+          business_name TEXT,
+          city_slug TEXT NOT NULL,
+          city_name TEXT NOT NULL,
+          state_code TEXT NOT NULL,
+          title TEXT NOT NULL,
+          duration TEXT NOT NULL,
+          meetup TEXT NOT NULL,
+          price_from TEXT NOT NULL,
+          joinable BOOLEAN NOT NULL DEFAULT TRUE,
+          interest TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          time_label TEXT NOT NULL DEFAULT '',
+          schedule TEXT NOT NULL DEFAULT 'flexible',
+          weekdays INTEGER[] NOT NULL DEFAULT '{}',
+          spaces_default INTEGER NOT NULL DEFAULT 8,
+          themes TEXT[] NOT NULL DEFAULT '{}',
+          status TEXT NOT NULL DEFAULT 'published',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS operator_listings_status_idx
+        ON operator_listings (status, created_at DESC)
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS operator_listings_operator_idx
+        ON operator_listings (operator_user_id, created_at DESC)
+      `;
     })();
   }
   await schemaReady;
@@ -371,4 +408,201 @@ export async function dbPageViewStats() {
     uniqueSessions24h: totals?.unique_sessions_24h ?? 0,
     topPaths: topPaths.map((row) => ({ path: row.path, views: row.views })),
   };
+}
+
+export type OperatorListingRow = {
+  id: string;
+  slug: string;
+  operator_user_id: string;
+  operator_email: string;
+  operator_name: string | null;
+  business_name: string | null;
+  city_slug: string;
+  city_name: string;
+  state_code: string;
+  title: string;
+  duration: string;
+  meetup: string;
+  price_from: string;
+  joinable: boolean;
+  interest: string;
+  summary: string;
+  time_label: string;
+  schedule: string;
+  weekdays: number[] | null;
+  spaces_default: number;
+  themes: string[] | null;
+  status: string;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
+export type OperatorListingRecord = {
+  id: string;
+  slug: string;
+  operatorUserId: string;
+  operatorEmail: string;
+  operatorName?: string;
+  businessName?: string;
+  citySlug: string;
+  cityName: string;
+  stateCode: string;
+  title: string;
+  duration: string;
+  meetup: string;
+  priceFrom: string;
+  joinable: boolean;
+  interest: string;
+  summary: string;
+  timeLabel: string;
+  schedule: "fixed" | "flexible" | "rolling";
+  weekdays: number[];
+  spacesDefault: number;
+  themes: string[];
+  status: "published" | "draft" | "archived";
+  createdAt: string;
+  updatedAt: string;
+};
+
+function rowToListing(row: OperatorListingRow): OperatorListingRecord {
+  const createdAt =
+    row.created_at instanceof Date
+      ? row.created_at.toISOString()
+      : new Date(row.created_at).toISOString();
+  const updatedAt =
+    row.updated_at instanceof Date
+      ? row.updated_at.toISOString()
+      : new Date(row.updated_at).toISOString();
+  const schedule =
+    row.schedule === "fixed" || row.schedule === "rolling"
+      ? row.schedule
+      : "flexible";
+  const status =
+    row.status === "draft" || row.status === "archived"
+      ? row.status
+      : "published";
+
+  return {
+    id: row.id,
+    slug: row.slug,
+    operatorUserId: row.operator_user_id,
+    operatorEmail: row.operator_email,
+    operatorName: row.operator_name || undefined,
+    businessName: row.business_name || undefined,
+    citySlug: row.city_slug,
+    cityName: row.city_name,
+    stateCode: row.state_code,
+    title: row.title,
+    duration: row.duration,
+    meetup: row.meetup,
+    priceFrom: row.price_from,
+    joinable: Boolean(row.joinable),
+    interest: row.interest,
+    summary: row.summary,
+    timeLabel: row.time_label || "",
+    schedule,
+    weekdays: Array.isArray(row.weekdays) ? row.weekdays : [],
+    spacesDefault: row.spaces_default || 8,
+    themes: Array.isArray(row.themes) ? row.themes : [],
+    status,
+    createdAt,
+    updatedAt,
+  };
+}
+
+export async function dbListPublishedListings(): Promise<OperatorListingRecord[]> {
+  await ensureAppSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT * FROM operator_listings
+    WHERE status = 'published'
+    ORDER BY created_at DESC
+    LIMIT 500
+  `) as OperatorListingRow[];
+  return rows.map(rowToListing);
+}
+
+export async function dbListListingsForOperator(
+  userId: string,
+): Promise<OperatorListingRecord[]> {
+  await ensureAppSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT * FROM operator_listings
+    WHERE operator_user_id = ${userId}
+    ORDER BY created_at DESC
+    LIMIT 200
+  `) as OperatorListingRow[];
+  return rows.map(rowToListing);
+}
+
+export async function dbGetListingBySlug(
+  slug: string,
+): Promise<OperatorListingRecord | null> {
+  await ensureAppSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT * FROM operator_listings WHERE slug = ${slug} LIMIT 1
+  `) as OperatorListingRow[];
+  return rows[0] ? rowToListing(rows[0]) : null;
+}
+
+export async function dbInsertListing(
+  listing: OperatorListingRecord,
+): Promise<OperatorListingRecord> {
+  await ensureAppSchema();
+  const sql = getSql();
+  await sql`
+    INSERT INTO operator_listings (
+      id, slug, operator_user_id, operator_email, operator_name, business_name,
+      city_slug, city_name, state_code, title, duration, meetup, price_from,
+      joinable, interest, summary, time_label, schedule, weekdays,
+      spaces_default, themes, status, created_at, updated_at
+    ) VALUES (
+      ${listing.id},
+      ${listing.slug},
+      ${listing.operatorUserId},
+      ${listing.operatorEmail},
+      ${listing.operatorName ?? null},
+      ${listing.businessName ?? null},
+      ${listing.citySlug},
+      ${listing.cityName},
+      ${listing.stateCode},
+      ${listing.title},
+      ${listing.duration},
+      ${listing.meetup},
+      ${listing.priceFrom},
+      ${listing.joinable},
+      ${listing.interest},
+      ${listing.summary},
+      ${listing.timeLabel},
+      ${listing.schedule},
+      ${listing.weekdays},
+      ${listing.spacesDefault},
+      ${listing.themes},
+      ${listing.status},
+      ${listing.createdAt},
+      ${listing.updatedAt}
+    )
+  `;
+  return listing;
+}
+
+export async function dbUpdateListingStatus(
+  id: string,
+  operatorUserId: string,
+  status: OperatorListingRecord["status"],
+): Promise<OperatorListingRecord | null> {
+  await ensureAppSchema();
+  const sql = getSql();
+  const updatedAt = new Date().toISOString();
+  await sql`
+    UPDATE operator_listings
+    SET status = ${status}, updated_at = ${updatedAt}
+    WHERE id = ${id} AND operator_user_id = ${operatorUserId}
+  `;
+  const rows = (await sql`
+    SELECT * FROM operator_listings WHERE id = ${id} LIMIT 1
+  `) as OperatorListingRow[];
+  return rows[0] ? rowToListing(rows[0]) : null;
 }

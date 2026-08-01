@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { listOperatorListings } from "@/lib/listings-store";
 import { listRequests } from "@/lib/requests-store";
+import { OperatorListingsPanel } from "@/components/OperatorListingsPanel";
 import { OperatorLogoutButton } from "@/components/OperatorLogoutButton";
 import { OperatorReplyForm } from "@/components/OperatorReplyForm";
 
@@ -50,6 +52,10 @@ export default async function OperatorDashboardPage() {
     (item) => item.needAccommodation || item.type === "accommodation_request",
   );
   const eventLeads = leads.filter((item) => item.type === "event_ride");
+  const myListings = await listOperatorListings(user.id);
+  const myListingsCount = myListings.filter(
+    (item) => item.status === "published",
+  ).length;
 
   return (
     <main className="flex-1 bg-[linear-gradient(180deg,var(--mist)_0%,var(--paper)_35%)]">
@@ -57,15 +63,15 @@ export default async function OperatorDashboardPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-skyline">
-              Operator · New York
+              Operator · USA
             </p>
             <h1 className="mt-3 font-display text-4xl text-ink sm:text-5xl">
-              Lead inbox
+              Listings & lead inbox
             </h1>
             <p className="mt-3 max-w-xl text-ink-soft">
               Signed in as {user.name || user.email}
-              {user.businessName ? ` · ${user.businessName}` : ""}. Reply on
-              ToursIWant to email the traveller — they see it in Account.
+              {user.businessName ? ` · ${user.businessName}` : ""}. Publish tours
+              (Religious, Museum, Beach…) then reply to traveller leads.
             </p>
           </div>
           <OperatorLogoutButton />
@@ -73,8 +79,8 @@ export default async function OperatorDashboardPage() {
 
         <div className="mt-10 grid gap-4 sm:grid-cols-4">
           {[
+            { label: "My listings", value: myListingsCount },
             { label: "All leads", value: leads.length },
-            { label: "Live (real)", value: liveLeads.length },
             { label: "Awaiting reply", value: awaitingReply.length },
             {
               label: "Events + stays",
@@ -93,7 +99,16 @@ export default async function OperatorDashboardPage() {
           ))}
         </div>
 
-        <div className="mt-10 space-y-3">
+        <OperatorListingsPanel />
+
+        <div className="mt-12">
+          <h2 className="font-display text-2xl text-ink">Lead inbox</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Reply on ToursIWant to email the traveller — they see it in Account.
+          </p>
+        </div>
+
+        <div className="mt-6 space-y-3">
           {leads.length === 0 ? (
             <p className="border border-ink/10 bg-white/70 p-8 text-ink-soft">
               No leads yet. When travellers submit requests, they appear here.
@@ -253,9 +268,9 @@ export default async function OperatorDashboardPage() {
         </div>
 
         <p className="mt-10 text-sm text-stone">
-          Need a listing profile?{" "}
+          Need to update your operator profile?{" "}
           <Link href="/request?intent=operator" className="text-skyline underline">
-            Update operator interest
+            Operator interest form
           </Link>
         </p>
       </div>

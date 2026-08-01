@@ -15,7 +15,7 @@ export type TourDeparture = CatalogTour & {
   departsLabel: string;
 };
 
-/** All starter (+ future operator) tours across the USA. */
+/** Starter catalog only — merge operator listings via getToursForDate extras. */
 export const sampleTours: CatalogTour[] = catalogTours;
 
 export function toDateKey(date: Date) {
@@ -52,15 +52,26 @@ function spacesFor(tour: CatalogTour, dateKey: string) {
   return Math.max(tour.spacesDefault - taken, 1);
 }
 
+function poolForCity(citySlug: string, extra: CatalogTour[] = []) {
+  const base = getToursByCity(citySlug);
+  const extras =
+    citySlug === "all"
+      ? extra
+      : extra.filter((tour) => tour.citySlug === citySlug);
+  const seen = new Set(base.map((tour) => tour.slug));
+  return [...base, ...extras.filter((tour) => !seen.has(tour.slug))];
+}
+
 export function getToursForDate(
   dateKey: string,
   citySlug: string = "all",
+  extraTours: CatalogTour[] = [],
 ): TourDeparture[] {
   const date = parseDateKey(dateKey);
   const weekday = date.getDay();
   const todayKey = toDateKey(new Date());
   const isToday = dateKey === todayKey;
-  const pool = getToursByCity(citySlug);
+  const pool = poolForCity(citySlug, extraTours);
 
   return pool
     .filter((tour) => {
@@ -98,8 +109,11 @@ export function getTourDeparture(
   slug: string,
   dateKey: string,
   citySlug: string = "all",
+  extraTours: CatalogTour[] = [],
 ) {
-  return getToursForDate(dateKey, citySlug).find((tour) => tour.slug === slug);
+  return getToursForDate(dateKey, citySlug, extraTours).find(
+    (tour) => tour.slug === slug,
+  );
 }
 
 export { listTourMetros, catalogTours, getToursByCity };

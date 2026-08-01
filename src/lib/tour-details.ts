@@ -1,5 +1,7 @@
+import { getListingTourBySlug } from "@/lib/listings-store";
 import { getSampleTour, type SampleTour } from "@/lib/sample-tours";
 import { tourRushLots } from "@/lib/tour-rush";
+import type { CatalogTour } from "@/lib/us-tour-catalog";
 
 export type TourDetails = SampleTour & {
   image: string;
@@ -460,12 +462,9 @@ const detailExtras: Record<
 const fallbackImage =
   "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=1600&q=80";
 
-export function getTourDetails(slug: string): TourDetails | undefined {
-  const tour = getSampleTour(slug);
-  if (!tour) return undefined;
-
-  const extras = detailExtras[slug];
-  const rush = tourRushLots.find((lot) => lot.tourSlug === slug);
+function detailsFromTour(tour: CatalogTour | SampleTour): TourDetails {
+  const extras = detailExtras[tour.slug];
+  const rush = tourRushLots.find((lot) => lot.tourSlug === tour.slug);
 
   return {
     ...tour,
@@ -479,17 +478,41 @@ export function getTourDetails(slug: string): TourDetails | undefined {
       `${tour.duration} experience`,
       tour.joinable ? "Shared group available" : "Private experience",
       `From ${tour.priceFrom}`,
+      tour.source === "operator" ? "Operator-published listing" : "Starter catalog",
     ],
-    includes: extras?.includes || ["Local operator", "Listed departure timing", "Meeting point guidance"],
+    includes: extras?.includes || [
+      tour.source === "operator" ? "Published by a ToursIWant operator" : "Local operator",
+      "Listed departure timing",
+      "Meeting point guidance",
+    ],
     goodToKnow: extras?.goodToKnow || [
-      "Availability changes by date",
+      "Availability changes by date — pick your travel day when you request",
       "Confirm return times for cruise or flight connections",
       "Message the operator with accessibility needs",
     ],
     languages: extras?.languages || ["English"],
     cancellation:
-      extras?.cancellation || "Cancellation terms confirmed with the operator when you enquire.",
+      extras?.cancellation ||
+      "Cancellation terms confirmed with the operator when you enquire.",
   };
+}
+
+/** Sync lookup for starter catalog only. */
+export function getTourDetails(slug: string): TourDetails | undefined {
+  const tour = getSampleTour(slug);
+  if (!tour) return undefined;
+  return detailsFromTour(tour);
+}
+
+/** Starter + operator-published listings. */
+export async function getTourDetailsAsync(
+  slug: string,
+): Promise<TourDetails | undefined> {
+  const starter = getSampleTour(slug);
+  if (starter) return detailsFromTour(starter);
+  const operatorTour = await getListingTourBySlug(slug);
+  if (!operatorTour) return undefined;
+  return detailsFromTour(operatorTour);
 }
 
 export function weekdayLabels(weekdays: number[]) {
