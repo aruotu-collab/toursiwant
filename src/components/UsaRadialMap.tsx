@@ -33,22 +33,24 @@ export function UsaRadialMap({
 
   function project(lat: number, lng: number) {
     // Local tangent approximation around stay
-    const xMeters = (lng - stayLng) * 85000 * Math.cos((stayLat * Math.PI) / 180);
+    const xMeters =
+      (lng - stayLng) * 85000 * Math.cos((stayLat * Math.PI) / 180);
     const yMeters = (lat - stayLat) * 110000;
-    const scale = 140 / (maxWalk * 80);
+    const scale = 120 / (maxWalk * 80);
     return {
-      x: 200 + xMeters * scale,
-      y: 200 - yMeters * scale,
+      x: Math.max(36, Math.min(364, 200 + xMeters * scale)),
+      y: Math.max(48, Math.min(352, 200 - yMeters * scale)),
     };
   }
 
   return (
-    <div className="relative touch-manipulation px-1 py-2 sm:px-4 sm:py-4">
+    <div className="relative overflow-visible touch-manipulation px-2 py-3 sm:px-4 sm:py-4">
       <svg
-        viewBox="0 0 400 400"
-        className="mx-auto h-auto w-full max-h-[min(52svh,380px)] max-w-md select-none"
+        viewBox="-16 -16 432 432"
+        className="mx-auto h-auto w-full max-w-md overflow-visible select-none"
         role="img"
         aria-label={`Local map around ${stayName} in ${metro}`}
+        preserveAspectRatio="xMidYMid meet"
       >
         <rect width="400" height="400" fill="#0a1520" />
         <circle cx="200" cy="200" r="160" fill="#1f4e79" opacity="0.12" />

@@ -548,9 +548,9 @@ export function TourPulseBoard({
         ) : null}
 
         {hasStay ? (
-        <div className="mt-5 grid gap-4 overflow-x-hidden sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
+        <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
           {/* Live list — below map on mobile, left column on desktop */}
-          <div className="order-2 border border-white/10 bg-white/[0.03] lg:order-1">
+          <div className="order-2 min-w-0 border border-white/10 bg-white/[0.03] lg:order-1">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
               <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
                 Live listing
@@ -622,8 +622,8 @@ export function TourPulseBoard({
           </div>
 
           {/* Corridor map — first on mobile */}
-          <div className="order-1 space-y-4 lg:order-2">
-            <div className="border border-white/10 bg-[#0a1520]">
+          <div className="order-1 min-w-0 space-y-4 overflow-visible lg:order-2">
+            <div className="overflow-visible border border-white/10 bg-[#0a1520]">
               <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
                 <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">
                   Corridor map
@@ -923,12 +923,13 @@ function CorridorMap({
   onSelectStop?: (stop: BoardingStop & { walkMinutes: number }) => void;
 }) {
   return (
-    <div className="relative touch-manipulation px-1 py-2 sm:px-4 sm:py-4">
+    <div className="relative overflow-visible touch-manipulation px-2 py-3 sm:px-4 sm:py-4">
       <svg
-        viewBox="0 0 400 520"
-        className="mx-auto h-auto w-full max-h-[min(52svh,380px)] max-w-md select-none lg:max-h-none"
+        viewBox="-24 -28 448 576"
+        className="mx-auto h-auto w-full max-w-md overflow-visible select-none"
         role="img"
         aria-label="New York tour corridor from harbor to airports"
+        preserveAspectRatio="xMidYMid meet"
       >
         <defs>
           <linearGradient id="corridorGlow" x1="0" y1="1" x2="1" y2="0">
