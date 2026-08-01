@@ -2,6 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import {
+  adjacentZones,
+  boardingKindLabel,
+  getNearMePlace,
+  searchNearMePlaces,
+  stopsNearPlace,
+  type BoardingKind,
+  type BoardingStop,
+  type NearMePlace,
+} from "@/lib/near-me";
 import { toDateKey } from "@/lib/sample-tours";
 import {
   activityHref,
@@ -79,11 +89,35 @@ export function TourPulseBoard({
     null,
   );
   const [tickFlash, setTickFlash] = useState<string | null>(null);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [placeId, setPlaceId] = useState<string | null>(null);
+  const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
+  const [stopKind, setStopKind] = useState<BoardingKind | "all">("all");
 
-  const filtered = useMemo(
-    () => activities.filter((a) => matchesPulseFilter(a, filter)),
-    [activities, filter],
+  const nearPlace = placeId ? getNearMePlace(placeId) || null : null;
+
+  const placeSuggestions = useMemo(
+    () => searchNearMePlaces(locationQuery),
+    [locationQuery],
   );
+
+  const nearbyStops = useMemo(() => {
+    if (!placeId) return [];
+    return stopsNearPlace(placeId, stopKind);
+  }, [placeId, stopKind]);
+
+  const nearZones = useMemo(
+    () => (nearPlace ? adjacentZones(nearPlace.zoneId) : null),
+    [nearPlace],
+  );
+
+  const filtered = useMemo(() => {
+    let list = activities.filter((a) => matchesPulseFilter(a, filter));
+    if (nearZones) {
+      list = list.filter((a) => nearZones.includes(a.zoneId));
+    }
+    return list;
+  }, [activities, filter, nearZones]);
 
   const selectedZone = pulseZones.find((z) => z.id === selectedZoneId) || null;
   const zoneItems = useMemo(
@@ -152,11 +186,32 @@ export function TourPulseBoard({
       (a) => a.zoneId === zoneId && matchesPulseFilter(a, filter),
     );
     setSelectedActivityId(inZone[0]?.id ?? null);
+    setSelectedStopId(null);
   }
 
   function selectActivity(activity: PulseActivity) {
     setSelectedZoneId(activity.zoneId);
     setSelectedActivityId(activity.id);
+    setSelectedStopId(null);
+  }
+
+  function choosePlace(place: NearMePlace) {
+    setPlaceId(place.id);
+    setLocationQuery(place.name);
+    setSelectedZoneId(place.zoneId);
+    setSelectedStopId(null);
+    const inZone = activities.filter(
+      (a) =>
+        a.zoneId === place.zoneId && matchesPulseFilter(a, filter),
+    );
+    setSelectedActivityId(inZone[0]?.id ?? null);
+  }
+
+  function clearPlace() {
+    setPlaceId(null);
+    setLocationQuery("");
+    setSelectedStopId(null);
+    setStopKind("all");
   }
 
   const spotlight = useMemo(() => {
@@ -218,9 +273,65 @@ export function TourPulseBoard({
         ) : (
           <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
             <span className="live-dot" aria-hidden />
-            {filtered.length} signals · public zones only
+            {filtered.length} signals
+            {nearPlace ? ` · near ${nearPlace.name}` : " · public zones only"}
           </p>
         )}
+
+        <div className="mt-4 border border-white/10 bg-white/[0.03] p-4 sm:mt-5">
+          <label className="block">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
+              Where are you?
+            </span>
+            <input
+              value={locationQuery}
+              onChange={(e) => {
+                setLocationQuery(e.target.value);
+                if (placeId) setPlaceId(null);
+              }}
+              placeholder="e.g. Aliz Hotel, Times Square, Battery Park…"
+              className="mt-2 w-full border border-white/15 bg-ink/60 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-amber/50"
+            />
+          </label>
+          {!nearPlace && placeSuggestions.length > 0 ? (
+            <ul className="mt-2 border border-white/10 bg-[#0a1520]">
+              {placeSuggestions.map((place) => (
+                <li key={place.id}>
+                  <button
+                    type="button"
+                    onClick={() => choosePlace(place)}
+                    className="flex w-full flex-col px-3 py-2.5 text-left hover:bg-white/5"
+                  >
+                    <span className="text-sm font-semibold text-white">
+                      {place.name}
+                    </span>
+                    <span className="text-xs text-white/50">{place.blurb}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {nearPlace ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="border border-amber/40 bg-amber/15 px-2.5 py-1 text-xs font-semibold text-amber">
+                Near {nearPlace.name}
+              </span>
+              <button
+                type="button"
+                onClick={clearPlace}
+                className="text-xs font-semibold text-white/55 underline-offset-2 hover:text-white hover:underline"
+              >
+                Clear
+              </button>
+              <p className="w-full text-sm text-white/60">{nearPlace.blurb}</p>
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-white/45">
+              Enter your hotel or landmark to see hop-on bus stops and nearby
+              activities on the corridor map.
+            </p>
+          )}
+        </div>
 
         <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
           {/* Live list — below map on mobile, left column on desktop */}
@@ -391,6 +502,14 @@ export function TourPulseBoard({
                 activities={filtered}
                 selectedZoneId={selectedZoneId}
                 onSelectZone={selectZone}
+                youAreHere={nearPlace}
+                boardingStops={nearbyStops}
+                selectedStopId={selectedStopId}
+                onSelectStop={(stop) => {
+                  setSelectedStopId(stop.id);
+                  setSelectedZoneId(stop.zoneId);
+                  setSelectedActivityId(null);
+                }}
               />
 
               <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-white/10 px-4 py-3">
@@ -406,11 +525,106 @@ export function TourPulseBoard({
                       style={{ background: color }}
                       aria-hidden
                     />
-                    {cat}
+                    {cat === "bus" ? "bus tours" : cat}
                   </span>
                 ))}
+                {nearPlace ? (
+                  <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-amber">
+                    <span className="h-2 w-2 rotate-45 bg-amber" aria-hidden />
+                    you are here
+                  </span>
+                ) : null}
               </div>
             </div>
+
+            {nearPlace && nearbyStops.length > 0 ? (
+              <div className="border border-amber/25 bg-amber/5 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-amber">
+                    Board near you
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(
+                      [
+                        ["all", "All stops"],
+                        ["hop_on_bus", "Bus tours"],
+                        ["walking_meetup", "Walking"],
+                        ["hotel_pickup", "Pickups"],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => {
+                          setStopKind(id);
+                          if (id === "hop_on_bus") setFilter("bus");
+                        }}
+                        className={`border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+                          stopKind === id
+                            ? "border-amber bg-amber text-ink"
+                            : "border-white/20 text-white/55 hover:text-white"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <ul className="mt-3 space-y-2">
+                  {nearbyStops.map((stop) => {
+                    const selected = selectedStopId === stop.id;
+                    return (
+                      <li key={stop.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedStopId(stop.id);
+                            setSelectedZoneId(stop.zoneId);
+                            setSelectedActivityId(null);
+                          }}
+                          className={`w-full border px-3 py-3 text-left transition ${
+                            selected
+                              ? "border-amber/50 bg-amber/10"
+                              : "border-white/10 bg-white/[0.03] hover:border-white/25"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-baseline justify-between gap-2">
+                            <p className="text-sm font-semibold text-white">
+                              {stop.name}
+                            </p>
+                            <p className="font-mono text-[11px] text-amber">
+                              ~{stop.walkMinutes} min walk
+                            </p>
+                          </div>
+                          <p className="mt-1 text-xs uppercase tracking-wider text-white/45">
+                            {boardingKindLabel[stop.kind]}
+                            {stop.operatorsHint
+                              ? ` · ${stop.operatorsHint}`
+                              : ""}
+                          </p>
+                          <p className="mt-1 text-sm text-white/60">
+                            {stop.addressHint}
+                          </p>
+                          {selected ? (
+                            <p className="mt-2 text-sm leading-relaxed text-white/75">
+                              {stop.howToBoard}
+                            </p>
+                          ) : null}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <Link
+                  href={`/request?details=${encodeURIComponent(
+                    `I am at ${nearPlace.name}. Help me board a hop-on hop-off bus nearby.`,
+                  )}`}
+                  className="mt-3 inline-flex text-sm font-semibold text-amber underline-offset-2 hover:underline"
+                >
+                  Request help boarding from here →
+                </Link>
+              </div>
+            ) : null}
 
             {selectedZone ? (
               <div id="pulse-zone-detail">
@@ -438,11 +652,19 @@ function CorridorMap({
   activities,
   selectedZoneId,
   onSelectZone,
+  youAreHere,
+  boardingStops,
+  selectedStopId,
+  onSelectStop,
 }: {
   filter: FilterId;
   activities: PulseActivity[];
   selectedZoneId: PulseZoneId | null;
   onSelectZone: (id: PulseZoneId) => void;
+  youAreHere?: NearMePlace | null;
+  boardingStops?: Array<BoardingStop & { walkMinutes: number }>;
+  selectedStopId?: string | null;
+  onSelectStop?: (stop: BoardingStop & { walkMinutes: number }) => void;
 }) {
   return (
     <div className="relative px-1 py-2 sm:px-4 sm:py-4">
@@ -512,6 +734,72 @@ function CorridorMap({
         >
           AIRPORTS
         </text>
+
+        {(boardingStops || []).map((stop) => {
+          const pt = pointOnCorridor(stop.t);
+          const selected = selectedStopId === stop.id;
+          const color =
+            stop.kind === "hop_on_bus"
+              ? pulseCategoryColor.bus
+              : stop.kind === "hotel_pickup"
+                ? pulseCategoryColor.pickup
+                : stop.kind === "cruise_terminal"
+                  ? pulseCategoryColor.cruise
+                  : pulseCategoryColor.tour;
+          return (
+            <g
+              key={stop.id}
+              transform={`translate(${pt.x}, ${pt.y})`}
+              className="cursor-pointer"
+              onClick={() => onSelectStop?.(stop)}
+            >
+              <circle r="14" fill="transparent" />
+              <rect
+                x="-5"
+                y="-5"
+                width="10"
+                height="10"
+                fill={color}
+                opacity={selected ? 1 : 0.85}
+                stroke={selected ? "#fff" : "none"}
+                strokeWidth="1.5"
+              />
+            </g>
+          );
+        })}
+
+        {youAreHere ? (
+          <g
+            transform={`translate(${pointOnCorridor(youAreHere.t).x}, ${pointOnCorridor(youAreHere.t).y})`}
+          >
+            <circle
+              r="18"
+              fill="#d4a017"
+              opacity="0.15"
+              className="pulse-ring"
+            />
+            <rect
+              x="-6"
+              y="-6"
+              width="12"
+              height="12"
+              fill="#d4a017"
+              transform="rotate(45)"
+              stroke="#0a1520"
+              strokeWidth="2"
+            />
+            <text
+              y="22"
+              textAnchor="middle"
+              fill="#d4a017"
+              fontSize="9"
+              fontFamily="ui-monospace, monospace"
+              fontWeight="700"
+            >
+              YOU
+            </text>
+          </g>
+        ) : null}
 
         {pulseZones.map((zone) => {
           const pt = pointOnCorridor(zone.t);

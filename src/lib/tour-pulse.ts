@@ -1,5 +1,6 @@
 export type PulseCategory =
   | "tour"
+  | "bus"
   | "pickup"
   | "cruise"
   | "event"
@@ -96,6 +97,7 @@ export const pulseFilterTabs: {
   label: string;
 }[] = [
   { id: "all", label: "All" },
+  { id: "bus", label: "Bus tours" },
   { id: "tour", label: "Tours" },
   { id: "pickup", label: "Pickups" },
   { id: "cruise", label: "Cruise" },
@@ -106,6 +108,7 @@ export const pulseFilterTabs: {
 
 export const pulseCategoryColor: Record<PulseCategory, string> = {
   tour: "#5b9bd5",
+  bus: "#f97316",
   pickup: "#d4a017",
   cruise: "#7dd3c0",
   event: "#c084fc",
@@ -206,6 +209,42 @@ export const seedPulseActivities: PulseActivity[] = [
     joinable: true,
     tourSlug: "broadway-night-lights",
     minutesAgo: 9,
+  },
+  {
+    id: "p7b",
+    zoneId: "midtown",
+    category: "bus",
+    status: "at_stop",
+    title: "Hop-on hop-off · Midtown loop",
+    detail: "Board at Port Authority / Times Square stop flags",
+    travellers: 18,
+    joinable: true,
+    href: "/request?details=Hop-on%20hop-off%20bus%20near%20my%20hotel",
+    minutesAgo: 5,
+  },
+  {
+    id: "p7c",
+    zoneId: "midtown",
+    category: "bus",
+    status: "departing_soon",
+    title: "Top View style double-decker · next buses",
+    detail: "8th Ave & Times Square boarding · day ticket loops",
+    travellers: 22,
+    joinable: true,
+    href: "/request?details=Top%20View%20hop-on%20hop-off%20boarding%20point",
+    minutesAgo: 11,
+  },
+  {
+    id: "p7d",
+    zoneId: "lower-manhattan",
+    category: "bus",
+    status: "en_route",
+    title: "Hop-on Downtown / harbor loop",
+    detail: "Battery Park stop · continue Midtown or Brooklyn",
+    travellers: 12,
+    joinable: true,
+    href: "/request?details=Downtown%20hop-on%20bus%20Battery%20Park",
+    minutesAgo: 16,
   },
   {
     id: "p8",

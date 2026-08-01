@@ -46,7 +46,7 @@ const TAB_COPY: Record<
     eyebrow: "Tour Pulse · New York",
     title: "Where tours are happening now",
     blurb:
-      "Live rhythm along the city spine — harbor to airports. Tap a pulse for zone activity, then join or request nearby.",
+      "Enter your hotel or landmark — see hop-on bus stops and nearby activities on the corridor map, then filter by bus tours, walks, and more.",
   },
   seats: {
     eyebrow: "Tour Rush · live now",
