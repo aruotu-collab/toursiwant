@@ -3,6 +3,7 @@ import { Fraunces, IBM_Plex_Mono, Manrope } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { VisitBeacon } from "@/components/VisitBeacon";
 import "./globals.css";
 
 const display = Fraunces({
@@ -79,6 +80,7 @@ export default function RootLayout({
         <SiteHeader />
         <div className="flex min-h-full flex-1 flex-col">{children}</div>
         <SiteFooter />
+        <VisitBeacon />
         {gaId ? <GoogleAnalytics gaId={gaId} /> : null}
       </body>
     </html>

@@ -26,9 +26,17 @@ export async function GET(request: Request) {
       ? result.nextPath
       : "/?menu=account";
 
-  if (result.user.role === "operator" || result.user.role === "admin") {
+  if (result.user.role === "admin") {
+    if (
+      !next.startsWith("/admin") &&
+      !next.startsWith("/operator") &&
+      !next.startsWith("/?menu=")
+    ) {
+      next = "/?menu=admin";
+    }
+  } else if (result.user.role === "operator") {
     if (!next.startsWith("/operator")) next = "/operator";
-  } else {
+  } else if (!result.nextPath || result.nextPath === "/?menu=account") {
     next = "/?menu=account";
   }
 

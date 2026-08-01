@@ -34,10 +34,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const role: UserRole =
-    body.role === "operator" || body.role === "admin"
-      ? body.role
-      : "traveller";
+  // Public signup may only request traveller or operator — never self-assign admin
+  const role: UserRole = body.role === "operator" ? "operator" : "traveller";
 
   const nextPath =
     body.nextPath?.startsWith("/") && !body.nextPath.startsWith("//")

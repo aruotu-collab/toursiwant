@@ -67,13 +67,42 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               Signed in as{" "}
               <span className="font-medium text-ink">{user.email}</span>
               {user.role === "operator" || user.role === "admin"
-                ? " · Operator"
+                ? user.role === "admin"
+                  ? " · Admin"
+                  : " · Operator"
                 : " · Traveller"}
               . When an operator replies, you get an email and it shows below.
             </p>
           </div>
           <AccountLogoutButton />
         </div>
+
+        {user.role === "admin" ? (
+          <div className="mt-8 flex flex-wrap gap-3 border border-skyline/20 bg-skyline/5 p-5">
+            <p className="w-full text-sm text-ink-soft">
+              Admin access — you can use traveller tools, the operator inbox, and
+              the platform console.
+            </p>
+            <Link
+              href="/admin"
+              className="bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft"
+            >
+              Admin console
+            </Link>
+            <Link
+              href="/operator"
+              className="border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-white"
+            >
+              Operator inbox
+            </Link>
+            <Link
+              href="/?menu=admin"
+              className="border border-ink/15 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-white"
+            >
+              Admin board menu
+            </Link>
+          </div>
+        ) : null}
 
         <div className="mt-10 grid gap-4 sm:grid-cols-3">
           <div className="border border-ink/10 bg-white/70 px-5 py-4">

@@ -140,6 +140,11 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
           Inbox
         </Link>
       ) : null}
+      {user.role === "admin" ? (
+        <Link href="/admin" className={`hidden sm:inline ${linkClass}`}>
+          Admin
+        </Link>
+      ) : null}
       <button
         type="button"
         onClick={logout}

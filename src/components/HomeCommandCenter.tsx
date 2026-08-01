@@ -20,9 +20,10 @@ export type CommandTab =
   | "tours"
   | "events"
   | "request"
-  | "account";
+  | "account"
+  | "admin";
 
-const MENU: { id: CommandTab; label: string; param: string }[] = [
+const BASE_MENU: { id: CommandTab; label: string; param: string }[] = [
   { id: "pulse", label: "Pulse", param: "pulse" },
   { id: "seats", label: "Live seats", param: "rush" },
   { id: "tours", label: "Find tours", param: "tours" },
@@ -30,6 +31,12 @@ const MENU: { id: CommandTab; label: string; param: string }[] = [
   { id: "request", label: "Request", param: "request" },
   { id: "account", label: "Account", param: "account" },
 ];
+
+const ADMIN_MENU_ITEM = {
+  id: "admin" as const,
+  label: "Admin",
+  param: "admin",
+};
 
 const TAB_COPY: Record<
   CommandTab,
@@ -71,6 +78,12 @@ const TAB_COPY: Record<
     blurb:
       "Signed-in home for your requests. Use the menus above anytime — Pulse, seats, tours, events.",
   },
+  admin: {
+    eyebrow: "Admin · platform",
+    title: "Monitor the marketplace",
+    blurb:
+      "Members, live requests, and site visits — plus shortcuts into traveller and operator tools.",
+  },
 };
 
 function tabFromMenuParam(value: string | null | undefined): CommandTab | null {
@@ -78,7 +91,8 @@ function tabFromMenuParam(value: string | null | undefined): CommandTab | null {
   const raw = value.toLowerCase();
   if (raw === "rush" || raw === "seats") return "seats";
   if (raw === "market") return "pulse";
-  const match = MENU.find((m) => m.param === raw || m.id === raw);
+  if (raw === "admin") return "admin";
+  const match = BASE_MENU.find((m) => m.param === raw || m.id === raw);
   return match?.id ?? null;
 }
 
@@ -89,22 +103,50 @@ export function HomeCommandCenter() {
   const [tab, setTabState] = useState<CommandTab>(
     () => tabFromMenuParam(menuParam) || "pulse",
   );
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const next = tabFromMenuParam(menuParam);
     if (next) setTabState(next);
   }, [menuParam]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d: { user?: { role?: string } | null }) => {
+        if (!cancelled) setIsAdmin(d.user?.role === "admin");
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const menu = useMemo(
+    () => (isAdmin ? [...BASE_MENU, ADMIN_MENU_ITEM] : BASE_MENU),
+    [isAdmin],
+  );
+
   const selectTab = useCallback(
     (next: CommandTab) => {
       setTabState(next);
-      const menu = next === "seats" ? "rush" : next;
-      router.replace(`/?menu=${menu}`, { scroll: false });
+      const menuParamNext = next === "seats" ? "rush" : next;
+      router.replace(`/?menu=${menuParamNext}`, { scroll: false });
     },
     [router],
   );
 
-  const copy = TAB_COPY[tab];
+  // If someone lands on ?menu=admin without admin role, fall back
+  useEffect(() => {
+    if (tab === "admin" && !isAdmin) {
+      setTabState("account");
+    }
+  }, [tab, isAdmin]);
+
+  const copy = TAB_COPY[tab === "admin" ? "admin" : tab];
 
   return (
     <div className="min-h-full bg-ink text-white">
@@ -141,7 +183,7 @@ export function HomeCommandCenter() {
 
         <div className="sticky top-[3.25rem] z-20 -mx-4 mt-4 border-b border-white/10 bg-ink/95 px-4 py-2.5 backdrop-blur-md sm:static sm:mx-0 sm:mt-6 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
           <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {MENU.map((item) => {
+            {menu.map((item) => {
               const active = tab === item.id;
               return (
                 <button
@@ -171,6 +213,7 @@ export function HomeCommandCenter() {
           {tab === "events" ? <EventsPanel /> : null}
           {tab === "request" ? <RequestPanel onSelectTab={selectTab} /> : null}
           {tab === "account" ? <AccountPanel onSelectTab={selectTab} /> : null}
+          {tab === "admin" && isAdmin ? <AdminBoardPanel /> : null}
         </div>
       </div>
     </div>
@@ -421,7 +464,9 @@ function AccountPanel({
         <p className="mt-2 text-white/65">
           {user.email}
           {user.role === "operator" || user.role === "admin"
-            ? " · Operator"
+            ? user.role === "admin"
+              ? " · Admin (traveller + operator + platform)"
+              : " · Operator"
             : " · Traveller"}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
@@ -446,12 +491,101 @@ function AccountPanel({
               Lead inbox
             </Link>
           ) : null}
+          {user.role === "admin" ? (
+            <Link
+              href="/admin"
+              className="border border-amber/50 bg-amber/15 px-5 py-3 text-sm font-semibold text-amber hover:bg-amber/25"
+            >
+              Admin console
+            </Link>
+          ) : null}
         </div>
       </div>
       <p className="text-sm text-white/50">
         Tip: the menus above (Pulse, Live seats, Find tours…) stay with you on
         this board — tap ToursIWant anytime to jump back to Pulse.
       </p>
+    </div>
+  );
+}
+
+function AdminBoardPanel() {
+  const [data, setData] = useState<{
+    members: { total: number; operators: number; admins: number };
+    requests: { live: number; open: number };
+    visitors: { last24h: number; last7d: number; uniqueSessions24h: number };
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/overview")
+      .then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error || "Failed");
+        setData(json);
+      })
+      .catch(() => setError("Could not load admin overview."));
+  }, []);
+
+  if (error) {
+    return (
+      <div className="border border-white/10 bg-white/[0.03] p-6 text-white/70">
+        {error}
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="h-40 animate-pulse border border-white/10 bg-white/5" />
+    );
+  }
+
+  const cards = [
+    { label: "Members", value: data.members.total },
+    { label: "Operators", value: data.members.operators },
+    { label: "Live requests", value: data.requests.live },
+    { label: "Awaiting reply", value: data.requests.open },
+    { label: "Visits 24h", value: data.visitors.last24h },
+    { label: "Visits 7d", value: data.visitors.last7d },
+    { label: "Unique 24h", value: data.visitors.uniqueSessions24h },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((card) => (
+          <div
+            key={card.label}
+            className="border border-white/10 bg-white/[0.03] px-4 py-4"
+          >
+            <p className="font-mono text-[10px] uppercase tracking-wider text-white/45">
+              {card.label}
+            </p>
+            <p className="mt-2 font-display text-3xl text-white">{card.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-3 border border-white/10 bg-white/[0.03] p-5">
+        <Link
+          href="/admin"
+          className="bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
+        >
+          Open full admin console →
+        </Link>
+        <Link
+          href="/operator"
+          className="border border-white/25 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
+        >
+          Operator inbox
+        </Link>
+        <Link
+          href="/account"
+          className="border border-white/25 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
+        >
+          Traveller account
+        </Link>
+      </div>
     </div>
   );
 }

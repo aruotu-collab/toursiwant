@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { isPlatformAdminEmail, resolveStoredRole } from "@/lib/admin";
 import { ensureAppSchema, getSql, hasDatabase } from "@/lib/db";
 
 export type UserRole = "traveller" | "operator" | "admin";
@@ -20,6 +21,21 @@ function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function rowToUser(row: Record<string, unknown>, roleOverride?: UserRole): AppUser {
+  return {
+    id: String(row.id),
+    email: String(row.email),
+    name: row.name ? String(row.name) : undefined,
+    phone: row.phone ? String(row.phone) : undefined,
+    role: roleOverride || (row.role as UserRole) || "traveller",
+    businessName: row.business_name ? String(row.business_name) : undefined,
+    createdAt:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at),
+  };
+}
+
 export async function upsertUser(input: {
   email: string;
   name?: string;
@@ -37,10 +53,11 @@ export async function upsertUser(input: {
 
   if (existing[0]) {
     const row = existing[0];
-    const role =
-      input.role && input.role !== "traveller"
-        ? input.role
-        : (row.role as UserRole);
+    const role = resolveStoredRole(
+      email,
+      input.role,
+      (row.role as UserRole) || "traveller",
+    );
     await sql`
       UPDATE users
       SET
@@ -50,20 +67,15 @@ export async function upsertUser(input: {
         role = ${role}
       WHERE email = ${email}
     `;
-    return {
-      id: String(row.id),
-      email,
-      name: (input.name || row.name || undefined) as string | undefined,
-      phone: (input.phone || row.phone || undefined) as string | undefined,
+    return rowToUser(
+      {
+        ...row,
+        name: input.name || row.name,
+        phone: input.phone || row.phone,
+        business_name: input.businessName || row.business_name,
+      },
       role,
-      businessName: (input.businessName ||
-        row.business_name ||
-        undefined) as string | undefined,
-      createdAt:
-        row.created_at instanceof Date
-          ? row.created_at.toISOString()
-          : String(row.created_at),
-    };
+    );
   }
 
   const user: AppUser = {
@@ -71,7 +83,7 @@ export async function upsertUser(input: {
     email,
     name: input.name,
     phone: input.phone,
-    role: input.role || "traveller",
+    role: resolveStoredRole(email, input.role),
     businessName: input.businessName,
     createdAt: new Date().toISOString(),
   };
@@ -206,20 +218,62 @@ export async function getCurrentUser(): Promise<AppUser | null> {
     return null;
   }
 
-  return {
-    id: String(row.id),
-    email: String(row.email),
-    name: row.name ? String(row.name) : undefined,
-    phone: row.phone ? String(row.phone) : undefined,
-    role: (row.role as UserRole) || "traveller",
-    businessName: row.business_name
-      ? String(row.business_name)
-      : undefined,
-    createdAt:
-      row.created_at instanceof Date
-        ? row.created_at.toISOString()
-        : String(row.created_at),
-  };
+  const email = String(row.email);
+  let role = (row.role as UserRole) || "traveller";
+
+  // Keep platform owner elevated even if DB drifted
+  if (isPlatformAdminEmail(email) && role !== "admin") {
+    await sql`UPDATE users SET role = 'admin' WHERE email = ${email}`;
+    role = "admin";
+  }
+
+  return rowToUser(row, role);
+}
+
+export async function requireAdmin(): Promise<AppUser | null> {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") return null;
+  return user;
+}
+
+export async function listUsers(limit = 200): Promise<AppUser[]> {
+  if (!hasDatabase()) return [];
+  await ensureAppSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT * FROM users
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `) as Array<Record<string, unknown>>;
+
+  return rows.map((row) => {
+    const email = String(row.email);
+    const role = isPlatformAdminEmail(email)
+      ? "admin"
+      : (row.role as UserRole) || "traveller";
+    return rowToUser(row, role);
+  });
+}
+
+export async function updateUserRole(
+  userId: string,
+  role: UserRole,
+): Promise<AppUser | null> {
+  if (!hasDatabase()) return null;
+  await ensureAppSchema();
+  const sql = getSql();
+
+  const rows = (await sql`
+    SELECT * FROM users WHERE id = ${userId} LIMIT 1
+  `) as Array<Record<string, unknown>>;
+  const row = rows[0];
+  if (!row) return null;
+
+  const email = String(row.email);
+  const nextRole = isPlatformAdminEmail(email) ? "admin" : role;
+
+  await sql`UPDATE users SET role = ${nextRole} WHERE id = ${userId}`;
+  return rowToUser(row, nextRole);
 }
 
 export async function sendMagicEmail(email: string, magicUrl: string) {

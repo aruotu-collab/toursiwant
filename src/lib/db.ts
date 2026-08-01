@@ -120,6 +120,20 @@ export async function ensureAppSchema() {
         CREATE INDEX IF NOT EXISTS tour_requests_email_idx
         ON tour_requests (email)
       `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS page_views (
+          id TEXT PRIMARY KEY,
+          path TEXT NOT NULL,
+          referrer TEXT,
+          session_key TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS page_views_created_at_idx
+        ON page_views (created_at DESC)
+      `;
     })();
   }
   await schemaReady;
@@ -296,4 +310,65 @@ export async function dbUpdateRequestReply(input: {
   `) as RequestRow[];
 
   return rows[0] ? rowToRequest(rows[0]) : null;
+}
+
+export async function dbRecordPageView(input: {
+  id: string;
+  path: string;
+  referrer?: string;
+  sessionKey?: string;
+}) {
+  await ensureAppSchema();
+  const sql = getSql();
+  await sql`
+    INSERT INTO page_views (id, path, referrer, session_key, created_at)
+    VALUES (
+      ${input.id},
+      ${input.path.slice(0, 500)},
+      ${input.referrer?.slice(0, 500) ?? null},
+      ${input.sessionKey?.slice(0, 120) ?? null},
+      ${new Date().toISOString()}
+    )
+  `;
+}
+
+export async function dbPageViewStats() {
+  await ensureAppSchema();
+  const sql = getSql();
+
+  const [totals] = (await sql`
+    SELECT
+      COUNT(*)::int AS all_time,
+      COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day')::int AS last_24h,
+      COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS last_7d,
+      COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS last_30d,
+      COUNT(DISTINCT session_key) FILTER (
+        WHERE created_at >= NOW() - INTERVAL '1 day' AND session_key IS NOT NULL
+      )::int AS unique_sessions_24h
+    FROM page_views
+  `) as Array<{
+    all_time: number;
+    last_24h: number;
+    last_7d: number;
+    last_30d: number;
+    unique_sessions_24h: number;
+  }>;
+
+  const topPaths = (await sql`
+    SELECT path, COUNT(*)::int AS views
+    FROM page_views
+    WHERE created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY path
+    ORDER BY views DESC
+    LIMIT 12
+  `) as Array<{ path: string; views: number }>;
+
+  return {
+    allTime: totals?.all_time ?? 0,
+    last24h: totals?.last_24h ?? 0,
+    last7d: totals?.last_7d ?? 0,
+    last30d: totals?.last_30d ?? 0,
+    uniqueSessions24h: totals?.unique_sessions_24h ?? 0,
+    topPaths: topPaths.map((row) => ({ path: row.path, views: row.views })),
+  };
 }
