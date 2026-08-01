@@ -39,12 +39,16 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), Georgia, serif;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 ::selection {
@@ -190,4 +194,21 @@ body {
 
 .corridor-dash {
   animation: corridor-dash-flow 18s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring,
+  .pulse-ring-delay,
+  .corridor-dash,
+  .countdown-urgent {
+    animation: none !important;
+  }
+}
+
+/* Mobile: stop nested scroll / rubber-band fighting the page */
+@media (max-width: 1023px) {
+  .pulse-ring,
+  .pulse-ring-delay {
+    animation: none;
+  }
 }

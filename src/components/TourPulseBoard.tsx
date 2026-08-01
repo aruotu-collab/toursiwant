@@ -383,8 +383,8 @@ export function TourPulseBoard({
       id={embedded ? undefined : "pulse"}
       className={
         embedded
-          ? "text-white"
-          : "scroll-mt-0 border-b border-ink/10 bg-ink text-white"
+          ? "overflow-x-hidden text-white"
+          : "scroll-mt-0 overflow-x-hidden border-b border-ink/10 bg-ink text-white"
       }
     >
       <div
@@ -548,7 +548,7 @@ export function TourPulseBoard({
         ) : null}
 
         {hasStay ? (
-        <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
+        <div className="mt-5 grid gap-4 overflow-x-hidden sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
           {/* Live list — below map on mobile, left column on desktop */}
           <div className="order-2 border border-white/10 bg-white/[0.03] lg:order-1">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
@@ -559,7 +559,7 @@ export function TourPulseBoard({
                 {filtered.length} shown
               </p>
             </div>
-            <ul className="max-h-[min(28rem,55vh)] divide-y divide-white/10 overflow-y-auto overscroll-contain lg:max-h-[34rem]">
+            <ul className="divide-y divide-white/10 lg:max-h-[34rem] lg:overflow-y-auto lg:overscroll-contain">
               {filtered.map((activity) => {
                 const zone = pulseZones.find((z) => z.id === activity.zoneId);
                 const selected = selectedActivityId === activity.id;
@@ -638,7 +638,7 @@ export function TourPulseBoard({
                 <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
                   3 · Corridor map · swipe filters →
                 </p>
-                <div className="mt-2 flex gap-4 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="mt-2 flex gap-4 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden">
                   {experienceTypeTabs.map((tab) => {
                     const active = filter === tab.id;
                     const count = filterCounts[tab.id] ?? 0;
@@ -923,10 +923,10 @@ function CorridorMap({
   onSelectStop?: (stop: BoardingStop & { walkMinutes: number }) => void;
 }) {
   return (
-    <div className="relative px-1 py-2 sm:px-4 sm:py-4">
+    <div className="relative touch-manipulation px-1 py-2 sm:px-4 sm:py-4">
       <svg
         viewBox="0 0 400 520"
-        className="mx-auto h-auto w-full max-h-[min(58vh,420px)] max-w-md lg:max-h-none"
+        className="mx-auto h-auto w-full max-h-[min(52svh,380px)] max-w-md select-none lg:max-h-none"
         role="img"
         aria-label="New York tour corridor from harbor to airports"
       >
@@ -1213,7 +1213,7 @@ function ZonePanel({
         </div>
       ) : null}
 
-      <ul className="mt-4 max-h-48 space-y-2 overflow-y-auto">
+      <ul className="mt-4 space-y-2 lg:max-h-48 lg:overflow-y-auto lg:overscroll-contain">
         {(items.length ? items : allInZone).slice(0, 8).map((item) => (
           <li key={item.id}>
             <button

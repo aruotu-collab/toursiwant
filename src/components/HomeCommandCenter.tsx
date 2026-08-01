@@ -149,7 +149,7 @@ export function HomeCommandCenter() {
   const copy = TAB_COPY[tab === "admin" ? "admin" : tab];
 
   return (
-    <div className="min-h-full bg-ink text-white">
+    <div className="min-h-dvh overflow-x-hidden overscroll-x-none bg-ink text-white">
       <div className="sticky top-0 z-30 border-b border-white/10 bg-[#0a1520]/supports-[backdrop-filter]:bg-[#0a1520]/95 supports-[backdrop-filter]:backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-[90rem] items-center gap-3 px-4 py-3 sm:px-8 sm:py-3.5">
           <div className="min-w-0 flex-1">
@@ -168,7 +168,7 @@ export function HomeCommandCenter() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[90rem] px-4 py-5 sm:px-8 sm:py-10">
+      <div className="mx-auto w-full max-w-[90rem] overflow-x-hidden px-4 py-5 sm:px-8 sm:py-10">
         <div className="max-w-2xl">
           <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-amber sm:text-[11px] sm:tracking-[0.2em]">
             {copy.eyebrow}
@@ -181,8 +181,8 @@ export function HomeCommandCenter() {
           </p>
         </div>
 
-        <div className="sticky top-[3.25rem] z-20 -mx-4 mt-4 border-b border-white/10 bg-ink/95 px-4 py-2.5 backdrop-blur-md sm:static sm:mx-0 sm:mt-6 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
-          <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="sticky top-[3.25rem] z-20 mt-4 border-b border-white/10 bg-ink/95 py-2.5 backdrop-blur-md sm:static sm:mt-6 sm:border-0 sm:bg-transparent sm:py-0 sm:backdrop-blur-none">
+          <div className="flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden">
             {menu.map((item) => {
               const active = tab === item.id;
               return (
@@ -190,7 +190,7 @@ export function HomeCommandCenter() {
                   key={item.id}
                   type="button"
                   onClick={() => selectTab(item.id)}
-                  className={`shrink-0 border px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] transition active:scale-[0.98] ${
+                  className={`shrink-0 border px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
                     active
                       ? "border-amber bg-amber text-ink"
                       : "border-white/20 bg-white/5 text-white/70 hover:border-white/40 hover:text-white"

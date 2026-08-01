@@ -43,10 +43,10 @@ export function UsaRadialMap({
   }
 
   return (
-    <div className="relative px-1 py-2 sm:px-4 sm:py-4">
+    <div className="relative touch-manipulation px-1 py-2 sm:px-4 sm:py-4">
       <svg
         viewBox="0 0 400 400"
-        className="mx-auto h-auto w-full max-h-[min(58vh,420px)] max-w-md"
+        className="mx-auto h-auto w-full max-h-[min(52svh,380px)] max-w-md select-none"
         role="img"
         aria-label={`Local map around ${stayName} in ${metro}`}
       >
