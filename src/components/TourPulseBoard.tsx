@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { UsaRadialMap } from "@/components/UsaRadialMap";
 import {
   adjacentZones,
   boardingKindLabel,
@@ -9,12 +10,12 @@ import {
   experienceTypeTabs,
   getNearMePlace,
   matchesExperienceType,
-  searchNearMePlaces,
   stopsNearPlace,
   type BoardingStop,
   type ExperienceType,
   type NearMePlace,
 } from "@/lib/near-me";
+import type { UsaNearbySpot, UsaStay } from "@/lib/places-usa";
 import { toDateKey } from "@/lib/sample-tours";
 import {
   activityHref,
@@ -30,6 +31,16 @@ import {
 } from "@/lib/tour-pulse";
 
 type FilterId = ExperienceType;
+
+type Suggestion = {
+  id: string;
+  name: string;
+  subtitle: string;
+  source: "curated" | "google";
+  placeId?: string;
+  zoneId?: PulseZoneId;
+  t?: number;
+};
 
 /** Cubic path Harbor (SW) → Airports (NE) in viewBox 0 0 400 520 */
 const CORRIDOR_D =
@@ -93,28 +104,71 @@ export function TourPulseBoard({
   const [locationQuery, setLocationQuery] = useState("");
   const [placeId, setPlaceId] = useState<string | null>(null);
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [usaEnabled, setUsaEnabled] = useState(false);
+  const [usaStay, setUsaStay] = useState<UsaStay | null>(null);
+  const [usaSpots, setUsaSpots] = useState<UsaNearbySpot[]>([]);
+  const [usaActivities, setUsaActivities] = useState<PulseActivity[] | null>(
+    null,
+  );
+  const [useCorridor, setUseCorridor] = useState(true);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyError, setNearbyError] = useState<string | null>(null);
 
   const nearPlace = placeId ? getNearMePlace(placeId) || null : null;
+  const hasStay = Boolean(nearPlace || usaStay);
 
-  const placeSuggestions = useMemo(
-    () => searchNearMePlaces(locationQuery),
-    [locationQuery],
-  );
+  useEffect(() => {
+    fetch("/api/places/status")
+      .then((r) => r.json())
+      .then((d: { enabled?: boolean }) => setUsaEnabled(Boolean(d.enabled)))
+      .catch(() => setUsaEnabled(false));
+  }, []);
+
+  useEffect(() => {
+    if (usaStay || placeId) {
+      setSuggestions([]);
+      return;
+    }
+    const q = locationQuery.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      fetch(`/api/places/autocomplete?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d: { places?: Suggestion[]; enabled?: boolean }) => {
+          setSuggestions(d.places || []);
+          if (typeof d.enabled === "boolean") setUsaEnabled(d.enabled);
+        })
+        .catch(() => setSuggestions([]));
+    }, 280);
+    return () => window.clearTimeout(handle);
+  }, [locationQuery, usaStay, placeId]);
 
   const nearbyStops = useMemo(() => {
+    if (usaSpots.length > 0) {
+      return usaSpots.filter(
+        (s) =>
+          filter === "all" || s.experienceTypes.includes(filter),
+      );
+    }
     if (!placeId) return [];
     return stopsNearPlace(placeId, filter);
-  }, [placeId, filter]);
+  }, [usaSpots, placeId, filter]);
 
-  const nearZones = useMemo(
-    () => (nearPlace ? adjacentZones(nearPlace.zoneId) : null),
-    [nearPlace],
-  );
+  const nearZones = useMemo(() => {
+    if (usaStay?.zoneId) return adjacentZones(usaStay.zoneId);
+    if (nearPlace) return adjacentZones(nearPlace.zoneId);
+    return null;
+  }, [nearPlace, usaStay]);
 
   const localActivities = useMemo(() => {
+    if (usaActivities) return usaActivities;
     if (!nearZones) return [];
     return activities.filter((a) => nearZones.includes(a.zoneId));
-  }, [activities, nearZones]);
+  }, [activities, nearZones, usaActivities]);
 
   const filtered = useMemo(() => {
     return localActivities.filter((a) => matchesExperienceType(a, filter));
@@ -130,7 +184,9 @@ export function TourPulseBoard({
   );
 
   const selectedActivity =
-    activities.find((a) => a.id === selectedActivityId) || null;
+    localActivities.find((a) => a.id === selectedActivityId) ||
+    activities.find((a) => a.id === selectedActivityId) ||
+    null;
 
   const nextUp = useMemo(() => {
     const soon = filtered
@@ -160,15 +216,23 @@ export function TourPulseBoard({
       .map((tab) => ({
         ...tab,
         count: filterCounts[tab.id] ?? 0,
-        stopCount: placeId
-          ? stopsNearPlace(placeId, tab.id).length
-          : 0,
+        stopCount: nearbyStops.filter(
+          (s) =>
+            "experienceTypes" in s &&
+            (s as { experienceTypes: ExperienceType[] }).experienceTypes.includes(
+              tab.id,
+            ),
+        ).length ||
+          (placeId && !usaSpots.length
+            ? stopsNearPlace(placeId, tab.id).length
+            : usaSpots.filter((s) => s.experienceTypes.includes(tab.id)).length),
       }))
       .filter((tab) => tab.count > 0 || tab.stopCount > 0);
-  }, [filterCounts, placeId]);
+  }, [filterCounts, placeId, usaSpots, nearbyStops]);
 
-  // Soft live tick — bump travellers / freshness like Tour Rush
+  // Soft live tick — only for seeded pulse, not Google snapshots
   useEffect(() => {
+    if (usaActivities) return;
     const id = window.setInterval(() => {
       setActivities((current) => {
         const idx = Math.floor(Math.random() * current.length);
@@ -188,7 +252,7 @@ export function TourPulseBoard({
       });
     }, 6800);
     return () => window.clearInterval(id);
-  }, []);
+  }, [usaActivities]);
 
   useEffect(() => {
     if (!tickFlash) return;
@@ -209,14 +273,74 @@ export function TourPulseBoard({
     setSelectedStopId(null);
   }
 
-  function choosePlace(place: NearMePlace) {
+  async function loadNearby(payload: {
+    curatedId?: string;
+    placeId?: string;
+    name?: string;
+  }) {
+    setNearbyLoading(true);
+    setNearbyError(null);
+    try {
+      const res = await fetch("/api/places/nearby", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        stay?: UsaStay;
+        useCorridor?: boolean;
+        spots?: UsaNearbySpot[];
+        activities?: PulseActivity[] | null;
+      };
+      if (!res.ok) {
+        setNearbyError(data.error || "Could not load places near this stay.");
+        return;
+      }
+      if (!data.stay) return;
+      setUsaStay(data.stay);
+      setUsaSpots(data.spots || []);
+      setUsaActivities(data.activities || null);
+      setUseCorridor(Boolean(data.useCorridor));
+      setSelectedZoneId(data.stay.zoneId || "midtown");
+      setSelectedStopId(null);
+      setFilter("all");
+      const first = (data.activities || [])[0];
+      setSelectedActivityId(first?.id ?? null);
+    } catch {
+      setNearbyError("Network error loading nearby places.");
+    } finally {
+      setNearbyLoading(false);
+    }
+  }
+
+  function chooseCurated(place: NearMePlace) {
     setPlaceId(place.id);
     setLocationQuery(place.name);
+    setUsaStay(null);
+    setUsaSpots([]);
+    setUsaActivities(null);
+    setUseCorridor(true);
     setSelectedZoneId(place.zoneId);
     setSelectedStopId(null);
     setFilter("all");
     const inZone = activities.filter((a) => a.zoneId === place.zoneId);
     setSelectedActivityId(inZone[0]?.id ?? null);
+    void loadNearby({ curatedId: place.id });
+  }
+
+  function chooseSuggestion(item: Suggestion) {
+    setLocationQuery(item.name);
+    setSuggestions([]);
+    if (item.source === "curated") {
+      const place = getNearMePlace(item.id);
+      if (place) chooseCurated(place);
+      return;
+    }
+    if (item.placeId) {
+      setPlaceId(null);
+      void loadNearby({ placeId: item.placeId, name: item.name });
+    }
   }
 
   function clearPlace() {
@@ -226,6 +350,11 @@ export function TourPulseBoard({
     setFilter("all");
     setSelectedZoneId(null);
     setSelectedActivityId(null);
+    setUsaStay(null);
+    setUsaSpots([]);
+    setUsaActivities(null);
+    setUseCorridor(true);
+    setNearbyError(null);
   }
 
   const spotlight = useMemo(() => {
@@ -280,9 +409,11 @@ export function TourPulseBoard({
           </div>
         ) : (
           <p className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
-            {nearPlace
-              ? `Staying near ${nearPlace.name} · ${filtered.length} nearby`
-              : "Step 1 · enter where you’re staying"}
+            {hasStay
+              ? `Staying · ${usaStay?.name || nearPlace?.name} · ${filtered.length} nearby`
+              : usaEnabled
+                ? "Step 1 · any hotel in the USA"
+                : "Step 1 · enter where you’re staying"}
           </p>
         )}
 
@@ -296,35 +427,43 @@ export function TourPulseBoard({
               value={locationQuery}
               onChange={(e) => {
                 setLocationQuery(e.target.value);
-                if (placeId) setPlaceId(null);
+                if (hasStay) clearPlace();
               }}
-              placeholder="e.g. Aliz Hotel Times Square…"
+              placeholder={
+                usaEnabled
+                  ? "Any US hotel — Miami, Chicago, Vegas, Aliz NYC…"
+                  : "e.g. Aliz Hotel Times Square…"
+              }
               className="w-full border border-white/15 bg-ink/70 px-3 py-3 text-base text-white outline-none placeholder:text-white/35 focus:border-amber/50"
               autoComplete="off"
             />
           </label>
-          {!nearPlace && placeSuggestions.length > 0 ? (
+          {!hasStay && suggestions.length > 0 ? (
             <ul className="mt-2 border border-white/10 bg-[#0a1520]">
-              {placeSuggestions.map((place) => (
-                <li key={place.id}>
+              {suggestions.map((item) => (
+                <li key={item.id}>
                   <button
                     type="button"
-                    onClick={() => choosePlace(place)}
+                    onClick={() => chooseSuggestion(item)}
                     className="flex w-full flex-col px-3 py-2.5 text-left hover:bg-white/5"
                   >
-                    <span className="text-sm font-semibold text-white">
-                      {place.name}
+                    <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                      {item.name}
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                        {item.source === "google" ? "USA" : "NYC"}
+                      </span>
                     </span>
-                    <span className="text-xs text-white/50">{place.blurb}</span>
+                    <span className="text-xs text-white/50">{item.subtitle}</span>
                   </button>
                 </li>
               ))}
             </ul>
           ) : null}
-          {nearPlace ? (
+          {hasStay ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="border border-amber/40 bg-amber/15 px-2.5 py-1 text-xs font-semibold text-amber">
-                Staying · {nearPlace.name}
+                Staying · {usaStay?.name || nearPlace?.name}
+                {usaStay?.metro ? ` · ${usaStay.metro}` : ""}
               </span>
               <button
                 type="button"
@@ -333,21 +472,29 @@ export function TourPulseBoard({
               >
                 Change stay
               </button>
+              {nearbyLoading ? (
+                <span className="text-xs text-white/45">Finding what’s around you…</span>
+              ) : null}
             </div>
           ) : (
             <p className="mt-2 text-xs text-white/45">
-              Try Aliz Hotel, Times Square, Chinatown, Battery Park, or The Met.
+              {usaEnabled
+                ? "USA-wide hotel search is on. Pick a stay to see bus tours, museums, pizza, Chinese food, and more nearby."
+                : "Curated NYC stays work now. Add GOOGLE_PLACES_API_KEY on Vercel to unlock hotels across the USA."}
             </p>
           )}
+          {nearbyError ? (
+            <p className="mt-2 text-xs text-amber-deep">{nearbyError}</p>
+          ) : null}
         </div>
 
-        {nearPlace ? (
+        {hasStay ? (
           <div className="mt-4 border border-white/10 bg-white/[0.03] p-4">
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
               2 · What’s around you?
             </p>
             <p className="mt-1 text-sm text-white/55">
-              Tap a type — the corridor map and list update.
+              Tap a type — the map and list update for this stay.
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
               <button
@@ -400,7 +547,7 @@ export function TourPulseBoard({
           </div>
         ) : null}
 
-        {nearPlace ? (
+        {hasStay ? (
         <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
           {/* Live list — below map on mobile, left column on desktop */}
           <div className="order-2 border border-white/10 bg-white/[0.03] lg:order-1">
@@ -565,20 +712,79 @@ export function TourPulseBoard({
                 </div>
               )}
 
-              <CorridorMap
-                filter={filter}
-                activities={filtered}
-                selectedZoneId={selectedZoneId}
-                onSelectZone={selectZone}
-                youAreHere={nearPlace}
-                boardingStops={nearbyStops}
-                selectedStopId={selectedStopId}
-                onSelectStop={(stop) => {
-                  setSelectedStopId(stop.id);
-                  setSelectedZoneId(stop.zoneId);
-                  setSelectedActivityId(null);
-                }}
-              />
+              {useCorridor ? (
+                <CorridorMap
+                  filter={filter}
+                  activities={filtered}
+                  selectedZoneId={selectedZoneId}
+                  onSelectZone={selectZone}
+                  youAreHere={
+                    usaStay?.t != null
+                      ? {
+                          id: usaStay.id,
+                          name: usaStay.name,
+                          aliases: [],
+                          zoneId: usaStay.zoneId || "midtown",
+                          t: usaStay.t,
+                          blurb: usaStay.address,
+                        }
+                      : nearPlace
+                  }
+                  boardingStops={nearbyStops.map((stop) => ({
+                    id: stop.id,
+                    name: stop.name,
+                    kind:
+                      "kind" in stop && typeof stop.kind === "string"
+                        ? (stop.kind as BoardingStop["kind"])
+                        : "walking_meetup",
+                    experienceTypes:
+                      "experienceTypes" in stop
+                        ? stop.experienceTypes
+                        : (["all"] as ExperienceType[]),
+                    zoneId: stop.zoneId,
+                    t: stop.t,
+                    addressHint: stop.addressHint,
+                    howToBoard: stop.howToBoard,
+                    walkFrom: {},
+                    walkMinutes: stop.walkMinutes,
+                    operatorsHint:
+                      "operatorsHint" in stop ? stop.operatorsHint : undefined,
+                  }))}
+                  selectedStopId={selectedStopId}
+                  onSelectStop={(stop) => {
+                    setSelectedStopId(stop.id);
+                    setSelectedZoneId(stop.zoneId);
+                    setSelectedActivityId(null);
+                  }}
+                />
+              ) : usaStay ? (
+                <UsaRadialMap
+                  stayName={usaStay.name}
+                  stayLat={usaStay.lat}
+                  stayLng={usaStay.lng}
+                  metro={usaStay.metro}
+                  spots={nearbyStops
+                    .filter(
+                      (s): s is UsaNearbySpot =>
+                        "lat" in s && typeof s.lat === "number",
+                    )
+                    .map((s) => ({
+                      id: s.id,
+                      name: s.name,
+                      walkMinutes: s.walkMinutes,
+                      lat: s.lat,
+                      lng: s.lng,
+                    }))}
+                  selectedId={selectedStopId}
+                  onSelect={(id) => {
+                    const stop = usaSpots.find((s) => s.id === id);
+                    if (!stop) return;
+                    setSelectedStopId(stop.id);
+                    setSelectedZoneId(stop.zoneId);
+                    setSelectedActivityId(null);
+                  }}
+                />
+              ) : null}
 
               <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-white/10 px-4 py-3">
                 {(
@@ -596,7 +802,7 @@ export function TourPulseBoard({
                     {cat === "bus" ? "bus tours" : cat}
                   </span>
                 ))}
-                {nearPlace ? (
+                {hasStay ? (
                   <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-amber">
                     <span className="h-2 w-2 rotate-45 bg-amber" aria-hidden />
                     you are here
@@ -605,7 +811,7 @@ export function TourPulseBoard({
               </div>
             </div>
 
-            {nearPlace && nearbyStops.length > 0 ? (
+            {hasStay && nearbyStops.length > 0 ? (
               <div className="border border-amber/25 bg-amber/5 p-4">
                 <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-amber">
                   Spots near your stay
@@ -616,6 +822,10 @@ export function TourPulseBoard({
                 <ul className="mt-3 space-y-2">
                   {nearbyStops.map((stop) => {
                     const selected = selectedStopId === stop.id;
+                    const kindLabel =
+                      boardingKindLabel[
+                        stop.kind as keyof typeof boardingKindLabel
+                      ] || String(stop.kind);
                     return (
                       <li key={stop.id}>
                         <button
@@ -640,8 +850,8 @@ export function TourPulseBoard({
                             </p>
                           </div>
                           <p className="mt-1 text-xs uppercase tracking-wider text-white/45">
-                            {boardingKindLabel[stop.kind]}
-                            {stop.operatorsHint
+                            {kindLabel}
+                            {"operatorsHint" in stop && stop.operatorsHint
                               ? ` · ${stop.operatorsHint}`
                               : ""}
                           </p>
@@ -660,7 +870,7 @@ export function TourPulseBoard({
                 </ul>
                 <Link
                   href={`/request?details=${encodeURIComponent(
-                    `I am staying at ${nearPlace.name}. Show me ${
+                    `I am staying at ${usaStay?.name || nearPlace?.name}. Show me ${
                       filter === "all" ? "nearby tours and food" : filter
                     } and where to go.`,
                   )}`}

@@ -43,10 +43,10 @@ const TAB_COPY: Record<
   { eyebrow: string; title: string; blurb: string }
 > = {
   pulse: {
-    eyebrow: "Near you · New York",
+    eyebrow: "Near you · USA",
     title: "Start with where you’re staying",
     blurb:
-      "Enter your hotel, then choose what’s around you — bus tours, museums, pizza, Chinese food — and see it on the corridor map.",
+      "Enter any US hotel — then choose bus tours, museums, pizza, Chinese food, and more. NYC uses the corridor map; other cities use a local walk map.",
   },
   seats: {
     eyebrow: "Tour Rush · live now",
