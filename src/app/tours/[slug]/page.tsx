@@ -57,7 +57,7 @@ export default async function TourDetailPage({
             ← Back to tours
           </Link>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber">
-            New York · {tour.interest}
+            {tour.cityName}, {tour.stateCode} · {tour.interest}
           </p>
           <h1 className="mt-3 max-w-3xl font-display text-4xl leading-tight text-white sm:text-5xl">
             {tour.title}

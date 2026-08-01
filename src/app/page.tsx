@@ -5,7 +5,7 @@ export default function HomePage() {
   return (
     <main className="flex-1">
       <h1 className="sr-only">
-        ToursIWant — New York tour pulse, live seats, tours, events, and requests
+        ToursIWant — USA tour pulse, live seats, tours, events, and requests
       </h1>
       <Suspense
         fallback={

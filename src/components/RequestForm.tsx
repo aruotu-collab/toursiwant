@@ -39,11 +39,11 @@ export default function RequestForm() {
   const [submittedEmail, setSubmittedEmail] = useState("");
 
   const title = useMemo(() => {
-    if (isOperator) return "Join ToursIWant as a New York operator";
+    if (isOperator) return "Join ToursIWant as a US tour operator";
     if (stayIntent && !selectedTour) return "Stay Near Your Tour";
     if (selectedTour) return `I want: ${selectedTour.title}`;
     if (hasAdvanceDate) return `Request a tour for ${formatDisplayDate(travelDate)}`;
-    return "Request the New York tour you want";
+    return "Request the tour you want";
   }, [hasAdvanceDate, isOperator, selectedTour, stayIntent, travelDate]);
 
   function toggleInterest(interest: TourInterest) {

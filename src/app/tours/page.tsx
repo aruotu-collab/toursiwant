@@ -1,10 +1,12 @@
-import { launchCity } from "@/lib/cities";
 import { ToursBrowser } from "@/components/ToursBrowser";
+import { catalogStats } from "@/lib/us-tour-catalog";
+
+const stats = catalogStats();
 
 export const metadata = {
-  title: "New York tours by date",
+  title: "Find tours across the USA",
   description:
-    "Browse New York tours happening today or months ahead. Pick your travel date and see what's available.",
+    "Browse starter tours in New York, Los Angeles, Las Vegas, Miami, Orlando, Chicago, and more — then request quotes from local operators.",
 };
 
 export default function ToursPage() {
@@ -12,15 +14,15 @@ export default function ToursPage() {
     <main className="flex-1 bg-paper">
       <div className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8 lg:py-28">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-skyline">
-          {launchCity.name} · Find tours
+          USA · Find tours
         </p>
         <h1 className="mt-3 max-w-2xl font-display text-4xl text-ink sm:text-5xl">
-          Read the board. Pick your date. Get the tour.
+          Real tour ideas across America — pick a city and a date.
         </h1>
         <p className="mt-4 max-w-2xl text-ink-soft">
-          See live New York demand, then browse departures for today or months
-          ahead. Claim a seat on a scheduled tour — or request a custom quote
-          when you know exactly what you want.
+          {stats.total} starter experiences in {stats.cities} US cities while
+          operators publish live inventory. Browse by city, travel date, and
+          type — then claim interest or request a custom quote.
         </p>
 
         <div className="mt-10">

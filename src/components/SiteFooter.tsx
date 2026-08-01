@@ -10,7 +10,7 @@ export function SiteFooter() {
           </p>
           <p className="mt-2 max-w-md text-sm text-white/70">
             Tell us the tour you want. Get quotes from local operators.
-            Launching in New York, expanding city by city.
+            Tours across the USA — New York and 19 more cities.
           </p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-white/75">

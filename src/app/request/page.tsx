@@ -4,7 +4,7 @@ import RequestForm from "@/components/RequestForm";
 export const metadata = {
   title: "Request a tour",
   description:
-    "Tell ToursIWant the New York tour you want. Local operators will send personalised quotes.",
+    "Tell ToursIWant the tour you want anywhere in the USA. Local operators will send personalised quotes.",
 };
 
 export default function RequestPage() {

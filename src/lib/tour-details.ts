@@ -473,7 +473,7 @@ export function getTourDetails(slug: string): TourDetails | undefined {
     imageAlt: extras?.imageAlt || rush?.imageAlt || tour.title,
     longDescription:
       extras?.longDescription ||
-      `${tour.summary} Send interest to claim a seat or request a quote from local New York operators.`,
+      `${tour.summary} Send interest to claim a seat or request a quote from local ${tour.cityName} operators.`,
     highlights: extras?.highlights || [
       tour.meetup,
       `${tour.duration} experience`,

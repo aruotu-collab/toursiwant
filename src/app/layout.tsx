@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     template: "%s · ToursIWant",
   },
   description:
-    "The tourism intelligence platform for New York tours. See what's being planned, request quotes, and join groups — today or months ahead.",
+    "The tourism intelligence platform for tours across the USA. See what's being planned, request quotes, and join groups — today or months ahead.",
   alternates: {
     canonical: "/",
   },
@@ -49,13 +49,13 @@ export const metadata: Metadata = {
     siteName: "ToursIWant",
     title: "ToursIWant — The live market for tours you want",
     description:
-      "The tourism intelligence platform for New York tours. See what's being planned, request quotes, and join groups — today or months ahead.",
+      "The tourism intelligence platform for tours across the USA. See what's being planned, request quotes, and join groups — today or months ahead.",
   },
   twitter: {
     card: "summary_large_image",
     title: "ToursIWant — The live market for tours you want",
     description:
-      "The tourism intelligence platform for New York tours. See what's being planned, request quotes, and join groups — today or months ahead.",
+      "The tourism intelligence platform for tours across the USA. See what's being planned, request quotes, and join groups — today or months ahead.",
   },
   verification: searchConsoleVerification
     ? { google: searchConsoleVerification }

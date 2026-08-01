@@ -11,6 +11,7 @@ import { formatEventWhen, nycEventsThisWeek } from "@/lib/events";
 import {
   formatDisplayDate,
   getToursForDate,
+  listTourMetros,
   toDateKey,
 } from "@/lib/sample-tours";
 
@@ -55,10 +56,10 @@ const TAB_COPY: Record<
       "Countdown, scarcity, and live interest — claim a New York seat before someone else does.",
   },
   tours: {
-    eyebrow: "Find tours · by date",
-    title: "Pick a date. See what’s running.",
+    eyebrow: "Find tours · USA",
+    title: "Pick a city and a date.",
     blurb:
-      "Browse New York departures for today or months ahead, then open a listing or request something custom.",
+      "Browse starter tours across America — New York, LA, Vegas, Miami, Chicago, and more — then open a listing or request something custom.",
   },
   events: {
     eyebrow: "Events This Week",
@@ -222,12 +223,34 @@ export function HomeCommandCenter() {
 
 function ToursPanel() {
   const today = toDateKey(new Date());
+  const metros = listTourMetros();
+  const [citySlug, setCitySlug] = useState("new-york");
   const [date, setDate] = useState(today);
-  const tours = useMemo(() => getToursForDate(date), [date]);
+  const tours = useMemo(
+    () => getToursForDate(date, citySlug),
+    [date, citySlug],
+  );
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end gap-3">
+        <label className="block">
+          <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
+            City
+          </span>
+          <select
+            value={citySlug}
+            onChange={(e) => setCitySlug(e.target.value)}
+            className="max-w-[12rem] border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-amber"
+          >
+            <option value="all">All USA</option>
+            {metros.map((metro) => (
+              <option key={metro.slug} value={metro.slug}>
+                {metro.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="block">
           <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
             Travel date
@@ -261,7 +284,7 @@ function ToursPanel() {
               <div className="min-w-0">
                 <p className="font-semibold text-white">{tour.title}</p>
                 <p className="mt-0.5 truncate text-sm text-white/55">
-                  {tour.departsLabel} · {tour.duration} · {tour.meetup}
+                  {tour.cityName} · {tour.departsLabel} · {tour.duration}
                   {tour.joinable ? " · joinable" : ""}
                 </p>
               </div>
@@ -360,7 +383,7 @@ function RequestPanel({
         },
         {
           title: "Operator interest",
-          copy: "List New York tours and receive the lead inbox.",
+          copy: "List US tours and receive the lead inbox.",
           href: "/request?intent=operator",
           cta: "Apply as operator",
         },
