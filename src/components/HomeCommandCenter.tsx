@@ -7,13 +7,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AuthGreeting, AuthNav } from "@/components/AuthNav";
 import { TourPulseBoard } from "@/components/TourPulseBoard";
 import { TourRushBoard } from "@/components/TourRushBoard";
+import { ToursBrowser } from "@/components/ToursBrowser";
 import { formatEventWhen, nycEventsThisWeek } from "@/lib/events";
-import {
-  formatDisplayDate,
-  getToursForDate,
-  listTourMetros,
-  toDateKey,
-} from "@/lib/sample-tours";
 
 export type CommandTab =
   | "pulse"
@@ -222,81 +217,7 @@ export function HomeCommandCenter() {
 }
 
 function ToursPanel() {
-  const today = toDateKey(new Date());
-  const metros = listTourMetros();
-  const [citySlug, setCitySlug] = useState("new-york");
-  const [date, setDate] = useState(today);
-  const tours = useMemo(
-    () => getToursForDate(date, citySlug),
-    [date, citySlug],
-  );
-
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="block">
-          <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
-            City
-          </span>
-          <select
-            value={citySlug}
-            onChange={(e) => setCitySlug(e.target.value)}
-            className="max-w-[12rem] border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-amber"
-          >
-            <option value="all">All USA</option>
-            {metros.map((metro) => (
-              <option key={metro.slug} value={metro.slug}>
-                {metro.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
-            Travel date
-          </span>
-          <input
-            type="date"
-            value={date}
-            min={today}
-            onChange={(e) => setDate(e.target.value)}
-            className="border border-white/20 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-amber"
-          />
-        </label>
-        <p className="pb-2 font-mono text-xs text-white/45">
-          {tours.length} tours · {formatDisplayDate(date)}
-        </p>
-        <Link
-          href="/tours"
-          className="ml-auto pb-2 text-sm font-semibold text-amber hover:underline"
-        >
-          Full browse page →
-        </Link>
-      </div>
-
-      <ul className="divide-y divide-white/10 border border-white/10 bg-white/[0.03]">
-        {tours.slice(0, 14).map((tour) => (
-          <li key={tour.slug}>
-            <Link
-              href={`/tours/${tour.slug}?date=${date}`}
-              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 transition hover:bg-white/[0.06]"
-            >
-              <div className="min-w-0">
-                <p className="font-semibold text-white">{tour.title}</p>
-                <p className="mt-0.5 truncate text-sm text-white/55">
-                  {tour.cityName} · {tour.departsLabel} · {tour.duration}
-                  {tour.joinable ? " · joinable" : ""}
-                </p>
-              </div>
-              <p className="shrink-0 font-mono text-sm text-amber">
-                from {tour.priceFrom}
-              </p>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+  return <ToursBrowser embedded />;
 }
 
 function EventsPanel() {
