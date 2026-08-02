@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { listUsers, requireAdmin } from "@/lib/auth";
 import { dbPageViewStats, hasDatabase } from "@/lib/db";
 import { listRequests } from "@/lib/requests-store";
+import { revenueEventStats } from "@/lib/revenue-events";
 
 export const runtime = "nodejs";
 
@@ -11,9 +12,10 @@ export async function GET() {
     return NextResponse.json({ error: "Admin only." }, { status: 403 });
   }
 
-  const [users, requests] = await Promise.all([
+  const [users, requests, affiliate] = await Promise.all([
     listUsers(500),
     listRequests(),
+    revenueEventStats(),
   ]);
 
   const live = requests.filter((item) => item.source === "live");
@@ -43,6 +45,7 @@ export async function GET() {
       responded: live.filter((item) => item.status === "responded").length,
     },
     visitors,
+    affiliate,
     recentUsers: users.slice(0, 8),
     recentLiveRequests: live.slice(0, 8),
   });

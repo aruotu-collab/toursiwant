@@ -171,6 +171,27 @@ export async function ensureAppSchema() {
         CREATE INDEX IF NOT EXISTS operator_listings_operator_idx
         ON operator_listings (operator_user_id, created_at DESC)
       `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS revenue_events (
+          id TEXT PRIMARY KEY,
+          kind TEXT NOT NULL,
+          partner TEXT,
+          product_id TEXT,
+          city_slug TEXT,
+          path TEXT,
+          meta TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS revenue_events_created_at_idx
+        ON revenue_events (created_at DESC)
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS revenue_events_kind_idx
+        ON revenue_events (kind, created_at DESC)
+      `;
     })();
   }
   await schemaReady;
@@ -605,4 +626,94 @@ export async function dbUpdateListingStatus(
     SELECT * FROM operator_listings WHERE id = ${id} LIMIT 1
   `) as OperatorListingRow[];
   return rows[0] ? rowToListing(rows[0]) : null;
+}
+
+export async function dbInsertRevenueEvent(event: {
+  id: string;
+  kind: string;
+  partner?: string;
+  productId?: string;
+  citySlug?: string;
+  path?: string;
+  meta?: string;
+  createdAt: string;
+}) {
+  await ensureAppSchema();
+  const sql = getSql();
+  await sql`
+    INSERT INTO revenue_events (
+      id, kind, partner, product_id, city_slug, path, meta, created_at
+    ) VALUES (
+      ${event.id},
+      ${event.kind},
+      ${event.partner ?? null},
+      ${event.productId ?? null},
+      ${event.citySlug ?? null},
+      ${event.path ?? null},
+      ${event.meta ?? null},
+      ${event.createdAt}
+    )
+  `;
+}
+
+export async function dbRevenueEventStats() {
+  await ensureAppSchema();
+  const sql = getSql();
+
+  const [totals] = (await sql`
+    SELECT
+      COUNT(*) FILTER (WHERE kind = 'affiliate_click')::int AS all_clicks,
+      COUNT(*) FILTER (
+        WHERE kind = 'affiliate_click'
+          AND created_at >= NOW() - INTERVAL '7 days'
+      )::int AS clicks_7d
+    FROM revenue_events
+  `) as Array<{ all_clicks: number; clicks_7d: number }>;
+
+  const byPartner = (await sql`
+    SELECT partner, COUNT(*)::int AS clicks
+    FROM revenue_events
+    WHERE kind = 'affiliate_click'
+      AND created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY partner
+    ORDER BY clicks DESC
+    LIMIT 20
+  `) as Array<{ partner: string | null; clicks: number }>;
+
+  const byCity = (await sql`
+    SELECT city_slug, COUNT(*)::int AS clicks
+    FROM revenue_events
+    WHERE kind = 'affiliate_click'
+      AND created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY city_slug
+    ORDER BY clicks DESC
+    LIMIT 20
+  `) as Array<{ city_slug: string | null; clicks: number }>;
+
+  const topProducts = (await sql`
+    SELECT product_id, COUNT(*)::int AS clicks
+    FROM revenue_events
+    WHERE kind = 'affiliate_click'
+      AND created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY product_id
+    ORDER BY clicks DESC
+    LIMIT 12
+  `) as Array<{ product_id: string | null; clicks: number }>;
+
+  return {
+    affiliateClicks7d: totals?.clicks_7d ?? 0,
+    affiliateClicksAll: totals?.all_clicks ?? 0,
+    byPartner: byPartner.map((row) => ({
+      partner: row.partner || "unknown",
+      clicks: row.clicks,
+    })),
+    byCity: byCity.map((row) => ({
+      citySlug: row.city_slug || "unknown",
+      clicks: row.clicks,
+    })),
+    topProducts: topProducts.map((row) => ({
+      productId: row.product_id || "unknown",
+      clicks: row.clicks,
+    })),
+  };
 }

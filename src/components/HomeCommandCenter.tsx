@@ -338,6 +338,7 @@ function AdminBoardPanel() {
     members: { total: number; operators: number; admins: number };
     requests: { live: number; open: number };
     visitors: { last24h: number; last7d: number; uniqueSessions24h: number };
+    affiliate?: { affiliateClicks7d: number; affiliateClicksAll: number };
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -372,7 +373,14 @@ function AdminBoardPanel() {
     { label: "Awaiting reply", value: data.requests.open },
     { label: "Visits 24h", value: data.visitors.last24h },
     { label: "Visits 7d", value: data.visitors.last7d },
-    { label: "Unique 24h", value: data.visitors.uniqueSessions24h },
+    {
+      label: "Affiliate clicks 7d",
+      value: data.affiliate?.affiliateClicks7d ?? 0,
+    },
+    {
+      label: "Affiliate clicks all",
+      value: data.affiliate?.affiliateClicksAll ?? 0,
+    },
   ];
 
   return (

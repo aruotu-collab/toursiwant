@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { TripUpsells } from "@/components/TripUpsells";
+import { tripUpsellsForCity } from "@/lib/affiliate-products";
 import { launchCity } from "@/lib/cities";
 import {
   formatDisplayDate,
@@ -282,6 +284,17 @@ export default function RequestForm() {
               Back home
             </Link>
           </div>
+
+          {!isOperator ? (
+            <div className="mt-10">
+              <TripUpsells
+                products={tripUpsellsForCity(
+                  selectedTour?.citySlug || launchCity.slug || "new-york",
+                )}
+                title="While you wait for quotes — hotels, eSIM, cars"
+              />
+            </div>
+          ) : null}
         </div>
       </main>
     );

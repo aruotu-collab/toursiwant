@@ -5,6 +5,7 @@ import { isPlatformAdminEmail, roleLabel } from "@/lib/admin";
 import { listUsers, requireAdmin } from "@/lib/auth";
 import { dbPageViewStats, hasDatabase } from "@/lib/db";
 import { listRequests } from "@/lib/requests-store";
+import { revenueEventStats } from "@/lib/revenue-events";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function AdminPage() {
     redirect(`/join?next=${encodeURIComponent("/admin")}`);
   }
 
-  const [users, requests, visitors] = await Promise.all([
+  const [users, requests, visitors, affiliate] = await Promise.all([
     listUsers(300),
     listRequests(),
     hasDatabase()
@@ -27,6 +28,7 @@ export default async function AdminPage() {
           uniqueSessions24h: 0,
           topPaths: [] as { path: string; views: number }[],
         }),
+    revenueEventStats(),
   ]);
 
   const live = requests.filter((item) => item.source === "live");
@@ -41,8 +43,8 @@ export default async function AdminPage() {
     { label: "Awaiting reply", value: openLive.length },
     { label: "Visits 24h", value: visitors.last24h },
     { label: "Visits 7d", value: visitors.last7d },
-    { label: "Unique 24h", value: visitors.uniqueSessions24h },
-    { label: "Visits all-time", value: visitors.allTime },
+    { label: "Affiliate clicks 7d", value: affiliate.affiliateClicks7d },
+    { label: "Affiliate clicks all", value: affiliate.affiliateClicksAll },
   ];
 
   return (
@@ -106,6 +108,70 @@ export default async function AdminPage() {
         </div>
 
         <section className="mt-12 grid gap-8 lg:grid-cols-2">
+          <div>
+            <h2 className="font-display text-2xl text-ink">
+              Affiliate revenue · clicks
+            </h2>
+            <p className="mt-2 text-sm text-ink-soft">
+              Tracked via /go/partner/product redirects. Booking revenue lands in
+              partner dashboards after you apply and add env IDs
+              (VIATOR_PARTNER_ID, etc.).
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="border border-ink/10 bg-white/80 px-4 py-3">
+                <p className="text-xs uppercase tracking-wider text-stone">
+                  Clicks · 7 days
+                </p>
+                <p className="mt-1 font-display text-3xl text-ink">
+                  {affiliate.affiliateClicks7d}
+                </p>
+              </div>
+              <div className="border border-ink/10 bg-white/80 px-4 py-3">
+                <p className="text-xs uppercase tracking-wider text-stone">
+                  Clicks · all time
+                </p>
+                <p className="mt-1 font-display text-3xl text-ink">
+                  {affiliate.affiliateClicksAll}
+                </p>
+              </div>
+            </div>
+            <ul className="mt-4 space-y-2">
+              {affiliate.byPartner.length === 0 ? (
+                <li className="border border-ink/10 bg-white/70 p-4 text-sm text-ink-soft">
+                  No affiliate clicks yet — open Find tours → Bookable now →
+                  Check availability.
+                </li>
+              ) : (
+                affiliate.byPartner.map((row) => (
+                  <li
+                    key={row.partner}
+                    className="flex justify-between border border-ink/10 bg-white/80 px-4 py-3 text-sm"
+                  >
+                    <span className="font-semibold capitalize text-ink">
+                      {row.partner}
+                    </span>
+                    <span className="font-mono text-ink">{row.clicks}</span>
+                  </li>
+                ))
+              )}
+            </ul>
+            <ul className="mt-3 space-y-2">
+              {affiliate.topProducts.slice(0, 6).map((row) => (
+                <li
+                  key={row.productId}
+                  className="flex justify-between gap-3 border border-ink/10 bg-white/60 px-4 py-2 text-xs"
+                >
+                  <span className="truncate font-mono text-ink-soft">
+                    {row.productId}
+                  </span>
+                  <span className="shrink-0 font-semibold text-ink">
+                    {row.clicks}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
           <div>
             <h2 className="font-display text-2xl text-ink">Top paths · 7 days</h2>
             <p className="mt-2 text-sm text-ink-soft">

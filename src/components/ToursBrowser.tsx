@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ToursCityMap } from "@/components/ToursCityMap";
 import {
+  affiliateGoPath,
+  searchAffiliateProducts,
+} from "@/lib/affiliate-products";
+import {
   BROWSE_MONTHS_AHEAD,
   formatDisplayDate,
   listTourMetros,
@@ -109,6 +113,17 @@ export function ToursBrowser({
     [selectedDate, theme, stateCode, citySlug, query, operatorTours],
   );
 
+  const bookableNow = useMemo(
+    () =>
+      searchAffiliateProducts({
+        theme,
+        stateCode,
+        citySlug,
+        query,
+      }).filter((item) => item.category === "experience" || item.category === "ticket"),
+    [theme, stateCode, citySlug, query],
+  );
+
   const shortcuts = quickOffsets();
   const activeMetro = metros.find((m) => m.slug === citySlug);
   const activeState = states.find((s) => s.code === stateCode);
@@ -146,7 +161,8 @@ export function ToursBrowser({
     setSelectedSlug(id);
   }
 
-  const list = embedded ? tours.slice(0, 16) : tours;
+  const list = embedded ? tours.slice(0, 12) : tours;
+  const bookableList = embedded ? bookableNow.slice(0, 6) : bookableNow;
   const placeLabel =
     citySlug !== "all"
       ? activeMetro?.name || "City"
@@ -159,11 +175,12 @@ export function ToursBrowser({
       {!embedded ? (
         <p className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
           <span className="live-dot mr-2 align-middle" aria-hidden />
-          Search from anywhere · {stats.total} tours · {stats.cities} cities
+          Marketplace + bookable partners · {stats.total}+ tours ·{" "}
+          {bookableNow.length} instant options in scope
         </p>
       ) : (
         <p className="mb-4 font-mono text-xs uppercase tracking-[0.14em] text-white/55">
-          {placeLabel} · {tours.length} tours · {formatDisplayDate(selectedDate)}
+          {placeLabel} · {tours.length} request · {bookableNow.length} book now
         </p>
       )}
 
@@ -336,98 +353,152 @@ export function ToursBrowser({
 
       {/* List + map */}
       <div className="mt-5 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start">
-        <div className="order-2 min-w-0 border border-white/10 bg-white/[0.03] lg:order-1">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
-              Matches
-            </p>
-            <p className="font-mono text-[10px] uppercase tracking-wider text-white/40">
-              {tours.length} found
-            </p>
-          </div>
-          <ul className="divide-y divide-white/10 lg:max-h-[34rem] lg:overflow-y-auto lg:overscroll-contain">
-            {list.map((tour) => {
-              const selected = selectedSlug === tour.slug;
-              const themes = deriveThemes(tour);
-              return (
-                <li key={`${tour.slug}-${tour.date}`}>
-                  <div
-                    className={`flex w-full gap-3 px-4 py-3.5 transition ${
-                      selected ? "bg-amber/15" : "hover:bg-white/[0.06]"
-                    }`}
-                    onMouseEnter={() => setSelectedSlug(tour.slug)}
-                  >
-                    <span
-                      className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{
-                        background: themeColor(themes[0] || "city"),
-                        boxShadow: `0 0 10px ${themeColor(themes[0] || "city")}88`,
-                      }}
-                      aria-hidden
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-amber">
-                          {tour.cityName}, {tour.stateCode}
-                        </span>
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
-                          {themes.slice(0, 2).join(" · ")}
-                        </span>
-                      </p>
-                      <Link
-                        href={`/tours/${tour.slug}?date=${tour.date}`}
-                        onClick={() => selectTour(tour)}
-                        className="mt-0.5 block font-semibold text-white [overflow-wrap:anywhere] hover:text-amber"
-                      >
-                        {tour.title}
-                      </Link>
-                      <p className="mt-0.5 text-sm text-white/55 [overflow-wrap:anywhere]">
-                        {tour.departsLabel} · {tour.duration} · {tour.meetup}
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="order-2 min-w-0 space-y-4 lg:order-1">
+          {/* ToursIWant / operators */}
+          <div className="border border-white/10 bg-white/[0.03]">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
+                ToursIWant · request quotes
+              </p>
+              <p className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                {tours.length} matches
+              </p>
+            </div>
+            <ul className="divide-y divide-white/10 lg:max-h-[22rem] lg:overflow-y-auto lg:overscroll-contain">
+              {list.map((tour) => {
+                const selected = selectedSlug === tour.slug;
+                const themes = deriveThemes(tour);
+                return (
+                  <li key={`${tour.slug}-${tour.date}`}>
+                    <div
+                      className={`flex w-full gap-3 px-4 py-3.5 transition ${
+                        selected ? "bg-amber/15" : "hover:bg-white/[0.06]"
+                      }`}
+                      onMouseEnter={() => setSelectedSlug(tour.slug)}
+                    >
+                      <span
+                        className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{
+                          background: themeColor(themes[0] || "city"),
+                          boxShadow: `0 0 10px ${themeColor(themes[0] || "city")}88`,
+                        }}
+                        aria-hidden
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-amber">
+                            {tour.cityName}, {tour.stateCode}
+                          </span>
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                            {tour.source === "operator" ? "operator" : "starter"} ·{" "}
+                            {themes.slice(0, 2).join(" · ")}
+                          </span>
+                        </p>
                         <Link
                           href={`/tours/${tour.slug}?date=${tour.date}`}
-                          className="border border-white/20 px-2.5 py-1 text-xs font-semibold text-white hover:border-amber/50"
+                          onClick={() => selectTour(tour)}
+                          className="mt-0.5 block font-semibold text-white [overflow-wrap:anywhere] hover:text-amber"
                         >
-                          View
+                          {tour.title}
                         </Link>
-                        <Link
-                          href={`/request?tour=${tour.slug}&suggested=${tour.date}`}
-                          className="bg-amber px-2.5 py-1 text-xs font-semibold text-ink hover:bg-amber-deep"
-                        >
-                          Request · pick your date
-                        </Link>
+                        <p className="mt-0.5 text-sm text-white/55 [overflow-wrap:anywhere]">
+                          {tour.departsLabel} · {tour.duration} · {tour.meetup}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/tours/${tour.slug}?date=${tour.date}`}
+                            className="border border-white/20 px-2.5 py-1 text-xs font-semibold text-white hover:border-amber/50"
+                          >
+                            View
+                          </Link>
+                          <Link
+                            href={`/request?tour=${tour.slug}&suggested=${tour.date}`}
+                            className="bg-amber px-2.5 py-1 text-xs font-semibold text-ink hover:bg-amber-deep"
+                          >
+                            Request · pick your date
+                          </Link>
+                        </div>
                       </div>
+                      <p className="shrink-0 self-start font-mono text-sm text-amber">
+                        {tour.priceFrom}
+                      </p>
                     </div>
-                    <p className="shrink-0 self-start font-mono text-sm text-amber">
-                      {tour.priceFrom}
+                  </li>
+                );
+              })}
+              {list.length === 0 ? (
+                <li className="px-4 py-8 text-center text-sm text-white/50">
+                  No marketplace matches.{" "}
+                  <Link
+                    href={`/request?date=${selectedDate}`}
+                    className="font-semibold text-amber hover:underline"
+                  >
+                    Request a custom tour
+                  </Link>{" "}
+                  or try Bookable now below.
+                </li>
+              ) : null}
+            </ul>
+          </div>
+
+          {/* Affiliate bookable now */}
+          <div className="border border-amber/25 bg-amber/[0.04]">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-amber">
+                Bookable now · partners
+              </p>
+              <p className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                {bookableNow.length} options
+              </p>
+            </div>
+            <p className="border-b border-white/10 px-4 py-2 text-xs text-white/50">
+              Instant inventory (Viator, Tiqets…). You complete booking on the
+              partner site — ToursIWant may earn a commission. Custom requests stay
+              with us.
+            </p>
+            <ul className="divide-y divide-white/10 lg:max-h-[18rem] lg:overflow-y-auto">
+              {bookableList.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 hover:bg-white/[0.04]"
+                >
+                  <div className="min-w-0">
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-amber">
+                      {item.partner} · {item.cityName}
+                    </p>
+                    <p className="font-semibold text-white">{item.title}</p>
+                    <p className="text-sm text-white/55">
+                      {item.duration} · {item.summary}
                     </p>
                   </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <p className="font-mono text-sm text-amber">{item.priceFrom}</p>
+                    <Link
+                      href={affiliateGoPath(item)}
+                      target="_blank"
+                      rel="noopener noreferrer sponsored"
+                      className="border border-amber/50 px-2.5 py-1 text-xs font-semibold text-amber hover:bg-amber hover:text-ink"
+                    >
+                      Check availability →
+                    </Link>
+                  </div>
                 </li>
-              );
-            })}
-            {list.length === 0 ? (
-              <li className="px-4 py-10 text-center text-sm text-white/50">
-                No matches. Try another theme/state, or{" "}
-                <Link
-                  href={`/request?date=${selectedDate}`}
-                  className="font-semibold text-amber hover:underline"
-                >
-                  request a custom tour
-                </Link>
-                .
-              </li>
-            ) : null}
-          </ul>
+              ))}
+              {bookableList.length === 0 ? (
+                <li className="px-4 py-6 text-center text-sm text-white/50">
+                  No partner inventory for this filter — try All themes / US.
+                </li>
+              ) : null}
+            </ul>
+          </div>
+
           {embedded && tours.length > list.length ? (
-            <div className="border-t border-white/10 px-4 py-3">
-              <Link
-                href="/tours"
-                className="text-sm font-semibold text-amber hover:underline"
-              >
-                See all {tours.length} matches →
-              </Link>
-            </div>
+            <Link
+              href="/tours"
+              className="inline-flex text-sm font-semibold text-amber hover:underline"
+            >
+              See all marketplace matches →
+            </Link>
           ) : null}
         </div>
 
@@ -462,11 +533,11 @@ export function ToursBrowser({
 
           <div className="border border-dashed border-white/15 bg-white/[0.02] p-4">
             <p className="font-display text-lg text-white">
-              Found it? Request a seat.
+              Can&apos;t find the exact tour?
             </p>
             <p className="mt-1 text-sm text-white/55">
-              Example: Religious → New York → search &quot;Patterson&quot; →
-              request the Bethel visitor tour — from anywhere in the world.
+              Use Bookable now for standard experiences — or request a custom
+              day (religious sites, private drivers, multi-hotel pickup).
             </p>
             <Link
               href={`/request?date=${selectedDate}`}

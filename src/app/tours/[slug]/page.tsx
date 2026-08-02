@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TourDatePicker } from "@/components/TourDatePicker";
+import { TripUpsells } from "@/components/TripUpsells";
+import { tripUpsellsForCity } from "@/lib/affiliate-products";
 import { getTourDetailsAsync, weekdayLabels } from "@/lib/tour-details";
 import { getTourDeparture, toDateKey } from "@/lib/sample-tours";
 
@@ -132,6 +134,11 @@ export default async function TourDetailPage({
               Request stay near this tour →
             </Link>
           </div>
+
+          <TripUpsells
+            products={tripUpsellsForCity(tour.citySlug)}
+            title="Hotels, data, cars & bookable attractions nearby"
+          />
         </div>
 
         <aside className="h-fit border border-ink/10 bg-white/80 p-5 sm:p-6 lg:sticky lg:top-8">
