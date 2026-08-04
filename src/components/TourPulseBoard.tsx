@@ -29,6 +29,14 @@ import {
   type PulseZone,
   type PulseZoneId,
 } from "@/lib/tour-pulse";
+import {
+  citySlugFromMetroLabel,
+  viatorProductToPulseActivity,
+} from "@/lib/viator";
+import {
+  affiliateGoPath,
+  type AffiliateProduct,
+} from "@/lib/affiliate-products";
 
 type FilterId = ExperienceType;
 
@@ -114,9 +122,66 @@ export function TourPulseBoard({
   const [useCorridor, setUseCorridor] = useState(true);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError] = useState<string | null>(null);
+  const [viatorProducts, setViatorProducts] = useState<AffiliateProduct[]>([]);
+  const [viatorSource, setViatorSource] = useState<
+    "viator" | "curated" | "loading"
+  >("loading");
+  const [viatorCitySlug, setViatorCitySlug] = useState("new-york");
 
   const nearPlace = placeId ? getNearMePlace(placeId) || null : null;
   const hasStay = Boolean(nearPlace || usaStay);
+
+  const pulseCitySlug = useMemo(() => {
+    if (usaStay?.metro) return citySlugFromMetroLabel(usaStay.metro);
+    if (nearPlace) return "new-york";
+    return "new-york";
+  }, [usaStay, nearPlace]);
+
+  // Live Viator → bookable pulse signals + pre-stay strip
+  useEffect(() => {
+    let cancelled = false;
+    setViatorSource("loading");
+    setViatorCitySlug(pulseCitySlug);
+    const params = new URLSearchParams({
+      city: pulseCitySlug,
+      count: "16",
+    });
+    const timer = window.setTimeout(() => {
+      fetch(`/api/affiliates/viator/search?${params.toString()}`)
+        .then((r) => r.json())
+        .then(
+          (data: {
+            products?: AffiliateProduct[];
+            source?: "viator" | "curated";
+          }) => {
+            if (cancelled) return;
+            const list = (data.products || []).filter(
+              (p) => p.category === "experience" || p.category === "ticket",
+            );
+            setViatorProducts(list);
+            setViatorSource(data.source || "curated");
+          },
+        )
+        .catch(() => {
+          if (!cancelled) {
+            setViatorProducts([]);
+            setViatorSource("curated");
+          }
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [pulseCitySlug]);
+
+  const viatorActivities = useMemo(
+    () =>
+      viatorProducts
+        .slice(0, 14)
+        .map((p, i) => viatorProductToPulseActivity(p, i)),
+    [viatorProducts],
+  );
 
   useEffect(() => {
     fetch("/api/places/status")
@@ -165,10 +230,17 @@ export function TourPulseBoard({
   }, [nearPlace, usaStay]);
 
   const localActivities = useMemo(() => {
-    if (usaActivities) return usaActivities;
-    if (!nearZones) return [];
-    return activities.filter((a) => nearZones.includes(a.zoneId));
-  }, [activities, nearZones, usaActivities]);
+    const base = usaActivities
+      ? usaActivities
+      : nearZones
+        ? activities.filter((a) => nearZones.includes(a.zoneId))
+        : [];
+    // Weave live bookable inventory into pulse when nearby stay is set
+    if (!viatorActivities.length) return base;
+    const seedIds = new Set(base.map((a) => a.id));
+    const extra = viatorActivities.filter((a) => !seedIds.has(a.id));
+    return [...extra, ...base];
+  }, [activities, nearZones, usaActivities, viatorActivities]);
 
   const filtered = useMemo(() => {
     return localActivities.filter((a) => matchesExperienceType(a, filter));
@@ -230,16 +302,18 @@ export function TourPulseBoard({
       .filter((tab) => tab.count > 0 || tab.stopCount > 0);
   }, [filterCounts, placeId, usaSpots, nearbyStops]);
 
-  // Soft live tick — only for seeded pulse, not Google snapshots
+  // Soft live tick — only for seeded pulse rows, not Viator / Google snapshots
   useEffect(() => {
     if (usaActivities) return;
     const id = window.setInterval(() => {
       setActivities((current) => {
-        const idx = Math.floor(Math.random() * current.length);
-        const target = current[idx];
+        const seedOnly = current.filter((a) => a.source !== "viator");
+        if (!seedOnly.length) return current;
+        const target = seedOnly[Math.floor(Math.random() * seedOnly.length)];
         setTickFlash(target.id);
-        return current.map((a, i) => {
-          if (i !== idx) {
+        return current.map((a) => {
+          if (a.source === "viator") return a;
+          if (a.id !== target.id) {
             return { ...a, minutesAgo: a.minutesAgo + 1 };
           }
           return {
@@ -488,6 +562,66 @@ export function TourPulseBoard({
           ) : null}
         </div>
 
+        {/* Always-on live bookable strip (works before stay is set) */}
+        <div className="mt-4 border border-amber/25 bg-amber/[0.04]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-amber">
+              Bookable ·{" "}
+              {viatorSource === "viator"
+                ? "Viator live"
+                : viatorSource === "loading"
+                  ? "loading…"
+                  : "partners"}
+            </p>
+            <p className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+              {viatorCitySlug.replace(/-/g, " ")} · {viatorProducts.length}{" "}
+              options
+            </p>
+          </div>
+          <p className="border-b border-white/10 px-4 py-2 text-xs text-white/50">
+            Instant experiences near this metro. After you add a stay, these also
+            appear as glowing signals on the Pulse list (mix of tours + bookable).
+          </p>
+          <ul className="divide-y divide-white/10">
+            {viatorProducts.slice(0, hasStay ? 4 : 8).map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-amber">
+                    {item.partner} · {item.priceFrom}
+                  </p>
+                  <p className="font-semibold text-white [overflow-wrap:anywhere]">
+                    {item.title}
+                  </p>
+                  <p className="text-sm text-white/50 line-clamp-1">
+                    {item.summary}
+                  </p>
+                </div>
+                <Link
+                  href={affiliateGoPath(item)}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  className="shrink-0 border border-amber/50 bg-amber/15 px-3 py-2 text-xs font-semibold text-amber hover:bg-amber hover:text-ink"
+                >
+                  Book now →
+                </Link>
+              </li>
+            ))}
+            {viatorSource === "loading" && !viatorProducts.length ? (
+              <li className="px-4 py-6 text-sm text-white/45">
+                Loading bookable inventory…
+              </li>
+            ) : null}
+            {viatorSource !== "loading" && !viatorProducts.length ? (
+              <li className="px-4 py-6 text-sm text-white/45">
+                No bookable listings yet — check Viator API key on the server.
+              </li>
+            ) : null}
+          </ul>
+        </div>
+
         {hasStay ? (
           <div className="mt-4 border border-white/10 bg-white/[0.03] p-4">
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
@@ -595,13 +729,21 @@ export function TourPulseBoard({
                           </span>
                         </span>
                         <span className="mt-0.5 block font-semibold text-white [overflow-wrap:anywhere]">
+                          {activity.source === "viator" ? (
+                            <span className="mr-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber">
+                              Bookable
+                            </span>
+                          ) : null}
                           {activity.title}
                         </span>
                         <span className="mt-0.5 block text-sm text-white/55 [overflow-wrap:anywhere]">
                           {activity.detail}
-                          {activity.joinable ? " · open to join" : ""}
-                          {" · "}
-                          {activity.travellers} travellers
+                          {activity.joinable && activity.source !== "viator"
+                            ? " · open to join"
+                            : ""}
+                          {activity.source !== "viator"
+                            ? ` · ${activity.travellers} travellers`
+                            : ""}
                         </span>
                       </span>
                       <span className="shrink-0 font-mono text-[10px] text-white/35">
@@ -685,11 +827,23 @@ export function TourPulseBoard({
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Link
                         href={activityHref(spotlight.activity, today)}
+                        target={
+                          spotlight.activity.href?.startsWith("/go/")
+                            ? "_blank"
+                            : undefined
+                        }
+                        rel={
+                          spotlight.activity.href?.startsWith("/go/")
+                            ? "noopener noreferrer sponsored"
+                            : undefined
+                        }
                         className="bg-amber px-3 py-1.5 text-xs font-semibold text-ink hover:bg-amber-deep"
                       >
-                        {spotlight.activity.joinable
-                          ? "View / join"
-                          : "View details"}
+                        {spotlight.activity.source === "viator"
+                          ? "Book on Viator"
+                          : spotlight.activity.joinable
+                            ? "View / join"
+                            : "View details"}
                       </Link>
                       <button
                         type="button"
@@ -1200,9 +1354,21 @@ function ZonePanel({
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               href={activityHref(focus, today)}
+              target={
+                focus.href?.startsWith("/go/") ? "_blank" : undefined
+              }
+              rel={
+                focus.href?.startsWith("/go/")
+                  ? "noopener noreferrer sponsored"
+                  : undefined
+              }
               className="bg-amber px-3 py-2 text-xs font-semibold text-ink hover:bg-amber-deep"
             >
-              {focus.joinable ? "View / join" : "View details"} →
+              {focus.source === "viator"
+                ? "Book on Viator →"
+                : focus.joinable
+                  ? "View / join →"
+                  : "View details →"}
             </Link>
             <Link
               href={`/request?date=${today}`}

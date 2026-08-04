@@ -2,8 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TourDatePicker } from "@/components/TourDatePicker";
-import { TripUpsells } from "@/components/TripUpsells";
-import { tripUpsellsForCity } from "@/lib/affiliate-products";
+import {
+  TourRelatedViator,
+  TourTripCompleteUpsells,
+} from "@/components/TourRelatedViator";
 import { getTourDetailsAsync, weekdayLabels } from "@/lib/tour-details";
 import { getTourDeparture, toDateKey } from "@/lib/sample-tours";
 
@@ -82,6 +84,12 @@ export default async function TourDetailPage({
             </p>
           </div>
 
+          <TourRelatedViator
+            citySlug={tour.citySlug}
+            cityName={tour.cityName}
+            title={tour.title}
+          />
+
           <div>
             <h3 className="font-display text-xl text-ink">Highlights</h3>
             <ul className="mt-4 space-y-2">
@@ -135,10 +143,7 @@ export default async function TourDetailPage({
             </Link>
           </div>
 
-          <TripUpsells
-            products={tripUpsellsForCity(tour.citySlug)}
-            title="Hotels, data, cars & bookable attractions nearby"
-          />
+          <TourTripCompleteUpsells citySlug={tour.citySlug} />
         </div>
 
         <aside className="h-fit border border-ink/10 bg-white/80 p-5 sm:p-6 lg:sticky lg:top-8">

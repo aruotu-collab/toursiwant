@@ -4,7 +4,15 @@
  * Golden Path: real-time /products/search → productUrl on Viator (commission).
  */
 
-import type { AffiliateProduct } from "@/lib/affiliate-products";
+import {
+  affiliateGoPath,
+  type AffiliateProduct,
+} from "@/lib/affiliate-products";
+import type {
+  PulseActivity,
+  PulseCategory,
+  PulseZoneId,
+} from "@/lib/tour-pulse";
 import type { TourTheme } from "@/lib/tour-themes";
 
 export type ViatorEnv = "sandbox" | "production";
@@ -372,6 +380,95 @@ export async function getViatorProductUrl(
     next: { revalidate: 3600 },
   });
   return data?.productUrl || null;
+}
+
+/** Map hotel metro label → destination we can search on Viator. */
+export function citySlugFromMetroLabel(metro?: string | null): string {
+  if (!metro) return "new-york";
+  const m = metro.toLowerCase();
+  if (/new york|manhattan|brooklyn|queens|jersey city/.test(m)) return "new-york";
+  if (/los angeles|hollywood|hollywood hollywood|santa monica/.test(m))
+    return "los-angeles";
+  if (/las vegas/.test(m)) return "las-vegas";
+  if (/miami|fort lauderdale|south beach/.test(m)) return "miami";
+  if (/orlando|disney/.test(m)) return "orlando";
+  if (/chicago/.test(m)) return "chicago";
+  if (/san francisco|sf bay|oakland/.test(m)) return "san-francisco";
+  if (/washington|d\.?c\.?/.test(m)) return "washington-dc";
+  if (/boston/.test(m)) return "boston";
+  if (/new orleans|nola/.test(m)) return "new-orleans";
+  if (/seattle/.test(m)) return "seattle";
+  if (/houston/.test(m)) return "houston";
+  if (/dallas|fort worth/.test(m)) return "dallas";
+  if (/atlanta/.test(m)) return "atlanta";
+  if (/san diego/.test(m)) return "san-diego";
+  if (/philadelphia|philly/.test(m)) return "philadelphia";
+  if (/honolulu|waikiki|oahu/.test(m)) return "honolulu";
+  if (/nashville/.test(m)) return "nashville";
+  if (/denver/.test(m)) return "denver";
+  if (/phoenix|scottsdale/.test(m)) return "phoenix";
+  return "new-york";
+}
+
+function zoneForViatorTitle(title: string, index: number): PulseZoneId {
+  const t = title.toLowerCase();
+  if (/statue|ellis|harbor|harbour|cruise|battery|liberty|ferry/.test(t))
+    return "harbor";
+  if (/wall street|downtown|9\/?11|financial|lower manhattan|ground zero/.test(t))
+    return "lower-manhattan";
+  if (/central park|museum|moma|met |guggenheim|upper east|5th /.test(t))
+    return "central-park";
+  if (/brooklyn|dumbo|williamsburg|bridge walk/.test(t)) return "brooklyn";
+  if (/airport|jfk|lga|ewr|transfer|shuttle/.test(t)) return "airports";
+  if (
+    /times square|broadway|midtown|rockefeller|empire|one world|summit|radio city/.test(
+      t,
+    )
+  )
+    return "midtown";
+  const zones: PulseZoneId[] = [
+    "harbor",
+    "lower-manhattan",
+    "midtown",
+    "central-park",
+    "brooklyn",
+    "airports",
+  ];
+  return zones[index % zones.length];
+}
+
+function categoryForViatorProduct(product: AffiliateProduct): PulseCategory {
+  const text = `${product.title} ${product.summary} ${product.themes.join(" ")}`.toLowerCase();
+  if (/museum|gallery|art/.test(text) || product.themes.includes("museum"))
+    return "museum";
+  if (/food|taste|culinary|wine|pizza/.test(text) || product.themes.includes("food"))
+    return "food";
+  if (/cruise|boat|ferry|harbor|yacht/.test(text)) return "cruise";
+  if (/bus|hop.?on|hop.?off|coach/.test(text)) return "bus";
+  if (/airport|transfer|pickup|shuttle/.test(text)) return "pickup";
+  if (/show|broadway|concert|event/.test(text)) return "event";
+  return "tour";
+}
+
+/** Project Viator affiliate inventory onto the NYC pulse spine. */
+export function viatorProductToPulseActivity(
+  product: AffiliateProduct,
+  index: number,
+): PulseActivity {
+  return {
+    id: `viator-${product.id}`,
+    zoneId: zoneForViatorTitle(product.title, index),
+    category: categoryForViatorProduct(product),
+    status: "departing_soon",
+    title: product.title,
+    detail: `Viator · ${product.priceFrom}${product.duration !== "See partner" ? ` · ${product.duration}` : ""} · book now`,
+    travellers: 4 + (index % 9),
+    joinable: true,
+    href: affiliateGoPath(product),
+    source: "viator",
+    priceFrom: product.priceFrom,
+    minutesAgo: index % 12,
+  };
 }
 
 export type { ViatorProductRaw };

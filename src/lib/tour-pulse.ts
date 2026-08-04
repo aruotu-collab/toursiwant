@@ -46,6 +46,9 @@ export type PulseActivity = {
   joinable: boolean;
   tourSlug?: string;
   href?: string;
+  /** live partner inventory (e.g. Viator bookable) */
+  source?: "seed" | "viator" | "places";
+  priceFrom?: string;
   minutesAgo: number;
 };
 
