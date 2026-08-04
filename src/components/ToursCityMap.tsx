@@ -26,9 +26,10 @@ function pinPoint(id: string, index: number, total: number) {
   const jitter = ((hash(id) % 100) / 100) * 0.35 - 0.17;
   const angle = even + jitter;
   const ring = total > 10 ? 78 + (hash(id + "r") % 55) : 90 + (hash(id + "r") % 40);
+  // Round so SSR (Node) and browser float results match (avoids hydration mismatch).
   return {
-    x: 200 + Math.cos(angle) * ring,
-    y: 205 + Math.sin(angle) * ring * 0.92,
+    x: Number((200 + Math.cos(angle) * ring).toFixed(3)),
+    y: Number((205 + Math.sin(angle) * ring * 0.92).toFixed(3)),
   };
 }
 

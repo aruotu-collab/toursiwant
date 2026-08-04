@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ToursCityMap } from "@/components/ToursCityMap";
 import {
   affiliateGoPath,
-  searchAffiliateProducts,
+  type AffiliateProduct,
 } from "@/lib/affiliate-products";
 import {
   BROWSE_MONTHS_AHEAD,
@@ -79,6 +79,11 @@ export function ToursBrowser({
   const [query, setQuery] = useState("");
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [operatorTours, setOperatorTours] = useState<CatalogTour[]>([]);
+  const [bookableNow, setBookableNow] = useState<AffiliateProduct[]>([]);
+  const [bookableSource, setBookableSource] = useState<
+    "viator" | "curated" | "loading"
+  >("loading");
+  const [bookableEnv, setBookableEnv] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +99,46 @@ export function ToursBrowser({
       cancelled = true;
     };
   }, []);
+
+  // Live Viator “Bookable now” (falls back to curated if no API key)
+  useEffect(() => {
+    let cancelled = false;
+    setBookableSource("loading");
+    const params = new URLSearchParams();
+    if (citySlug !== "all") params.set("city", citySlug);
+    if (stateCode !== "all") params.set("state", stateCode);
+    if (theme !== "all") params.set("theme", theme);
+    if (query.trim()) params.set("q", query.trim());
+    params.set("count", "24");
+
+    const timer = window.setTimeout(() => {
+      fetch(`/api/affiliates/viator/search?${params.toString()}`)
+        .then((r) => r.json())
+        .then(
+          (data: {
+            products?: AffiliateProduct[];
+            source?: "viator" | "curated";
+            env?: string;
+          }) => {
+            if (cancelled) return;
+            setBookableNow(data.products || []);
+            setBookableSource(data.source || "curated");
+            setBookableEnv(data.env || "");
+          },
+        )
+        .catch(() => {
+          if (!cancelled) {
+            setBookableNow([]);
+            setBookableSource("curated");
+          }
+        });
+    }, 280);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [citySlug, stateCode, theme, query]);
 
   const citiesForState = useMemo(
     () => citiesInState(stateCode),
@@ -111,17 +156,6 @@ export function ToursBrowser({
         extraTours: operatorTours,
       }),
     [selectedDate, theme, stateCode, citySlug, query, operatorTours],
-  );
-
-  const bookableNow = useMemo(
-    () =>
-      searchAffiliateProducts({
-        theme,
-        stateCode,
-        citySlug,
-        query,
-      }).filter((item) => item.category === "experience" || item.category === "ticket"),
-    [theme, stateCode, citySlug, query],
   );
 
   const shortcuts = quickOffsets();
@@ -445,16 +479,24 @@ export function ToursBrowser({
           <div className="border border-amber/25 bg-amber/[0.04]">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
               <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-amber">
-                Bookable now · partners
+                Bookable now ·{" "}
+                {bookableSource === "viator"
+                  ? "Viator live"
+                  : bookableSource === "loading"
+                    ? "loading…"
+                    : "partners"}
               </p>
               <p className="font-mono text-[10px] uppercase tracking-wider text-white/40">
-                {bookableNow.length} options
+                {bookableSource === "loading"
+                  ? "…"
+                  : `${bookableNow.length} options`}
+                {bookableEnv ? ` · ${bookableEnv}` : ""}
               </p>
             </div>
             <p className="border-b border-white/10 px-4 py-2 text-xs text-white/50">
-              Instant inventory (Viator, Tiqets…). You complete booking on the
-              partner site — ToursIWant may earn a commission. Custom requests stay
-              with us.
+              Live Viator inventory when your API key is set. Booking finishes on
+              Viator (30-day attribution). Custom & operator tours stay with
+              ToursIWant.
             </p>
             <ul className="divide-y divide-white/10 lg:max-h-[18rem] lg:overflow-y-auto">
               {bookableList.map((item) => (
