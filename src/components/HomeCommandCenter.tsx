@@ -52,9 +52,9 @@ const TAB_COPY: Record<
   },
   tours: {
     eyebrow: "Find tours · USA",
-    title: "Theme, state, then the tour.",
+    title: "Browse by place — or near your stay.",
     blurb:
-      "Religious, museum, beach… pick a state or city, search by name (e.g. Patterson), then request — from anywhere in the world.",
+      "Pick state/city, search by name, or enter where you’re staying (same hotel search as Pulse). Request custom tours or book partners instantly.",
   },
   events: {
     eyebrow: "Events This Week",

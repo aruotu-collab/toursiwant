@@ -7,6 +7,7 @@ import {
   affiliateGoPath,
   type AffiliateProduct,
 } from "@/lib/affiliate-products";
+import { getNearMePlace } from "@/lib/near-me";
 import {
   BROWSE_MONTHS_AHEAD,
   formatDisplayDate,
@@ -24,6 +25,31 @@ import {
   tourThemeDefs,
   type TourThemeId,
 } from "@/lib/tour-themes";
+import {
+  citySlugFromMetroLabel,
+  viatorDestinationByCity,
+} from "@/lib/viator";
+
+type WhereMode = "browse" | "near";
+
+type StaySuggestion = {
+  id: string;
+  name: string;
+  subtitle: string;
+  source: "curated" | "google";
+  placeId?: string;
+};
+
+function applyCityFocus(
+  slug: string,
+  setCitySlug: (s: string) => void,
+  setStateCode: (s: string) => void,
+) {
+  const metro = listTourMetros().find((m) => m.slug === slug);
+  const dest = viatorDestinationByCity[slug];
+  setCitySlug(slug);
+  setStateCode(metro?.stateCode || dest?.stateCode || "all");
+}
 
 function addMonths(date: Date, months: number) {
   const next = new Date(date);
@@ -84,6 +110,14 @@ export function ToursBrowser({
     "viator" | "curated" | "loading"
   >("loading");
   const [bookableEnv, setBookableEnv] = useState<string>("");
+  const [whereMode, setWhereMode] = useState<WhereMode>("browse");
+  const [stayQuery, setStayQuery] = useState("");
+  const [stayName, setStayName] = useState<string | null>(null);
+  const [stayMetro, setStayMetro] = useState<string | null>(null);
+  const [staySuggestions, setStaySuggestions] = useState<StaySuggestion[]>([]);
+  const [placesEnabled, setPlacesEnabled] = useState(false);
+  const [stayLoading, setStayLoading] = useState(false);
+  const [stayError, setStayError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +133,35 @@ export function ToursBrowser({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    fetch("/api/places/status")
+      .then((r) => r.json())
+      .then((d: { enabled?: boolean }) => setPlacesEnabled(Boolean(d.enabled)))
+      .catch(() => setPlacesEnabled(false));
+  }, []);
+
+  useEffect(() => {
+    if (whereMode !== "near" || stayName) {
+      setStaySuggestions([]);
+      return;
+    }
+    const q = stayQuery.trim();
+    if (q.length < 2) {
+      setStaySuggestions([]);
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      fetch(`/api/places/autocomplete?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d: { places?: StaySuggestion[]; enabled?: boolean }) => {
+          setStaySuggestions(d.places || []);
+          if (typeof d.enabled === "boolean") setPlacesEnabled(d.enabled);
+        })
+        .catch(() => setStaySuggestions([]));
+    }, 280);
+    return () => window.clearTimeout(handle);
+  }, [stayQuery, stayName, whereMode]);
 
   // Live Viator “Bookable now” (falls back to curated if no API key)
   useEffect(() => {
@@ -161,6 +224,61 @@ export function ToursBrowser({
   const shortcuts = quickOffsets();
   const activeMetro = metros.find((m) => m.slug === citySlug);
   const activeState = states.find((s) => s.code === stateCode);
+
+  function clearStay() {
+    setStayName(null);
+    setStayMetro(null);
+    setStayQuery("");
+    setStayError(null);
+    setStayLoading(false);
+    setStaySuggestions([]);
+    setCitySlug("all");
+    setStateCode("all");
+    setSelectedSlug(null);
+  }
+
+  function focusFromStay(name: string, metroLabel: string) {
+    const slug = citySlugFromMetroLabel(metroLabel);
+    setStayName(name);
+    setStayMetro(metroLabel);
+    setStayQuery(name);
+    setStaySuggestions([]);
+    setSelectedSlug(null);
+    applyCityFocus(slug, setCitySlug, setStateCode);
+  }
+
+  async function chooseStaySuggestion(item: StaySuggestion) {
+    setStayError(null);
+    if (item.source === "curated") {
+      const place = getNearMePlace(item.id);
+      focusFromStay(item.name, "New York");
+      if (place) applyCityFocus("new-york", setCitySlug, setStateCode);
+      return;
+    }
+    if (!item.placeId) return;
+    setStayLoading(true);
+    try {
+      const res = await fetch("/api/places/nearby", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ placeId: item.placeId, name: item.name }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        stay?: { name: string; metro: string };
+      };
+      if (!res.ok || !data.stay) {
+        setStayError(data.error || "Could not resolve this stay.");
+        focusFromStay(item.name, "New York");
+        return;
+      }
+      focusFromStay(data.stay.name, data.stay.metro);
+    } catch {
+      setStayError("Could not resolve this stay. Try Browse by place.");
+    } finally {
+      setStayLoading(false);
+    }
+  }
 
   const mapPins = useMemo(() => {
     if (citySlug === "all" && stateCode === "all" && theme === "all" && !query) {
@@ -258,90 +376,215 @@ export function ToursBrowser({
         </div>
       </div>
 
-      {/* 2 · State + city + keyword */}
+      {/* 2 · Where: browse by place OR near my stay */}
       <div className="mt-4 border border-white/10 bg-white/[0.03] p-4 sm:p-5">
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
-          2 · Where? (state → city → name search)
+          2 · Where?
         </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="block">
-            <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
-              State
-            </span>
-            <select
-              value={stateCode}
-              onChange={(e) => {
-                setStateCode(e.target.value);
-                setCitySlug("all");
-                setSelectedSlug(null);
-              }}
-              className="w-full border border-white/15 bg-ink/70 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-amber/50"
-            >
-              <option value="all">All US states</option>
-              {states.map((state) => (
-                <option key={state.code} value={state.code}>
-                  {state.name} ({state.code}) · {state.count}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
-              City
-            </span>
-            <select
-              value={citySlug}
-              onChange={(e) => {
-                setCitySlug(e.target.value);
-                setSelectedSlug(null);
-              }}
-              className="w-full border border-white/15 bg-ink/70 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-amber/50"
-            >
-              <option value="all">All cities in scope</option>
-              {citiesForState.map((metro) => (
-                <option key={metro.slug} value={metro.slug}>
-                  {metro.name}, {metro.stateCode}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block sm:col-span-2 lg:col-span-1">
-            <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
-              Search by name
-            </span>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g. Patterson, Bethel, Jehovah…"
-              className="w-full border border-white/15 bg-ink/70 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-amber/50"
-            />
-          </label>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setWhereMode("browse");
+              if (stayName) clearStay();
+            }}
+            className={`border px-3 py-2 text-xs font-semibold transition ${
+              whereMode === "browse"
+                ? "border-amber bg-amber text-ink"
+                : "border-white/15 text-white/70 hover:border-white/35"
+            }`}
+          >
+            Browse by place
+          </button>
+          <button
+            type="button"
+            onClick={() => setWhereMode("near")}
+            className={`border px-3 py-2 text-xs font-semibold transition ${
+              whereMode === "near"
+                ? "border-amber bg-amber text-ink"
+                : "border-white/15 text-white/70 hover:border-white/35"
+            }`}
+          >
+            Near my stay
+          </button>
         </div>
-        {stateCode !== "all" || citySlug !== "all" ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {citiesForState.map((metro) => {
-              const active = citySlug === metro.slug;
-              return (
+
+        {whereMode === "near" ? (
+          <div className="mt-3 border border-amber/25 bg-amber/[0.04] p-3 sm:p-4">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-amber">
+              Same hotel search as Pulse
+            </p>
+            <label className="mt-2 block">
+              <span className="sr-only">Hotel or stay</span>
+              <input
+                value={stayQuery}
+                onChange={(e) => {
+                  setStayQuery(e.target.value);
+                  if (stayName) {
+                    setStayName(null);
+                    setStayMetro(null);
+                  }
+                }}
+                placeholder={
+                  placesEnabled
+                    ? "Any US hotel — Miami, Chicago, Aliz NYC…"
+                    : "e.g. Aliz Hotel Times Square…"
+                }
+                className="w-full border border-white/15 bg-ink/70 px-3 py-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-amber/50"
+                autoComplete="off"
+              />
+            </label>
+            {!stayName && staySuggestions.length > 0 ? (
+              <ul className="mt-2 border border-white/10 bg-[#0a1520]">
+                {staySuggestions.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => void chooseStaySuggestion(item)}
+                      className="flex w-full flex-col px-3 py-2.5 text-left hover:bg-white/5"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                        {item.name}
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                          {item.source === "google" ? "USA" : "NYC"}
+                        </span>
+                      </span>
+                      <span className="text-xs text-white/50">
+                        {item.subtitle}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {stayName ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="border border-amber/40 bg-amber/15 px-2.5 py-1 text-xs font-semibold text-amber">
+                  Near · {stayName}
+                  {stayMetro ? ` · ${stayMetro}` : ""}
+                  {citySlug !== "all" && activeMetro
+                    ? ` · ${activeMetro.name}`
+                    : ""}
+                </span>
                 <button
-                  key={metro.slug}
                   type="button"
-                  onClick={() => {
-                    setCitySlug(metro.slug);
-                    setStateCode(metro.stateCode);
-                    setSelectedSlug(null);
-                  }}
-                  className={`border px-2.5 py-1.5 text-xs font-semibold transition ${
-                    active
-                      ? "border-amber bg-amber text-ink"
-                      : "border-white/15 text-white/70 hover:border-white/35"
-                  }`}
+                  onClick={clearStay}
+                  className="text-xs font-semibold text-white/55 underline-offset-2 hover:text-white hover:underline"
                 >
-                  {metro.name}
+                  Clear stay
                 </button>
-              );
-            })}
+                {stayLoading ? (
+                  <span className="text-xs text-white/45">Resolving metro…</span>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-white/45">
+                {placesEnabled
+                  ? "Enter a stay — we lock Find tours + Viator bookable to that metro."
+                  : "Curated NYC hotels work now. Add GOOGLE_PLACES_API_KEY for USA-wide stay search."}
+              </p>
+            )}
+            {stayError ? (
+              <p className="mt-2 text-xs text-amber">{stayError}</p>
+            ) : null}
+            <label className="mt-3 block">
+              <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
+                Search by name (optional)
+              </span>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="e.g. museum, transfer, Patterson…"
+                className="w-full border border-white/15 bg-ink/70 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-amber/50"
+              />
+            </label>
           </div>
-        ) : null}
+        ) : (
+          <>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <label className="block">
+                <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
+                  State
+                </span>
+                <select
+                  value={stateCode}
+                  onChange={(e) => {
+                    setStateCode(e.target.value);
+                    setCitySlug("all");
+                    setSelectedSlug(null);
+                    if (stayName) clearStay();
+                  }}
+                  className="w-full border border-white/15 bg-ink/70 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-amber/50"
+                >
+                  <option value="all">All US states</option>
+                  {states.map((state) => (
+                    <option key={state.code} value={state.code}>
+                      {state.name} ({state.code}) · {state.count}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
+                  City
+                </span>
+                <select
+                  value={citySlug}
+                  onChange={(e) => {
+                    setCitySlug(e.target.value);
+                    setSelectedSlug(null);
+                    if (stayName) clearStay();
+                  }}
+                  className="w-full border border-white/15 bg-ink/70 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-amber/50"
+                >
+                  <option value="all">All cities in scope</option>
+                  {citiesForState.map((metro) => (
+                    <option key={metro.slug} value={metro.slug}>
+                      {metro.name}, {metro.stateCode}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block sm:col-span-2 lg:col-span-1">
+                <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-white/45">
+                  Search by name
+                </span>
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="e.g. Patterson, Bethel, Jehovah…"
+                  className="w-full border border-white/15 bg-ink/70 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-amber/50"
+                />
+              </label>
+            </div>
+            {stateCode !== "all" || citySlug !== "all" ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {citiesForState.map((metro) => {
+                  const active = citySlug === metro.slug;
+                  return (
+                    <button
+                      key={metro.slug}
+                      type="button"
+                      onClick={() => {
+                        setCitySlug(metro.slug);
+                        setStateCode(metro.stateCode);
+                        setSelectedSlug(null);
+                        if (stayName) clearStay();
+                      }}
+                      className={`border px-2.5 py-1.5 text-xs font-semibold transition ${
+                        active
+                          ? "border-amber bg-amber text-ink"
+                          : "border-white/15 text-white/70 hover:border-white/35"
+                      }`}
+                    >
+                      {metro.name}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
 
       {/* 3 · When */}
