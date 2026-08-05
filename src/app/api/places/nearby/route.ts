@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { getNearMePlace, stopsNearPlace } from "@/lib/near-me";
 import {
+  curatedEssentialsForZone,
+  dayOneEssentialQueries,
+  googlePlaceToDayOne,
+  rankEssentialsForFilters,
+  type DayOneEssential,
+} from "@/lib/day-one-essentials";
+import {
   googlePlaceToSpot,
   hasGooglePlacesKey,
   isInNycMetro,
@@ -50,12 +57,13 @@ async function googleNearby(input: {
   key: string;
   type?: string;
   keyword?: string;
+  radius?: number;
 }) {
   const endpoint = new URL(
     "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
   );
   endpoint.searchParams.set("location", `${input.lat},${input.lng}`);
-  endpoint.searchParams.set("radius", "3200");
+  endpoint.searchParams.set("radius", String(input.radius ?? 3200));
   if (input.type) endpoint.searchParams.set("type", input.type);
   if (input.keyword) endpoint.searchParams.set("keyword", input.keyword);
   endpoint.searchParams.set("key", input.key);
@@ -127,6 +135,7 @@ export async function POST(request: Request) {
       spots,
       activities: null,
       typeCounts: null,
+      essentials: curatedEssentialsForZone(place.zoneId),
     });
   }
 
@@ -212,6 +221,32 @@ export async function POST(request: Request) {
     (a, b) => a.minutesAgo - b.minutesAgo,
   );
 
+  // Day-1 essentials: convenience, supermarket (better value further), pharmacy, ATM
+  const essentialRaw: DayOneEssential[] = [];
+  for (const q of dayOneEssentialQueries) {
+    const nearby = await googleNearby({
+      lat: loc.lat,
+      lng: loc.lng,
+      key,
+      type: q.type,
+      keyword: q.keyword,
+      radius: q.radius,
+    });
+    for (const place of (nearby.results || []).slice(0, 5)) {
+      essentialRaw.push(
+        googlePlaceToDayOne({
+          place,
+          stay: loc,
+          need: q.need,
+        }),
+      );
+    }
+  }
+  let essentials = rankEssentialsForFilters(essentialRaw, 4);
+  if (!essentials.length) {
+    essentials = curatedEssentialsForZone(projected?.zoneId || "midtown");
+  }
+
   return NextResponse.json({
     mode: "google",
     stay,
@@ -219,5 +254,6 @@ export async function POST(request: Request) {
     spots,
     activities,
     typeCounts,
+    essentials,
   });
 }

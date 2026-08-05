@@ -369,6 +369,113 @@ export async function searchViatorProducts(options: {
   return { products, source: "viator", env: viatorEnvLabel() };
 }
 
+/** Fetch inventory for Tour Intelligence comparison. */
+export async function searchViatorForCompare(options: {
+  citySlug?: string;
+  query: string;
+  count?: number;
+}): Promise<{
+  tours: import("@/lib/tour-compare").NormalizedTour[];
+  source: "viator" | "none";
+  env: ViatorEnv;
+  error?: string;
+}> {
+  const { normalizeFromViatorLike } = await import("@/lib/tour-compare");
+  if (!hasViatorApiKey()) {
+    return {
+      tours: [],
+      source: "none",
+      env: viatorEnvLabel(),
+      error: "VIATOR_API_KEY not set",
+    };
+  }
+
+  const count = Math.min(Math.max(options.count || 50, 1), 50);
+  const citySlug =
+    options.citySlug && options.citySlug !== "all"
+      ? options.citySlug
+      : "new-york";
+  const dest =
+    viatorDestinationByCity[citySlug] || viatorDestinationByCity["new-york"];
+  const query = options.query.trim();
+
+  const mapRaw = (list: ViatorProductRaw[]) =>
+    list
+      .map((p) => {
+        const code = p.productCode?.trim();
+        const title = p.title?.trim();
+        const url = p.productUrl?.trim();
+        if (!code || !title || !url) return null;
+        const place = mapCityFromProduct(p, citySlug);
+        return normalizeFromViatorLike({
+          productCode: code,
+          title,
+          description: p.description,
+          productUrl: url,
+          priceFrom: p.pricing?.summary?.fromPrice,
+          currency: p.pricing?.currency || "USD",
+          rating: p.reviews?.combinedAverageRating,
+          reviewCount: p.reviews?.totalReviews,
+          flags: p.flags,
+          imageUrl: pickImage(p),
+          destination: place.cityName,
+        });
+      })
+      .filter((t): t is NonNullable<typeof t> => Boolean(t));
+
+  if (query.length >= 2) {
+    const freetext = await viatorFetch<{ products?: ViatorProductRaw[] }>(
+      "/search/freetext",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          searchTerm: query,
+          productFiltering: { destination: dest.destinationId },
+          searchTypes: ["PRODUCTS"],
+          currency: "USD",
+          pagination: { start: 1, count },
+        }),
+      },
+    );
+    const tours = mapRaw(freetext?.products || []);
+    if (tours.length) {
+      return { tours, source: "viator", env: viatorEnvLabel() };
+    }
+  }
+
+  const data = await viatorFetch<{ products?: ViatorProductRaw[] }>(
+    "/products/search",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        filtering: { destination: dest.destinationId },
+        sorting: { sort: "TRAVELER_RATING", order: "DESCENDING" },
+        pagination: { start: 1, count },
+        currency: "USD",
+      }),
+    },
+  );
+
+  if (!data) {
+    return {
+      tours: [],
+      source: "none",
+      env: viatorEnvLabel(),
+      error: "Viator search failed",
+    };
+  }
+
+  let tours = mapRaw(data.products || []);
+  if (query.length >= 2) {
+    const q = query.toLowerCase();
+    tours = tours.filter((t) =>
+      `${t.title} ${t.summary}`.toLowerCase().includes(q),
+    );
+  }
+
+  return { tours, source: "viator", env: viatorEnvLabel() };
+}
+
 /** Resolve product page URL for redirect tracking. */
 export async function getViatorProductUrl(
   productCode: string,

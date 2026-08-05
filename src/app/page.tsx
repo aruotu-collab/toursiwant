@@ -1,21 +1,12 @@
-import { Suspense } from "react";
-import { HomeCommandCenter } from "@/components/HomeCommandCenter";
+import { TourIntelligenceApp } from "@/components/TourIntelligenceApp";
 
 export default function HomePage() {
   return (
     <main className="flex-1">
       <h1 className="sr-only">
-        ToursIWant — USA tour pulse, live seats, tours, events, and requests
+        ToursIWant — We compare the tours. You choose the experience.
       </h1>
-      <Suspense
-        fallback={
-          <div className="min-h-[50vh] bg-ink px-4 py-10 text-white/50">
-            Loading live board…
-          </div>
-        }
-      >
-        <HomeCommandCenter />
-      </Suspense>
+      <TourIntelligenceApp />
     </main>
   );
 }

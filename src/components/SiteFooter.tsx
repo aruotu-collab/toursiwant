@@ -14,8 +14,8 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-white/75">
-          <Link href="/?menu=pulse" className="hover:text-white">
-            Live board
+          <Link href="/?menu=near" className="hover:text-white">
+            Near you
           </Link>
           <Link href="/?menu=rush" className="hover:text-white">
             Live seats

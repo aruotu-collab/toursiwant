@@ -50,8 +50,8 @@ const intents: {
   },
   {
     id: "pulse",
-    title: "Tour Pulse",
-    copy: "See what’s near your stay, then join.",
+    title: "Near you",
+    copy: "See what’s near your stay, then join or book.",
     menu: "pulse",
   },
 ];

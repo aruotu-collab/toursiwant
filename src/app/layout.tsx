@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Mono, Manrope } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
-import { SiteFooter } from "@/components/SiteFooter";
-import { SiteHeader } from "@/components/SiteHeader";
 import { VisitBeacon } from "@/components/VisitBeacon";
 import "./globals.css";
 
@@ -34,11 +32,11 @@ const searchConsoleVerification =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "ToursIWant — The live market for tours you want",
+    default: "ToursIWant — We compare the tours. You choose the experience.",
     template: "%s · ToursIWant",
   },
   description:
-    "The tourism intelligence platform for tours across the USA. See what's being planned, request quotes, and join groups — today or months ahead.",
+    "Tour Intelligence: we analyse Viator inventory and show which tours best fit your budget, travellers and priorities — then you book with confidence.",
   alternates: {
     canonical: "/",
   },
@@ -47,15 +45,15 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: siteUrl,
     siteName: "ToursIWant",
-    title: "ToursIWant — The live market for tours you want",
+    title: "ToursIWant — We compare the tours. You choose the experience.",
     description:
-      "The tourism intelligence platform for tours across the USA. See what's being planned, request quotes, and join groups — today or months ahead.",
+      "Tell us what matters. We’ll compare available tours and show the strongest choices.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ToursIWant — The live market for tours you want",
+    title: "ToursIWant — We compare the tours. You choose the experience.",
     description:
-      "The tourism intelligence platform for tours across the USA. See what's being planned, request quotes, and join groups — today or months ahead.",
+      "Tell us what matters. We’ll compare available tours and show the strongest choices.",
   },
   verification: searchConsoleVerification
     ? { google: searchConsoleVerification }
@@ -76,10 +74,8 @@ export default function RootLayout({
       lang="en"
       className={`${display.variable} ${body.variable} ${mono.variable} h-full`}
     >
-      <body className="min-h-full bg-paper font-sans text-ink antialiased">
-        <SiteHeader />
+      <body className="min-h-full bg-[#070f18] font-sans text-white antialiased">
         <div className="flex min-h-full flex-1 flex-col">{children}</div>
-        <SiteFooter />
         <VisitBeacon />
         {gaId ? <GoogleAnalytics gaId={gaId} /> : null}
       </body>
