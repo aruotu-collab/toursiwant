@@ -52,10 +52,10 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Link
-              href="/?menu=near"
+              href="/?menu=pulse"
               className="mb-4 inline-flex text-sm font-semibold text-skyline underline-offset-2 hover:underline"
             >
-              ← Back to Near you
+              ← Back to live board
             </Link>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-skyline">
               Member area

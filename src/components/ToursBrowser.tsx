@@ -412,7 +412,7 @@ export function ToursBrowser({
         {whereMode === "near" ? (
           <div className="mt-3 border border-amber/25 bg-amber/[0.04] p-3 sm:p-4">
             <p className="font-mono text-[10px] uppercase tracking-wider text-amber">
-              Same hotel search as Near you
+              Same hotel search as Pulse
             </p>
             <label className="mt-2 block">
               <span className="sr-only">Hotel or stay</span>

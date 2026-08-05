@@ -37,13 +37,6 @@ import {
   affiliateGoPath,
   type AffiliateProduct,
 } from "@/lib/affiliate-products";
-import {
-  dayOneNeedLabel,
-  dayOneNeedOrder,
-  dayTripQueryForCity,
-  type DayOneEssential,
-  type DayOneNeed,
-} from "@/lib/day-one-essentials";
 
 type FilterId = ExperienceType;
 
@@ -134,30 +127,9 @@ export function TourPulseBoard({
     "viator" | "curated" | "loading"
   >("loading");
   const [viatorCitySlug, setViatorCitySlug] = useState("new-york");
-  const [dayTrips, setDayTrips] = useState<AffiliateProduct[]>([]);
-  const [essentials, setEssentials] = useState<DayOneEssential[]>([]);
-  const [essentialsFilter, setEssentialsFilter] = useState<
-    "all" | DayOneNeed
-  >("all");
-  const [stayPanel, setStayPanel] = useState<"essentials" | "daytrips" | "both">(
-    "both",
-  );
 
   const nearPlace = placeId ? getNearMePlace(placeId) || null : null;
   const hasStay = Boolean(nearPlace || usaStay);
-
-  const filteredEssentials = useMemo(() => {
-    if (essentialsFilter === "all") return essentials;
-    return essentials.filter((e) => e.need === essentialsFilter);
-  }, [essentials, essentialsFilter]);
-
-  const essentialsCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: essentials.length };
-    for (const need of dayOneNeedOrder) {
-      counts[need] = essentials.filter((e) => e.need === need).length;
-    }
-    return counts;
-  }, [essentials]);
 
   const pulseCitySlug = useMemo(() => {
     if (usaStay?.metro) return citySlugFromMetroLabel(usaStay.metro);
@@ -165,7 +137,7 @@ export function TourPulseBoard({
     return "new-york";
   }, [usaStay, nearPlace]);
 
-  // Live Viator → bookable pulse signals + pre-stay strip + day trips
+  // Live Viator → bookable pulse signals + pre-stay strip
   useEffect(() => {
     let cancelled = false;
     setViatorSource("loading");
@@ -174,45 +146,25 @@ export function TourPulseBoard({
       city: pulseCitySlug,
       count: "16",
     });
-    const dayParams = new URLSearchParams({
-      city: pulseCitySlug,
-      q: dayTripQueryForCity(pulseCitySlug),
-      count: "8",
-    });
     const timer = window.setTimeout(() => {
-      Promise.all([
-        fetch(`/api/affiliates/viator/search?${params.toString()}`).then((r) =>
-          r.json(),
-        ),
-        fetch(`/api/affiliates/viator/search?${dayParams.toString()}`).then(
-          (r) => r.json(),
-        ),
-      ])
+      fetch(`/api/affiliates/viator/search?${params.toString()}`)
+        .then((r) => r.json())
         .then(
-          ([data, dayData]: [
-            {
-              products?: AffiliateProduct[];
-              source?: "viator" | "curated";
-            },
-            { products?: AffiliateProduct[] },
-          ]) => {
+          (data: {
+            products?: AffiliateProduct[];
+            source?: "viator" | "curated";
+          }) => {
             if (cancelled) return;
             const list = (data.products || []).filter(
               (p) => p.category === "experience" || p.category === "ticket",
             );
             setViatorProducts(list);
             setViatorSource(data.source || "curated");
-            setDayTrips(
-              (dayData.products || []).filter(
-                (p) => p.category === "experience" || p.category === "ticket",
-              ),
-            );
           },
         )
         .catch(() => {
           if (!cancelled) {
             setViatorProducts([]);
-            setDayTrips([]);
             setViatorSource("curated");
           }
         });
@@ -414,7 +366,6 @@ export function TourPulseBoard({
         useCorridor?: boolean;
         spots?: UsaNearbySpot[];
         activities?: PulseActivity[] | null;
-        essentials?: DayOneEssential[];
       };
       if (!res.ok) {
         setNearbyError(data.error || "Could not load places near this stay.");
@@ -424,8 +375,6 @@ export function TourPulseBoard({
       setUsaStay(data.stay);
       setUsaSpots(data.spots || []);
       setUsaActivities(data.activities || null);
-      setEssentials(data.essentials || []);
-      setEssentialsFilter("all");
       setUseCorridor(Boolean(data.useCorridor));
       setSelectedZoneId(data.stay.zoneId || "midtown");
       setSelectedStopId(null);
@@ -445,7 +394,6 @@ export function TourPulseBoard({
     setUsaStay(null);
     setUsaSpots([]);
     setUsaActivities(null);
-    setEssentials([]);
     setUseCorridor(true);
     setSelectedZoneId(place.zoneId);
     setSelectedStopId(null);
@@ -479,9 +427,6 @@ export function TourPulseBoard({
     setUsaStay(null);
     setUsaSpots([]);
     setUsaActivities(null);
-    setEssentials([]);
-    setEssentialsFilter("all");
-    setStayPanel("both");
     setUseCorridor(true);
     setNearbyError(null);
   }
@@ -509,7 +454,7 @@ export function TourPulseBoard({
 
   return (
     <section
-      id={embedded ? undefined : "near-you"}
+      id={embedded ? undefined : "pulse"}
       className={
         embedded
           ? "overflow-x-hidden text-white"
@@ -635,7 +580,7 @@ export function TourPulseBoard({
           </div>
           <p className="border-b border-white/10 px-4 py-2 text-xs text-white/50">
             Instant experiences near this metro. After you add a stay, these also
-            appear as glowing signals in the Near you list (tours + bookable).
+            appear as glowing signals on the Pulse list (mix of tours + bookable).
           </p>
           <ul className="divide-y divide-white/10">
             {viatorProducts.slice(0, hasStay ? 4 : 8).map((item) => (
@@ -676,191 +621,6 @@ export function TourPulseBoard({
             ) : null}
           </ul>
         </div>
-
-        {/* Day-1 essentials + day trips — after check-in */}
-        {hasStay ? (
-          <div className="mt-4 space-y-4">
-            <div className="border border-white/10 bg-white/[0.03] p-3 sm:p-4">
-              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-amber">
-                Focus
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(
-                  [
-                    { id: "both" as const, label: "All" },
-                    { id: "essentials" as const, label: "Day 1 shops" },
-                    { id: "daytrips" as const, label: "Day trips" },
-                  ] as const
-                ).map((tab) => {
-                  const active = stayPanel === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setStayPanel(tab.id)}
-                      className={`border px-3 py-2 text-xs font-semibold transition ${
-                        active
-                          ? "border-amber bg-amber text-ink"
-                          : "border-white/15 text-white/75 hover:border-white/35"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {stayPanel === "essentials" || stayPanel === "both" ? (
-            <div className="border border-emerald-500/30 bg-emerald-500/[0.06]">
-              <div className="border-b border-white/10 px-4 py-3">
-                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-300">
-                  Day 1 · near your hotel
-                </p>
-                <p className="mt-1 text-sm text-white/55">
-                  Filter by type — hotel-strip shops are often pricier; use
-                  supermarket + stretch walk for value.
-                </p>
-                <div className="mt-3 flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <button
-                    type="button"
-                    onClick={() => setEssentialsFilter("all")}
-                    className={`shrink-0 border px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] transition ${
-                      essentialsFilter === "all"
-                        ? "border-emerald-400 bg-emerald-400 text-ink"
-                        : "border-white/20 text-white/70 hover:border-white/40"
-                    }`}
-                  >
-                    All ({essentialsCounts.all})
-                  </button>
-                  {dayOneNeedOrder.map((need) => {
-                    const count = essentialsCounts[need] ?? 0;
-                    const active = essentialsFilter === need;
-                    return (
-                      <button
-                        key={need}
-                        type="button"
-                        onClick={() => setEssentialsFilter(need)}
-                        className={`shrink-0 border px-3 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] transition ${
-                          active
-                            ? "border-emerald-400 bg-emerald-400 text-ink"
-                            : "border-white/20 text-white/70 hover:border-white/40"
-                        }`}
-                      >
-                        {dayOneNeedLabel[need]} ({count})
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              {filteredEssentials.length > 0 ? (
-                <ul className="divide-y divide-white/10">
-                  {filteredEssentials.map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex flex-wrap items-start justify-between gap-3 px-4 py-3"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-mono text-[10px] uppercase tracking-wider text-emerald-300/90">
-                          {dayOneNeedLabel[item.need]}
-                          {item.valueNote === "stretch_for_value"
-                            ? " · stretch walk · often better value"
-                            : " · closer option"}
-                        </p>
-                        <p className="mt-0.5 font-semibold text-white [overflow-wrap:anywhere]">
-                          {item.name}
-                        </p>
-                        <p className="mt-0.5 text-sm text-white/50">
-                          ~{item.walkMinutes} min walk · {item.addressHint}
-                        </p>
-                        <p className="mt-1 text-xs text-white/40">{item.tip}</p>
-                      </div>
-                      <a
-                        href={item.mapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="shrink-0 border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20"
-                      >
-                        Walk directions →
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              ) : nearbyLoading ? (
-                <p className="px-4 py-6 text-sm text-white/45">
-                  Finding shops near your stay…
-                </p>
-              ) : essentials.length > 0 ? (
-                <p className="px-4 py-6 text-sm text-white/45">
-                  No results for this filter. Try All or another type.
-                </p>
-              ) : (
-                <p className="px-4 py-6 text-sm text-white/45">
-                  Essentials will appear after we resolve your stay. Try another
-                  hotel if this is empty.
-                </p>
-              )}
-            </div>
-            ) : null}
-
-            {stayPanel === "daytrips" || stayPanel === "both" ? (
-            <div className="border border-sky-400/25 bg-sky-500/[0.05]">
-              <div className="border-b border-white/10 px-4 py-3">
-                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">
-                  How do we get there? · day trips
-                </p>
-                <p className="mt-1 text-sm text-white/55">
-                  Like Niagara from New York — book a day trip, or request a private
-                  driver if you need custom pickup from this hotel.
-                </p>
-              </div>
-              <ul className="divide-y divide-white/10">
-                {(dayTrips.length ? dayTrips : viatorProducts)
-                  .slice(0, 5)
-                  .map((item) => (
-                    <li
-                      key={`day-${item.id}`}
-                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-mono text-[10px] uppercase tracking-wider text-sky-300/90">
-                          {item.partner} · {item.priceFrom}
-                        </p>
-                        <p className="font-semibold text-white [overflow-wrap:anywhere]">
-                          {item.title}
-                        </p>
-                      </div>
-                      <Link
-                        href={affiliateGoPath(item)}
-                        target="_blank"
-                        rel="noopener noreferrer sponsored"
-                        className="shrink-0 border border-sky-400/40 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200 hover:bg-sky-500/20"
-                      >
-                        Book day trip →
-                      </Link>
-                    </li>
-                  ))}
-              </ul>
-              <div className="flex flex-wrap gap-2 border-t border-white/10 px-4 py-3">
-                <Link
-                  href={`/?menu=tours`}
-                  className="border border-white/20 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10"
-                >
-                  Browse Find tours
-                </Link>
-                <Link
-                  href={`/request?details=${encodeURIComponent(
-                    `I am staying at ${usaStay?.name || nearPlace?.name || "my hotel"}. I need a day trip or private transfer plan from here.`,
-                  )}`}
-                  className="bg-amber px-3 py-2 text-xs font-semibold text-ink hover:bg-amber-deep"
-                >
-                  Request private day trip →
-                </Link>
-              </div>
-            </div>
-            ) : null}
-          </div>
-        ) : null}
 
         {hasStay ? (
           <div className="mt-4 border border-white/10 bg-white/[0.03] p-4">

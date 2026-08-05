@@ -71,7 +71,7 @@ export function ToursCityMap({
           strokeDasharray="4 6"
         />
 
-        {/* Soft spine — echoes Near you corridor without claiming geography */}
+        {/* Soft spine — echoes Pulse corridor without claiming geography */}
         <path
           d="M 70 320 C 120 260, 150 220, 200 200 C 250 180, 290 120, 330 70"
           fill="none"

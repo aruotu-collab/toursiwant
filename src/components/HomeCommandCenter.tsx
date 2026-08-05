@@ -20,7 +20,7 @@ export type CommandTab =
   | "admin";
 
 const BASE_MENU: { id: CommandTab; label: string; param: string }[] = [
-  { id: "pulse", label: "Near you", param: "near" },
+  { id: "pulse", label: "Pulse", param: "pulse" },
   { id: "seats", label: "Live seats", param: "rush" },
   { id: "tours", label: "Find tours", param: "tours" },
   { id: "events", label: "Events", param: "events" },
@@ -42,19 +42,19 @@ const TAB_COPY: Record<
     eyebrow: "Near you · USA",
     title: "Start with where you’re staying",
     blurb:
-      "Enter any US hotel — Day 1 shops (convenience, better-value grocery, pharmacy), day trips like Niagara, plus bus tours, museums, and food on the map.",
+      "Enter any US hotel — then choose bus tours, museums, pizza, Chinese food, and more. NYC uses the corridor map; other cities use a local walk map.",
   },
   seats: {
     eyebrow: "Tour Rush · live now",
     title: "Seats are filling. Timers are running.",
     blurb:
-      "Filter ending-soon lots, pick a seat, then claim or request — same live-board feel as Near you.",
+      "Filter ending-soon lots, pick a seat, then claim or request — same live-board feel as Pulse.",
   },
   tours: {
     eyebrow: "Find tours · USA",
     title: "Browse by place — or near your stay.",
     blurb:
-      "Pick state/city, search by name, or enter where you’re staying (same hotel search as Near you). Request custom tours or book partners instantly.",
+      "Pick state/city, search by name, or enter where you’re staying (same hotel search as Pulse). Request custom tours or book partners instantly.",
   },
   events: {
     eyebrow: "Events This Week",
@@ -72,7 +72,7 @@ const TAB_COPY: Record<
     eyebrow: "Member area",
     title: "Your ToursIWant account",
     blurb:
-      "Signed-in home for your requests. Use the menus above anytime — Near you, seats, tours, events.",
+      "Signed-in home for your requests. Use the menus above anytime — Pulse, seats, tours, events.",
   },
   admin: {
     eyebrow: "Admin · platform",
@@ -86,9 +86,7 @@ function tabFromMenuParam(value: string | null | undefined): CommandTab | null {
   if (!value) return null;
   const raw = value.toLowerCase();
   if (raw === "rush" || raw === "seats") return "seats";
-  // near = current name; pulse/market kept for old links
-  if (raw === "near" || raw === "nearyou" || raw === "market" || raw === "pulse")
-    return "pulse";
+  if (raw === "market") return "pulse";
   if (raw === "admin") return "admin";
   const match = BASE_MENU.find((m) => m.param === raw || m.id === raw);
   return match?.id ?? null;
@@ -131,8 +129,7 @@ export function HomeCommandCenter() {
   const selectTab = useCallback(
     (next: CommandTab) => {
       setTabState(next);
-      const menuParamNext =
-        next === "seats" ? "rush" : next === "pulse" ? "near" : next;
+      const menuParamNext = next === "seats" ? "rush" : next;
       router.replace(`/?menu=${menuParamNext}`, { scroll: false });
     },
     [router],
@@ -302,7 +299,7 @@ function AccountPanel({
             onClick={() => onSelectTab("pulse")}
             className="bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
           >
-            Open Near you
+            Open live board
           </button>
           <Link
             href="/account"
@@ -329,8 +326,8 @@ function AccountPanel({
         </div>
       </div>
       <p className="text-sm text-white/50">
-        Tip: the menus above (Near you, Live seats, Find tours…) stay with you on
-        this board — tap ToursIWant anytime to jump back to Near you.
+        Tip: the menus above (Pulse, Live seats, Find tours…) stay with you on
+        this board — tap ToursIWant anytime to jump back to Pulse.
       </p>
     </div>
   );

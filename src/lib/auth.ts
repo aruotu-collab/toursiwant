@@ -310,7 +310,7 @@ export async function sendMagicEmail(email: string, magicUrl: string) {
       html: `
         <div style="font-family:Georgia,serif;line-height:1.5;color:#0c1b2a;max-width:520px">
           <p style="margin:0 0 12px;font-size:18px"><strong>Sign in to ToursIWant</strong></p>
-          <p style="margin:0 0 16px;color:#243447">Use the button below to open ToursIWant near you. This link expires in 30 minutes.</p>
+          <p style="margin:0 0 16px;color:#243447">Use the button below to open your live board. This link expires in 30 minutes.</p>
           <p style="margin:0 0 20px">
             <a href="${magicUrl}" style="display:inline-block;background:#d4a017;color:#0c1b2a;text-decoration:none;padding:12px 18px;font-weight:600">
               Sign in to ToursIWant
