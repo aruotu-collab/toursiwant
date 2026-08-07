@@ -373,18 +373,15 @@ export function searchAffiliateProducts(filters: {
     if (theme !== "all" && !item.themes.includes(theme as TourTheme))
       return false;
     if (category !== "all" && item.category !== category) return false;
-    if (query) {
-      const hay =
-        `${item.title} ${item.summary} ${item.cityName} ${item.partner}`.toLowerCase();
-      if (
-        !query
-          .split(/\s+/)
-          .filter(Boolean)
-          .every((word) => hay.includes(word))
-      ) {
-        return false;
-      }
+    // Soft match: any query word can hit (better recall for stop-node searches)
+  if (query) {
+    const hay =
+      `${item.title} ${item.summary} ${item.cityName} ${item.themes.join(" ")} ${item.partner}`.toLowerCase();
+    const words = query.split(/\s+/).filter(Boolean);
+    if (!words.some((word) => hay.includes(word))) {
+      return false;
     }
+  }
     return true;
   });
 }

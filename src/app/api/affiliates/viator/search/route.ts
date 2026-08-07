@@ -29,14 +29,29 @@ export async function GET(request: Request) {
     (item) => item.category === "experience" || item.category === "ticket",
   );
 
+  // If a tight query matches nothing in curated seed, still show city inventory
+  const curatedOrCity =
+    curated.length > 0
+      ? curated
+      : searchAffiliateProducts({
+          theme,
+          stateCode: stateCode === "all" ? "all" : stateCode,
+          citySlug: citySlug === "all" ? "new-york" : citySlug,
+          query: "",
+        }).filter(
+          (item) =>
+            item.category === "experience" || item.category === "ticket",
+        );
+
   if (!hasViatorApiKey()) {
     return NextResponse.json({
-      products: curated,
+      products: curatedOrCity,
       source: "curated",
       viatorConfigured: false,
       env: viatorEnvLabel(),
       message:
         "Set VIATOR_API_KEY (and VIATOR_API_ENV=sandbox|production) on Vercel to load live inventory.",
+      broadened: curated.length === 0 && Boolean(query),
     });
   }
 
@@ -51,7 +66,7 @@ export async function GET(request: Request) {
     if (live.products.length > 0) {
       // Prefer live; keep curated non-viator (tiqets etc.) and unique viator extras
       const liveIds = new Set(live.products.map((p) => p.id));
-      const extras = curated.filter(
+      const extras = curatedOrCity.filter(
         (p) => p.partner !== "viator" || !liveIds.has(p.id),
       );
       return NextResponse.json({
@@ -63,16 +78,38 @@ export async function GET(request: Request) {
       });
     }
 
+    // Live empty — try a broader city search once when a specific query was used
+    if (query.trim()) {
+      const broad = await searchViatorProducts({
+        citySlug: citySlug === "all" ? "new-york" : citySlug,
+        query: "",
+        theme,
+        count,
+      });
+      if (broad.products.length > 0) {
+        return NextResponse.json({
+          products: broad.products.slice(0, 40),
+          source: "viator",
+          viatorConfigured: true,
+          env: broad.env,
+          totalLive: broad.products.length,
+          broadened: true,
+          message: `No exact matches for “${query}” — showing popular tours nearby.`,
+        });
+      }
+    }
+
     return NextResponse.json({
-      products: curated,
+      products: curatedOrCity,
       source: "curated",
       viatorConfigured: true,
       env: live.env,
       error: live.error || "No live products; showing curated fallback",
+      broadened: curated.length === 0,
     });
   } catch (error) {
     return NextResponse.json({
-      products: curated,
+      products: curatedOrCity,
       source: "curated",
       viatorConfigured: true,
       env: viatorEnvLabel(),

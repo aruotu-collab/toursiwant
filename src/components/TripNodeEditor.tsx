@@ -6,7 +6,7 @@ import {
   type RouteNode,
 } from "@/components/TemplateRouteLoop";
 import {
-  queryForRouteNode,
+  queriesForRouteNode,
   templateViatorCity,
 } from "@/lib/node-tours";
 import type { TripTemplate } from "@/lib/trip-templates";
@@ -74,6 +74,7 @@ export function TripNodeEditor({
   const [tours, setTours] = useState<TourHit[]>([]);
   const [loadingTours, setLoadingTours] = useState(false);
   const [tourError, setTourError] = useState<string | null>(null);
+  const [tourNote, setTourNote] = useState<string | null>(null);
 
   const atLimit = nodes.length >= MAX_ROUTE_NODES;
   const chips = Array.from(
@@ -93,30 +94,52 @@ export function TripNodeEditor({
     if (!selected) {
       setTours([]);
       setTourError(null);
+      setTourNote(null);
       return;
     }
-    const q = queryForRouteNode(selected, template);
+    const queries = queriesForRouteNode(selected, template);
     const city = templateViatorCity(template);
     let cancelled = false;
     setLoadingTours(true);
     setTourError(null);
+    setTourNote(null);
     setTours([]);
     void (async () => {
       try {
-        const res = await fetch(
-          `/api/affiliates/viator/search?city=${encodeURIComponent(city)}&q=${encodeURIComponent(q)}&count=6`,
-        );
-        const data = (await res.json()) as {
-          products?: TourHit[];
-          error?: string;
-        };
+        let products: TourHit[] = [];
+        let usedQuery = queries[0] || "";
+        let broadened = false;
+
+        for (const q of queries) {
+          const res = await fetch(
+            `/api/affiliates/viator/search?city=${encodeURIComponent(city)}&q=${encodeURIComponent(q)}&count=6`,
+          );
+          const data = (await res.json()) as {
+            products?: TourHit[];
+            error?: string;
+            broadened?: boolean;
+            message?: string;
+          };
+          if (cancelled) return;
+          const hits = (data.products || []).slice(0, 6);
+          if (hits.length) {
+            products = hits;
+            usedQuery = q;
+            broadened = Boolean(data.broadened) || q === "";
+            if (data.message) setTourNote(data.message);
+            break;
+          }
+        }
+
         if (cancelled) return;
-        const products = (data.products || []).slice(0, 6);
         setTours(products);
         if (!products.length) {
           setTourError(
-            data.error ||
-              `No tours found yet for “${selected.label}” — try another stop.`,
+            `No tours found for “${selected.label}” yet — try another stop or city.`,
+          );
+        } else if (broadened && usedQuery === "") {
+          setTourNote(
+            `No exact match for “${selected.label}” — showing popular tours in this city.`,
           );
         }
       } catch {
@@ -180,8 +203,7 @@ export function TripNodeEditor({
                 {selected.label}
               </p>
               <p className="mt-1 text-xs text-white/45">
-                Searching {queryForRouteNode(selected, template)} ·{" "}
-                {templateViatorCity(template)}
+                Bookable near {templateViatorCity(template)}
               </p>
             </div>
             <button
@@ -192,6 +214,10 @@ export function TripNodeEditor({
               Close
             </button>
           </div>
+
+          {tourNote ? (
+            <p className="mt-3 text-sm text-amber/90">{tourNote}</p>
+          ) : null}
 
           {loadingTours ? (
             <p className="mt-4 text-sm text-white/50">Loading tours…</p>

@@ -18,29 +18,63 @@ const cityCodeToViator: Record<string, string> = {
   SD: "san-diego",
 };
 
-/** Map a path-node label to a Viator search query for that stop type. */
-export function nodeTourQuery(label: string): string {
+/** Primary + broader fallbacks so every stop can still show bookable options. */
+export function nodeTourQueries(label: string): string[] {
   const l = label.toLowerCase().replace(/\s+\d+$/, "").trim();
+  const bare = label.replace(/\s+\d+$/, "").trim();
 
-  if (/hotel|aliz|stay|resort/.test(l)) return "Midtown Manhattan tours";
-  if (/museum|met\b|gallery/.test(l)) return "museum";
-  if (/market/.test(l)) return "market food tour";
-  if (/restaurant|food hall|food/.test(l)) return "food tour";
-  if (/park/.test(l)) return "Central Park";
-  if (/harbor|liberty|statue/.test(l)) return "Statue of Liberty";
-  if (/broadway|show|theater|theatre/.test(l)) return "Broadway";
-  if (/shopping|shop/.test(l)) return "shopping";
-  if (/viewpoint|view|skyline|empire/.test(l)) return "Empire State";
-  if (/walk|midtown/.test(l)) return "walking tour Midtown";
-  if (/downtown|leisure/.test(l)) return "downtown Manhattan";
-  if (/morning/.test(l)) return "Central Park morning";
-  if (/chinatown/.test(l)) return "Chinatown food tour";
-  if (/niagara|falls/.test(l)) return "Niagara Falls";
-  if (/disney/.test(l)) return "Disney";
-  if (/beach/.test(l)) return "beach";
+  if (/hotel|aliz|stay|resort/.test(l)) {
+    return ["Midtown", "hop-on", "SUMMIT", "observation"];
+  }
+  if (/museum|met\b|gallery|moma/.test(l)) {
+    return ["museum", "MoMA", "Metropolitan"];
+  }
+  if (/market/.test(l)) {
+    return ["food", "market", "tasting"];
+  }
+  if (/restaurant|food hall|food/.test(l)) {
+    return ["food", "tasting", "dinner"];
+  }
+  if (/park morning|morning/.test(l)) {
+    return ["Central Park", "park"];
+  }
+  if (/park/.test(l)) {
+    return ["Central Park", "park", "bike"];
+  }
+  if (/harbor|liberty|statue|ellis/.test(l)) {
+    return ["Statue of Liberty", "Ellis", "harbor", "cruise"];
+  }
+  if (/broadway|show|theater|theatre/.test(l)) {
+    return ["Broadway", "show", "theater"];
+  }
+  if (/shopping|shop/.test(l)) {
+    return ["shopping", "Fifth Avenue", "hop-on"];
+  }
+  if (/viewpoint|view|skyline|empire|summit|edge/.test(l)) {
+    return ["SUMMIT", "Edge", "observation", "Empire"];
+  }
+  if (/walkable|walk|midtown/.test(l)) {
+    return ["hop-on", "Midtown", "walking", "SUMMIT"];
+  }
+  if (/downtown|leisure|choose/.test(l)) {
+    return ["Statue of Liberty", "downtown", "harbor", "food"];
+  }
+  if (/chinatown/.test(l)) {
+    return ["Chinatown", "food"];
+  }
+  if (/niagara|falls/.test(l)) {
+    return ["Niagara", "Falls"];
+  }
+  if (/disney/.test(l)) {
+    return ["Disney", "theme park"];
+  }
+  if (/beach/.test(l)) {
+    return ["beach", "boat"];
+  }
 
-  // Fallback: use the label itself as the search
-  return label.replace(/\s+\d+$/, "").trim() || "tours";
+  // Generic: try the label, then first word, then empty (city popular) handled by caller
+  const first = bare.split(/\s+/)[0] || bare;
+  return [bare, first].filter(Boolean);
 }
 
 export function templateViatorCity(template: TripTemplate): string {
@@ -52,16 +86,46 @@ export function templateViatorCity(template: TripTemplate): string {
   return "new-york";
 }
 
-/** Prefer linked block's viatorQuery when the node came from the itinerary. */
+/**
+ * Ordered search queries for a path node.
+ * Empty string at the end = city bestsellers (always filled by API).
+ */
+export function queriesForRouteNode(
+  node: RouteNode,
+  template: TripTemplate,
+): string[] {
+  const list: string[] = [];
+
+  if (node.blockId) {
+    const block = template.blocks.find((b) => b.id === node.blockId);
+    if (block?.viatorQuery) list.push(block.viatorQuery);
+    for (const alt of block?.alternatives || []) {
+      if (alt.viatorQuery) list.push(alt.viatorQuery);
+    }
+  }
+
+  list.push(...nodeTourQueries(node.label));
+  list.push(""); // city popular fallback
+
+  // Dedupe, keep order
+  const seen = new Set<string>();
+  return list.filter((q) => {
+    const key = q.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** @deprecated use queriesForRouteNode */
 export function queryForRouteNode(
   node: RouteNode,
   template: TripTemplate,
 ): string {
-  if (node.blockId) {
-    const block = template.blocks.find((b) => b.id === node.blockId);
-    if (block?.viatorQuery) return block.viatorQuery;
-    const alt = block?.alternatives?.find((a) => a.viatorQuery);
-    if (alt?.viatorQuery) return alt.viatorQuery;
-  }
-  return nodeTourQuery(node.label);
+  return queriesForRouteNode(node, template)[0] || node.label;
+}
+
+/** @deprecated use nodeTourQueries */
+export function nodeTourQuery(label: string): string {
+  return nodeTourQueries(label)[0] || label;
 }
