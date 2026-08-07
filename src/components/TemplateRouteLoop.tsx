@@ -151,11 +151,7 @@ function solidPath(points: Point[]) {
   if (points.length < 2) return "";
   let d = `M ${points[0].x} ${points[0].y}`;
   for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const cur = points[i];
-    const cx = (prev.x + cur.x) / 2;
-    const cy = (prev.y + cur.y) / 2 - (i === points.length - 1 ? 0 : 4);
-    d += ` Q ${cx} ${cy} ${cur.x} ${cur.y}`;
+    d += ` L ${points[i].x} ${points[i].y}`;
   }
   return d;
 }
@@ -164,9 +160,7 @@ function returnPath(points: Point[]) {
   if (points.length < 2) return "";
   const first = points[0];
   const last = points[points.length - 1];
-  const cx = Math.min(first.x, last.x) - 10;
-  const cy = (first.y + last.y) / 2 + 22;
-  return `M ${last.x} ${last.y} Q ${cx} ${cy} ${first.x} ${first.y}`;
+  return `M ${last.x} ${last.y} L ${first.x} ${first.y}`;
 }
 
 export function TemplateRouteLoop({
