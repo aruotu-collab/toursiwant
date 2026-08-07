@@ -6,7 +6,7 @@ import {
   getTemplateRouteNodes,
   type RouteNode,
 } from "@/components/TemplateRouteLoop";
-import { TripNodeEditor } from "@/components/TripNodeEditor";
+import { TripNodeEditor, createAddedStopNode, MAX_ROUTE_NODES } from "@/components/TripNodeEditor";
 import {
   experienceCategoryLabel,
   personalizeAvailability,
@@ -221,31 +221,20 @@ export function TemplateWorkspace({
     setStatus("Trip reset to the original template.");
   }, [initial]);
 
-  function handleRouteNodesChange(next: RouteNode[]) {
-    const withIds = next.map((n) => {
-      if (n.kind === "hotel" || n.blockId) return n;
-      return {
-        ...n,
-        blockId: `added_${n.id.replace(/[^a-zA-Z0-9]+/g, "_")}`,
-      };
-    });
-    setRouteNodes(withIds);
-
+  function syncTemplateToNodes(next: RouteNode[]) {
     setTemplate((prev) => {
       const keepAdded = new Set(
-        withIds
+        next
           .map((n) => n.blockId)
           .filter((id): id is string => Boolean(id && id.startsWith("added_"))),
       );
 
-      // Trip map must NOT delete original itinerary / flexible days —
-      // only drop user-added stop blocks that were removed from the map.
       let blocks = prev.blocks.filter((b) => {
         if (String(b.id).startsWith("added_")) return keepAdded.has(b.id);
         return true;
       });
 
-      for (const n of withIds) {
+      for (const n of next) {
         if (!n.blockId || n.kind === "hotel") continue;
         if (!String(n.blockId).startsWith("added_")) continue;
         if (blocks.some((b) => b.id === n.blockId)) continue;
@@ -263,11 +252,34 @@ export function TemplateWorkspace({
 
       return {
         ...prev,
-        route: withIds.map((n) => n.label).join(" → "),
+        route: next.map((n) => n.label).join(" → "),
         blocks,
       };
     });
-    setStatus("Trip map updated — personalize still works on flexible days.");
+  }
+
+  function addRouteStop(baseLabel: string) {
+    setRouteNodes((prev) => {
+      if (prev.length >= MAX_ROUTE_NODES) return prev;
+      const next = [...prev, createAddedStopNode(baseLabel, prev)];
+      syncTemplateToNodes(next);
+      return next;
+    });
+    setStatus("Stop added — tap again to add another of the same type.");
+  }
+
+  function removeRouteStop(id: string) {
+    setRouteNodes((prev) => {
+      const target = prev.find((n) => n.id === id);
+      if (!target || target.kind === "hotel") return prev;
+      let next = prev.filter((n) => n.id !== id);
+      if (!next.some((n) => n.kind === "hotel")) {
+        next = [{ id: "hotel", label: "Hotel", kind: "hotel" }, ...next];
+      }
+      syncTemplateToNodes(next);
+      return next;
+    });
+    setStatus("Stop removed.");
   }
 
   useEffect(() => {
@@ -808,7 +820,8 @@ export function TemplateWorkspace({
 
             <TripNodeEditor
               nodes={routeNodes}
-              onChange={handleRouteNodesChange}
+              onAddStop={addRouteStop}
+              onRemoveStop={removeRouteStop}
               suggestions={[
                 "Market",
                 "Restaurant",
@@ -818,6 +831,8 @@ export function TemplateWorkspace({
                 "Broadway",
                 "Shopping",
                 "Viewpoint",
+                "Food hall",
+                "Walk",
                 ...(initial.addDestinationHints?.map((h) => h.label) || []),
               ]}
             />

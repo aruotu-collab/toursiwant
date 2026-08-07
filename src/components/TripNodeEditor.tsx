@@ -19,55 +19,52 @@ const SUGGESTED_STOPS = [
   "Walk",
 ];
 
-const MAX_NODES = 8;
+export const MAX_ROUTE_NODES = 12;
 
-function nextLabel(base: string, nodes: RouteNode[]) {
-  const clean = base.trim();
+function newStopId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `custom:${crypto.randomUUID()}`;
+  }
+  return `custom:${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+/** Number duplicate labels: Market, Market 2, Market 3… */
+export function labelForNewStop(base: string, nodes: RouteNode[]) {
+  const clean = base.trim().slice(0, 18);
+  if (!clean) return "Stop";
   const lower = clean.toLowerCase();
-  const same = nodes.filter(
-    (n) =>
-      n.label.toLowerCase() === lower ||
-      n.label.toLowerCase().startsWith(`${lower} `),
-  ).length;
-  if (same === 0) return clean.slice(0, 18);
-  return `${clean.slice(0, 14)} ${same + 1}`.slice(0, 18);
+  const count = nodes.filter((n) => {
+    const l = n.label.toLowerCase();
+    return l === lower || l.match(new RegExp(`^${escapeRegExp(lower)} \\d+$`));
+  }).length;
+  if (count === 0) return clean;
+  return `${clean.slice(0, 14)} ${count + 1}`.slice(0, 18);
+}
+
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function TripNodeEditor({
   nodes,
-  onChange,
+  onAddStop,
+  onRemoveStop,
   suggestions = SUGGESTED_STOPS,
 }: {
   nodes: RouteNode[];
-  onChange: (nodes: RouteNode[]) => void;
+  onAddStop: (label: string) => void;
+  onRemoveStop: (id: string) => void;
   suggestions?: string[];
 }) {
   const [custom, setCustom] = useState("");
-  const atLimit = nodes.length >= MAX_NODES;
+  const atLimit = nodes.length >= MAX_ROUTE_NODES;
+  // Unique chips even if parent passes duplicate hint names
+  const chips = Array.from(new Set(suggestions.map((s) => s.trim()).filter(Boolean)));
 
-  function removeNode(id: string) {
-    const target = nodes.find((n) => n.id === id);
-    if (!target || target.kind === "hotel") return;
-    const next = nodes.filter((n) => n.id !== id);
-    if (!next.some((n) => n.kind === "hotel")) {
-      onChange([{ id: "hotel", label: "Hotel", kind: "hotel" }, ...next]);
-      return;
-    }
-    onChange(next);
-  }
-
-  function addStop(label: string) {
+  function add(label: string) {
     const clean = label.trim();
     if (!clean || atLimit) return;
-    const display = nextLabel(clean, nodes);
-    onChange([
-      ...nodes,
-      {
-        id: `custom:${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        label: display,
-        kind: "stop",
-      },
-    ]);
+    onAddStop(clean);
     setCustom("");
   }
 
@@ -79,23 +76,22 @@ export function TripNodeEditor({
             Trip map
           </p>
           <p className="mt-1 max-w-xl text-sm text-white/65">
-            Circles are stops. Add as many markets or museums as you want —
-            hotel stays put. Personalize still works on flexible days below.
+            Tap + Market or + Museum as many times as you like — each tap adds
+            another stop. Hotel stays as the start.
           </p>
         </div>
         <p className="font-mono text-[11px] text-white/40">
-          {nodes.length}/{MAX_NODES} stops
+          {nodes.length}/{MAX_ROUTE_NODES} stops
         </p>
       </div>
 
       <TemplateRouteLoop
         nodes={nodes}
         interactive
-        onRemoveNode={removeNode}
+        onRemoveNode={onRemoveStop}
         className="h-[240px] w-full border-0 sm:h-[280px]"
       />
 
-      {/* Easy edit list — clearer than tiny SVG × alone */}
       <ul className="flex flex-wrap gap-2 border-t border-white/10 px-4 py-3 sm:px-5">
         {nodes.map((node, i) => (
           <li
@@ -115,7 +111,7 @@ export function TripNodeEditor({
             ) : (
               <button
                 type="button"
-                onClick={() => removeNode(node.id)}
+                onClick={() => onRemoveStop(node.id)}
                 className="ml-1 text-white/45 hover:text-amber"
                 aria-label={`Remove ${node.label}`}
               >
@@ -128,15 +124,15 @@ export function TripNodeEditor({
 
       <div className="space-y-3 border-t border-white/10 px-4 py-4 sm:px-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-          Add another stop
+          Add another stop — tap again for a second Market, Museum, etc.
         </p>
         <div className="flex flex-wrap gap-2">
-          {suggestions.map((label) => (
+          {chips.map((label) => (
             <button
               key={label}
               type="button"
               disabled={atLimit}
-              onClick={() => addStop(label)}
+              onClick={() => add(label)}
               className="border border-white/20 px-3 py-2 text-sm text-white/80 transition hover:border-amber hover:bg-amber/10 hover:text-amber disabled:opacity-40"
             >
               + {label}
@@ -150,7 +146,7 @@ export function TripNodeEditor({
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                addStop(custom);
+                add(custom);
               }
             }}
             placeholder="Custom stop — e.g. Chinatown"
@@ -159,7 +155,7 @@ export function TripNodeEditor({
           <button
             type="button"
             disabled={!custom.trim() || atLimit}
-            onClick={() => addStop(custom)}
+            onClick={() => add(custom)}
             className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
           >
             Add node
@@ -173,4 +169,17 @@ export function TripNodeEditor({
       </div>
     </div>
   );
+}
+
+export function createAddedStopNode(
+  baseLabel: string,
+  existing: RouteNode[],
+): RouteNode {
+  const id = newStopId();
+  return {
+    id,
+    label: labelForNewStop(baseLabel, existing),
+    kind: "stop",
+    blockId: `added_${id.replace(/[^a-zA-Z0-9]+/g, "_")}`,
+  };
 }

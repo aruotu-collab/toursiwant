@@ -122,23 +122,28 @@ type Point = { x: number; y: number; labelY: number };
 /** Stops laid out like the hand sketch: top row → right curve → bottom → dashed home. */
 function layoutStops(n: number): Point[] {
   const ring: Point[] = [
-    { x: 40, y: 48, labelY: 24 },
-    { x: 100, y: 34, labelY: 16 },
-    { x: 160, y: 34, labelY: 16 },
-    { x: 210, y: 52, labelY: 28 },
-    { x: 220, y: 100, labelY: 88 },
-    { x: 170, y: 138, labelY: 158 },
-    { x: 100, y: 142, labelY: 162 },
-    { x: 40, y: 110, labelY: 130 },
+    { x: 36, y: 48, labelY: 24 },
+    { x: 90, y: 32, labelY: 14 },
+    { x: 145, y: 28, labelY: 12 },
+    { x: 195, y: 40, labelY: 22 },
+    { x: 230, y: 72, labelY: 58 },
+    { x: 235, y: 110, labelY: 98 },
+    { x: 200, y: 142, labelY: 162 },
+    { x: 145, y: 152, labelY: 172 },
+    { x: 90, y: 148, labelY: 168 },
+    { x: 45, y: 125, labelY: 145 },
+    { x: 28, y: 90, labelY: 78 },
+    { x: 32, y: 65, labelY: 52 },
   ];
-  if (n <= 1) return [ring[0]];
-  if (n === 2) return [ring[0], ring[3]];
-  if (n === 3) return [ring[0], ring[3], ring[5]];
-  if (n === 4) return [ring[0], ring[1], ring[3], ring[5]];
-  if (n === 5) return [ring[0], ring[1], ring[3], ring[4], ring[5]];
-  if (n === 6) return [ring[0], ring[1], ring[2], ring[3], ring[5], ring[6]];
-  if (n === 7)
-    return [ring[0], ring[1], ring[2], ring[3], ring[4], ring[5], ring[6]];
+  if (n <= 0) return [ring[0]];
+  if (n >= ring.length) return ring;
+  // Pick evenly spaced points around the ring for fewer stops
+  if (n === 1) return [ring[0]];
+  if (n === 2) return [ring[0], ring[5]];
+  if (n === 3) return [ring[0], ring[4], ring[7]];
+  if (n === 4) return [ring[0], ring[2], ring[5], ring[8]];
+  if (n === 5) return [ring[0], ring[2], ring[4], ring[6], ring[8]];
+  if (n === 6) return [ring[0], ring[2], ring[4], ring[6], ring[8], ring[10]];
   return ring.slice(0, n);
 }
 
