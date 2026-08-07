@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { HereNowPanel } from "@/components/HereNowPanel";
 import { LiveTripsPanel } from "@/components/LiveTripsPanel";
+import { ExploreRouteLoop } from "@/components/ExploreRouteLoop";
 import { TemplateRouteLoop } from "@/components/TemplateRouteLoop";
 import {
   combineUsCities,
@@ -24,14 +25,25 @@ const scaleLabel: Record<TripTemplate["scale"], string> = {
   here_now: "I'm here now",
 };
 
-function TemplateCard({ t }: { t: TripTemplate }) {
+function TemplateCard({
+  t,
+  /** Loop preview is Explore-only — keep vertical elsewhere. */
+  diagram = "vertical",
+}: {
+  t: TripTemplate;
+  diagram?: "vertical" | "loop";
+}) {
   return (
     <Link
       href={`/trips/${t.slug}`}
       className="group block overflow-hidden border border-white/15 bg-white/[0.04] transition hover:border-amber/50 hover:bg-white/[0.07]"
       style={{ animation: "rise-in 0.45s ease-out both" }}
     >
-      <TemplateRouteLoop template={t} className="h-52 w-full" />
+      {diagram === "loop" ? (
+        <ExploreRouteLoop template={t} className="h-52 w-full" />
+      ) : (
+        <TemplateRouteLoop template={t} className="h-52 w-full" />
+      )}
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber">
@@ -398,7 +410,7 @@ export function TripsHome() {
               </div>
               <div className="mt-8 grid gap-4 md:grid-cols-2">
                 {exploreList.map((t) => (
-                  <TemplateCard key={t.id} t={t} />
+                  <TemplateCard key={t.id} t={t} diagram="loop" />
                 ))}
               </div>
             </div>
