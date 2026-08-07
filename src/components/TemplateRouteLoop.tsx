@@ -122,18 +122,23 @@ type Point = { x: number; y: number; labelY: number };
 /** Stops laid out like the hand sketch: top row → right curve → bottom → dashed home. */
 function layoutStops(n: number): Point[] {
   const ring: Point[] = [
-    { x: 40, y: 42, labelY: 22 },
-    { x: 112, y: 32, labelY: 14 },
-    { x: 180, y: 42, labelY: 22 },
-    { x: 194, y: 88, labelY: 72 },
-    { x: 130, y: 122, labelY: 142 },
-    { x: 56, y: 116, labelY: 136 },
+    { x: 40, y: 48, labelY: 24 },
+    { x: 100, y: 34, labelY: 16 },
+    { x: 160, y: 34, labelY: 16 },
+    { x: 210, y: 52, labelY: 28 },
+    { x: 220, y: 100, labelY: 88 },
+    { x: 170, y: 138, labelY: 158 },
+    { x: 100, y: 142, labelY: 162 },
+    { x: 40, y: 110, labelY: 130 },
   ];
   if (n <= 1) return [ring[0]];
-  if (n === 2) return [ring[0], ring[2]];
-  if (n === 3) return [ring[0], ring[2], ring[4]];
-  if (n === 4) return [ring[0], ring[1], ring[2], ring[4]];
-  if (n === 5) return [ring[0], ring[1], ring[2], ring[3], ring[4]];
+  if (n === 2) return [ring[0], ring[3]];
+  if (n === 3) return [ring[0], ring[3], ring[5]];
+  if (n === 4) return [ring[0], ring[1], ring[3], ring[5]];
+  if (n === 5) return [ring[0], ring[1], ring[3], ring[4], ring[5]];
+  if (n === 6) return [ring[0], ring[1], ring[2], ring[3], ring[5], ring[6]];
+  if (n === 7)
+    return [ring[0], ring[1], ring[2], ring[3], ring[4], ring[5], ring[6]];
   return ring.slice(0, n);
 }
 
@@ -185,7 +190,7 @@ export function TemplateRouteLoop({
       aria-hidden={!interactive}
     >
       <svg
-        viewBox="0 0 230 160"
+        viewBox="0 0 260 180"
         className="h-full w-full"
         preserveAspectRatio="xMidYMid meet"
       >
@@ -211,44 +216,44 @@ export function TemplateRouteLoop({
           const p = points[i];
           if (!p) return null;
           const isHotel = node.kind === "hotel" || i === 0;
-          const r = isHotel ? 11 : 9;
+          const r = isHotel ? 14 : 12;
           return (
             <g key={node.id}>
               {/* Outer ring — reads as a node */}
               <circle
                 cx={p.x}
                 cy={p.y}
-                r={r + 3.5}
+                r={r + 5}
                 fill="none"
                 stroke={
                   isHotel
-                    ? "rgba(212,160,23,0.45)"
-                    : "rgba(243,239,230,0.22)"
+                    ? "rgba(212,160,23,0.5)"
+                    : "rgba(243,239,230,0.28)"
                 }
-                strokeWidth="1.2"
+                strokeWidth="1.4"
               />
               <circle
                 cx={p.x}
                 cy={p.y}
                 r={r}
                 fill={isHotel ? "#d4a017" : "#f3efe6"}
-                stroke={isHotel ? "#f3efe6" : "rgba(212,160,23,0.9)"}
-                strokeWidth="1.5"
+                stroke={isHotel ? "#f3efe6" : "rgba(212,160,23,0.95)"}
+                strokeWidth="1.8"
               />
               {/* Tiny center dot */}
               <circle
                 cx={p.x}
                 cy={p.y}
-                r={2.2}
+                r={2.8}
                 fill={isHotel ? "#0a1520" : "#d4a017"}
               />
               <text
                 x={p.x}
                 y={p.labelY}
                 textAnchor="middle"
-                fill="rgba(243,239,230,0.92)"
+                fill="rgba(243,239,230,0.95)"
                 style={{
-                  fontSize: "10px",
+                  fontSize: "12px",
                   fontFamily: "var(--font-body), Georgia, serif",
                   fontWeight: 600,
                   letterSpacing: "0.01em",
@@ -268,19 +273,19 @@ export function TemplateRouteLoop({
                   aria-label={`Remove ${node.label}`}
                 >
                   <circle
-                    cx={p.x + r + 2}
-                    cy={p.y - r - 2}
-                    r={7}
+                    cx={p.x + r + 4}
+                    cy={p.y - r - 4}
+                    r={9}
                     fill="#0a1520"
-                    stroke="rgba(255,255,255,0.45)"
-                    strokeWidth="1"
+                    stroke="rgba(255,255,255,0.55)"
+                    strokeWidth="1.2"
                   />
                   <text
-                    x={p.x + r + 2}
-                    y={p.y - r + 1.5}
+                    x={p.x + r + 4}
+                    y={p.y - r + 0.5}
                     textAnchor="middle"
-                    fill="rgba(243,239,230,0.85)"
-                    style={{ fontSize: "9px", fontWeight: 700 }}
+                    fill="rgba(243,239,230,0.9)"
+                    style={{ fontSize: "11px", fontWeight: 700 }}
                   >
                     ×
                   </text>

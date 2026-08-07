@@ -192,21 +192,23 @@ export function TemplateWorkspace({
   }, [voterName]);
 
   const runPersonalize = useCallback(() => {
+    // Always personalize from the original template spine so flexible days
+    // stay available even if the trip map was edited.
     const result = personalizeTemplate(initial, wants);
-    setTemplate((prev) => ({
-      ...result.template,
-      route: prev.route,
-      blocks: [
-        ...result.template.blocks.filter(
-          (b) => !String(b.id).startsWith("added_"),
-        ),
-        ...prev.blocks.filter((b) => String(b.id).startsWith("added_")),
-      ],
-    }));
+    setTemplate((prev) => {
+      const added = prev.blocks.filter((b) =>
+        String(b.id).startsWith("added_"),
+      );
+      return {
+        ...result.template,
+        route: prev.route,
+        blocks: [...result.template.blocks, ...added],
+      };
+    });
     setPersonalizeResult(result);
     setStatus(
       result.applied.length
-        ? `Applied ${result.applied.length} change${result.applied.length === 1 ? "" : "s"}.`
+        ? `Applied ${result.applied.length} change${result.applied.length === 1 ? "" : "s"}. Trip map stops kept.`
         : "Nothing to apply yet — pick what the group wants.",
     );
   }, [initial, wants]);
@@ -220,9 +222,6 @@ export function TemplateWorkspace({
   }, [initial]);
 
   function handleRouteNodesChange(next: RouteNode[]) {
-    const prevLinked = new Set(
-      routeNodes.map((n) => n.blockId).filter(Boolean) as string[],
-    );
     const withIds = next.map((n) => {
       if (n.kind === "hotel" || n.blockId) return n;
       return {
@@ -231,16 +230,24 @@ export function TemplateWorkspace({
       };
     });
     setRouteNodes(withIds);
+
     setTemplate((prev) => {
-      const keep = new Set(
-        withIds.map((n) => n.blockId).filter(Boolean) as string[],
+      const keepAdded = new Set(
+        withIds
+          .map((n) => n.blockId)
+          .filter((id): id is string => Boolean(id && id.startsWith("added_"))),
       );
+
+      // Trip map must NOT delete original itinerary / flexible days —
+      // only drop user-added stop blocks that were removed from the map.
       let blocks = prev.blocks.filter((b) => {
-        if (prevLinked.has(b.id) && !keep.has(b.id)) return false;
+        if (String(b.id).startsWith("added_")) return keepAdded.has(b.id);
         return true;
       });
+
       for (const n of withIds) {
         if (!n.blockId || n.kind === "hotel") continue;
+        if (!String(n.blockId).startsWith("added_")) continue;
         if (blocks.some((b) => b.id === n.blockId)) continue;
         blocks = [
           ...blocks,
@@ -253,13 +260,14 @@ export function TemplateWorkspace({
           },
         ];
       }
+
       return {
         ...prev,
         route: withIds.map((n) => n.label).join(" → "),
         blocks,
       };
     });
-    setStatus("Trip map updated.");
+    setStatus("Trip map updated — personalize still works on flexible days.");
   }
 
   useEffect(() => {
