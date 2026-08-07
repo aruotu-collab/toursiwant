@@ -173,20 +173,10 @@ export function shortenLabel(raw: string) {
   return `${s.slice(0, 14).trim()}…`;
 }
 
-const DEFAULT_SUGGESTIONS = [
-  "Market",
-  "Restaurant",
-  "Museum",
-  "Park",
-  "Harbor",
-  "Broadway",
-  "Shopping",
-  "Viewpoint",
-];
-
 /**
- * Vertical journey diagram: Hotel → Day 1 → Day 2 → Day 3 with arrows.
- * Fixed panel height; diagram scrolls inside. Days expand independently.
+ * Vertical journey diagram only: Hotel → days with arrows,
+ * stops branched off each day circle with connector lines.
+ * Add-a-stop UI lives outside this panel.
  */
 export function TemplateRouteLoop({
   template,
@@ -200,9 +190,6 @@ export function TemplateRouteLoop({
   onSelectNode,
   onSelectStop,
   onRemoveStop,
-  onAddStop,
-  addSuggestions,
-  canAddStop,
 }: {
   template?: TripTemplate;
   nodes?: RouteNode[];
@@ -216,10 +203,6 @@ export function TemplateRouteLoop({
   onSelectNode?: (node: RouteNode) => void;
   onSelectStop?: (day: RouteNode, stop: DayStop) => void;
   onRemoveStop?: (dayId: string, stopId: string) => void;
-  onAddStop?: (dayId: string, label: string) => void;
-  addSuggestions?: string[];
-  /** When false, disable add controls (limits hit). */
-  canAddStop?: (day: RouteNode) => boolean;
 }) {
   const nodes =
     nodesProp || (template ? getTemplateRouteNodes(template) : []);
@@ -234,15 +217,6 @@ export function TemplateRouteLoop({
     if (controlled) onExpandedDayIdsChange?.(ids);
     else setInternalExpanded(ids);
   }
-
-  const [customByDay, setCustomByDay] = useState<Record<string, string>>({});
-  const chips = Array.from(
-    new Set(
-      (addSuggestions || DEFAULT_SUGGESTIONS)
-        .map((s) => s.trim())
-        .filter(Boolean),
-    ),
-  );
 
   function isExpanded(dayId: string) {
     return expandedDayIds.includes(dayId);
@@ -275,7 +249,7 @@ export function TemplateRouteLoop({
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
             Trip diagram
             <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-white/45">
-              · follow the arrows · + opens stops
+              · arrows = days · branches = stops
             </span>
           </p>
           <div className="flex gap-2">
@@ -299,7 +273,6 @@ export function TemplateRouteLoop({
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5">
         <ol className="relative mx-auto max-w-lg">
-          {/* Hotel node */}
           {hotel ? (
             <li className="relative">
               <div className="flex items-start gap-3 sm:gap-4">
@@ -333,21 +306,17 @@ export function TemplateRouteLoop({
 
           {days.map((day, i) => {
             const num = day.dayIndex ?? i + 1;
-            const stopCount = day.stops?.length || 0;
+            const stops = day.stops || [];
+            const stopCount = stops.length;
             const expanded = isExpanded(day.id);
             const daySelected =
               selectedNodeId === day.id && !selectedStopId;
-            const allowAdd =
-              interactive &&
-              onAddStop &&
-              (canAddStop ? canAddStop(day) : true);
-            const custom = customByDay[day.id] || "";
             const isLast = i === days.length - 1;
+            const showStops = expanded && stopCount > 0;
 
             return (
               <li key={day.id} className="relative">
                 <div className="flex items-start gap-3 sm:gap-4">
-                  {/* Spine node */}
                   <div className="relative z-10 flex w-12 shrink-0 flex-col items-center sm:w-14">
                     <button
                       type="button"
@@ -364,15 +333,8 @@ export function TemplateRouteLoop({
                     </button>
                   </div>
 
-                  {/* Label + expand */}
-                  <div
-                    className={`min-w-0 flex-1 border transition ${
-                      expanded || daySelected
-                        ? "border-amber/35 bg-amber/10"
-                        : "border-white/10 bg-white/[0.03]"
-                    }`}
-                  >
-                    <div className="flex items-start gap-2 px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-2 pt-1.5 sm:pt-2.5">
                       <button
                         type="button"
                         onClick={() => onSelectNode?.(day)}
@@ -393,15 +355,19 @@ export function TemplateRouteLoop({
                         {!expanded ? (
                           <p className="mt-0.5 text-[11px] text-white/40">
                             {stopCount === 0
-                              ? "No stops yet"
-                              : `${stopCount} stop${stopCount === 1 ? "" : "s"}`}
+                              ? "No stops"
+                              : `${stopCount} stop${stopCount === 1 ? "" : "s"} · tap +`}
+                          </p>
+                        ) : stopCount === 0 ? (
+                          <p className="mt-0.5 text-[11px] text-white/40">
+                            No stops on this day yet
                           </p>
                         ) : null}
                       </button>
                       <button
                         type="button"
                         onClick={() => toggleDay(day)}
-                        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center border text-lg leading-none transition ${
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center border text-lg leading-none transition ${
                           expanded
                             ? "border-amber bg-amber text-ink"
                             : "border-white/25 text-white/70 hover:border-amber hover:text-amber"
@@ -417,129 +383,68 @@ export function TemplateRouteLoop({
                       </button>
                     </div>
 
-                    {expanded ? (
-                      <div className="border-t border-white/10 px-3 pb-3 pt-2">
-                        {stopCount === 0 ? (
-                          <p className="mb-2 text-sm text-white/45">
-                            No stops yet
-                            {interactive ? " · add one below" : ""}
-                          </p>
-                        ) : (
-                          <ul className="mb-2 space-y-1.5">
-                            {day.stops!.map((stop) => {
-                              const stopSelected =
-                                selectedNodeId === day.id &&
-                                selectedStopId === stop.id;
-                              return (
-                                <li
-                                  key={stop.id}
-                                  className="flex items-center gap-2"
-                                >
-                                  <span
-                                    className="text-amber/60"
-                                    aria-hidden
-                                  >
-                                    →
-                                  </span>
-                                  {onSelectStop ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => onSelectStop(day, stop)}
-                                      className={`min-w-0 flex-1 truncate border px-2.5 py-1.5 text-left text-sm transition ${
-                                        stopSelected
-                                          ? "border-amber bg-amber/20 text-amber"
-                                          : "border-white/15 text-white/80 hover:border-amber/50"
-                                      }`}
-                                    >
-                                      {stop.label}
-                                    </button>
-                                  ) : (
-                                    <span className="min-w-0 flex-1 truncate border border-white/10 px-2.5 py-1.5 text-sm text-white/70">
-                                      {stop.label}
-                                    </span>
-                                  )}
-                                  {interactive && onRemoveStop ? (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        onRemoveStop(day.id, stop.id)
-                                      }
-                                      className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/20 text-white/50 hover:border-amber hover:text-amber"
-                                      aria-label={`Remove ${stop.label}`}
-                                    >
-                                      ×
-                                    </button>
-                                  ) : null}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        )}
-
-                        {interactive && onAddStop ? (
-                          <div className="space-y-2 border-t border-white/10 pt-2">
-                            <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/40">
-                              Add a stop to {day.dayLabel || `Day ${num}`}
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {chips.slice(0, 8).map((label) => (
-                                <button
-                                  key={label}
-                                  type="button"
-                                  disabled={!allowAdd}
-                                  onClick={() => onAddStop(day.id, label)}
-                                  className="border border-white/20 px-2 py-1 text-[11px] text-white/75 hover:border-amber hover:text-amber disabled:opacity-40"
-                                >
-                                  + {label}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="flex gap-2">
-                              <input
-                                value={custom}
-                                onChange={(e) =>
-                                  setCustomByDay((prev) => ({
-                                    ...prev,
-                                    [day.id]: e.target.value,
-                                  }))
-                                }
-                                onFocus={() => onSelectNode?.(day)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    const v = custom.trim();
-                                    if (!v || !allowAdd) return;
-                                    onAddStop(day.id, v);
-                                    setCustomByDay((prev) => ({
-                                      ...prev,
-                                      [day.id]: "",
-                                    }));
-                                  }
-                                }}
-                                placeholder="Custom stop"
-                                disabled={!allowAdd}
-                                className="min-w-0 flex-1 border border-white/20 bg-black/30 px-2 py-1.5 text-sm outline-none focus:border-amber disabled:opacity-40"
-                              />
-                              <button
-                                type="button"
-                                disabled={!custom.trim() || !allowAdd}
-                                onClick={() => {
-                                  const v = custom.trim();
-                                  if (!v || !allowAdd) return;
-                                  onAddStop(day.id, v);
-                                  setCustomByDay((prev) => ({
-                                    ...prev,
-                                    [day.id]: "",
-                                  }));
-                                }}
-                                className="bg-amber px-2.5 py-1.5 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
+                    {/* Stops branched from the day circle with connector lines */}
+                    {showStops ? (
+                      <ul className="relative mt-3 space-y-2 pl-1">
+                        {stops.map((stop, stopIndex) => {
+                          const stopSelected =
+                            selectedNodeId === day.id &&
+                            selectedStopId === stop.id;
+                          return (
+                            <li
+                              key={stop.id}
+                              className="relative flex items-center gap-0"
+                            >
+                              {/* Branch line from spine toward stop */}
+                              <span
+                                className="relative mr-2 flex h-8 w-6 shrink-0 items-center sm:w-8"
+                                aria-hidden
                               >
-                                Add
-                              </button>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
+                                <span className="absolute left-0 top-1/2 h-px w-full bg-amber/55" />
+                                {stopIndex < stops.length - 1 ? (
+                                  <span className="absolute bottom-0 left-0 top-1/2 w-px bg-amber/35" />
+                                ) : null}
+                                {stopIndex > 0 ? (
+                                  <span className="absolute left-0 top-0 h-1/2 w-px bg-amber/35" />
+                                ) : (
+                                  <span className="absolute left-0 top-0 h-1/2 w-px bg-amber/35" />
+                                )}
+                                <span className="absolute right-0 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-amber" />
+                              </span>
+
+                              {onSelectStop ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectStop(day, stop)}
+                                  className={`min-w-0 flex-1 truncate rounded-full border px-3 py-1.5 text-left text-sm transition ${
+                                    stopSelected
+                                      ? "border-amber bg-amber/20 text-amber"
+                                      : "border-white/20 bg-black/20 text-white/85 hover:border-amber/50"
+                                  }`}
+                                >
+                                  {stop.label}
+                                </button>
+                              ) : (
+                                <span className="min-w-0 flex-1 truncate rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-sm text-white/70">
+                                  {stop.label}
+                                </span>
+                              )}
+                              {interactive && onRemoveStop ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onRemoveStop(day.id, stop.id)
+                                  }
+                                  className="ml-1.5 flex h-7 w-7 shrink-0 items-center justify-center border border-white/20 text-white/45 hover:border-amber hover:text-amber"
+                                  aria-label={`Remove ${stop.label}`}
+                                >
+                                  ×
+                                </button>
+                              ) : null}
+                            </li>
+                          );
+                        })}
+                      </ul>
                     ) : null}
                   </div>
                 </div>
@@ -549,7 +454,6 @@ export function TemplateRouteLoop({
             );
           })}
 
-          {/* Return to hotel */}
           {days.length > 0 ? (
             <li className="relative">
               <FlowArrow dashed />
@@ -571,7 +475,7 @@ export function TemplateRouteLoop({
   );
 }
 
-/** Vertical connector with a down arrow — the diagram “flow”. */
+/** Vertical connector with a down arrow — the diagram day flow. */
 function FlowArrow({ dashed = false }: { dashed?: boolean }) {
   return (
     <div
