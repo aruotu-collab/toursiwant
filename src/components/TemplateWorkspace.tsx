@@ -463,6 +463,16 @@ export function TemplateWorkspace({
           </div>
 
           <aside className="space-y-6 lg:sticky lg:top-8 lg:self-start">
+            <div className="border border-amber/30 bg-amber/10 p-5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
+                Make it yours
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-white/80">
+                Anchors stay. Flexible days swap. Share one link so the group can
+                vote — then book paid pieces only when they fit.
+              </p>
+            </div>
+
             <div className="border border-white/15 bg-white/[0.05] p-5">
               <h2 className="font-display text-xl">Personalize</h2>
               <p className="mt-2 text-sm text-white/55">

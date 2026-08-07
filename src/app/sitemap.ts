@@ -1,6 +1,4 @@
 import type { MetadataRoute } from "next";
-import { listPublishedCatalogTours } from "@/lib/listings-store";
-import { sampleTours } from "@/lib/sample-tours";
 import { tripTemplates } from "@/lib/trip-templates";
 
 const siteUrl =
@@ -10,19 +8,14 @@ const siteUrl =
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-  const staticRoutes: MetadataRoute.Sitemap = [
-    "",
-    "/tours",
-    "/events",
-    "/events/ride",
-    "/request",
-    "/operator",
-  ].map((path) => ({
-    url: `${siteUrl}${path}`,
-    lastModified: now,
-    changeFrequency: path === "" || path === "/tours" ? "daily" : "weekly",
-    priority: path === "" ? 1 : path === "/tours" ? 0.9 : 0.7,
-  }));
+  const staticRoutes: MetadataRoute.Sitemap = ["", "/account", "/join"].map(
+    (path) => ({
+      url: `${siteUrl}${path}`,
+      lastModified: now,
+      changeFrequency: path === "" ? "daily" : "monthly",
+      priority: path === "" ? 1 : 0.5,
+    }),
+  );
 
   const tripRoutes: MetadataRoute.Sitemap = tripTemplates.map((t) => ({
     url: `${siteUrl}/trips/${t.slug}`,
@@ -31,19 +24,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.9,
   }));
 
-  const operatorTours = await listPublishedCatalogTours().catch(() => []);
-  const seen = new Set(sampleTours.map((tour) => tour.slug));
-  const allTours = [
-    ...sampleTours,
-    ...operatorTours.filter((tour) => !seen.has(tour.slug)),
-  ];
-
-  const tourRoutes: MetadataRoute.Sitemap = allTours.map((tour) => ({
-    url: `${siteUrl}/tours/${tour.slug}`,
-    lastModified: now,
-    changeFrequency: "weekly" as const,
-    priority: 0.8,
-  }));
-
-  return [...staticRoutes, ...tripRoutes, ...tourRoutes];
+  return [...staticRoutes, ...tripRoutes];
 }

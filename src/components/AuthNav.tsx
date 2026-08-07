@@ -61,7 +61,7 @@ export function AuthGreeting({ variant = "light" }: { variant?: Variant }) {
 
   return (
     <Link
-      href="/?menu=account"
+      href="/account"
       className={
         dark
           ? "mt-0.5 block truncate text-[11px] font-medium text-white/70 transition hover:text-white sm:text-xs"
@@ -114,32 +114,18 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
 
   if (!user) {
     return (
-      <>
-        <Link href="/join" className={accountClass}>
-          <span className="sm:hidden">Sign in</span>
-          <span className="hidden sm:inline">Sign in</span>
-        </Link>
-        <Link
-          href="/join?role=operator&next=/operator"
-          className={`hidden sm:inline-flex ${buttonClass}`}
-        >
-          Operators
-        </Link>
-      </>
+      <Link href="/join" className={accountClass}>
+        Sign in
+      </Link>
     );
   }
 
   return (
     <>
-      <Link href="/?menu=account" className={accountClass}>
+      <Link href="/account" className={accountClass}>
         <span className="sm:hidden">Account</span>
         <span className="hidden sm:inline">My account</span>
       </Link>
-      {user.role === "operator" || user.role === "admin" ? (
-        <Link href="/operator" className={`hidden sm:inline ${linkClass}`}>
-          Inbox
-        </Link>
-      ) : null}
       {user.role === "admin" ? (
         <Link href="/admin" className={`hidden sm:inline ${linkClass}`}>
           Admin

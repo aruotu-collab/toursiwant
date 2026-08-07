@@ -35,7 +35,7 @@ function JoinContent() {
           email,
           name: name || undefined,
           role: isOperator ? "operator" : "traveller",
-          nextPath: nextPath || (isOperator ? "/operator" : "/?menu=account"),
+          nextPath: nextPath || (isOperator ? "/operator" : "/"),
         }),
       });
       const payload = (await response.json()) as {
@@ -68,25 +68,18 @@ function JoinContent() {
           Join ToursIWant
         </p>
         <h1 className="mt-3 font-display text-4xl leading-tight text-ink sm:text-5xl">
-          {isOperator ? "Operator sign-in" : "Continue with email"}
+          {isOperator ? "Staff sign-in" : "Continue with email"}
         </h1>
         <p className="mt-4 max-w-md text-ink-soft">
-          Browse freely. Sign in when you want to save a request, track quotes,
-          or open the operator lead inbox.
+          Browse trip templates freely. Sign in when you want to save shared
+          plans with your group.
         </p>
-        <div className="mt-8 flex flex-wrap gap-3 text-sm">
+        <div className="mt-8">
           <Link
-            href="/join"
-            className="text-skyline underline-offset-2 hover:underline"
+            href="/"
+            className="text-sm text-skyline underline-offset-2 hover:underline"
           >
-            Traveller
-          </Link>
-          <span className="text-stone">·</span>
-          <Link
-            href="/join?role=operator"
-            className="text-skyline underline-offset-2 hover:underline"
-          >
-            Operator
+            ← Back to trips
           </Link>
         </div>
       </div>
