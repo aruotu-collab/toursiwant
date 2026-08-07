@@ -120,16 +120,19 @@ export const personalizeOptions: Array<{
   id: ExperienceCategory;
   label: string;
 }> = [
-  { id: "RELIGIOUS", label: "Religious / spiritual sites" },
-  { id: "WATER_ACTIVITY", label: "Waterpark / theme park" },
-  { id: "LIVE_ENTERTAINMENT", label: "Live entertainment / show" },
-  { id: "PRIVATE_GROUP_EVENT", label: "Private group dinner" },
-  { id: "NIGHTLIFE", label: "Nightlife" },
-  { id: "SHOPPING", label: "Shopping day" },
-  { id: "NATURE", label: "Nature / parks day" },
+  { id: "SIGHTS", label: "Famous sights" },
   { id: "FOOD", label: "Food tour" },
+  { id: "CULTURE", label: "Museums / culture" },
+  { id: "NATURE", label: "Nature / parks day" },
+  { id: "LIVE_ENTERTAINMENT", label: "Live entertainment / show" },
+  { id: "SHOPPING", label: "Shopping day" },
   { id: "FAMILY", label: "Children’s activities" },
   { id: "RELAX", label: "Relaxation / spa" },
+  { id: "NIGHTLIFE", label: "Nightlife" },
+  { id: "RELIGIOUS", label: "Religious / spiritual sites" },
+  { id: "FREE_TIME", label: "Free time / slow day" },
+  { id: "WATER_ACTIVITY", label: "Waterpark / theme park" },
+  { id: "PRIVATE_GROUP_EVENT", label: "Private group dinner" },
 ];
 
 export const usCityOptions = [
@@ -1254,14 +1257,47 @@ export const tripTemplates: TripTemplate[] = [
       lng: -73.9855,
     },
     blocks: [
-      anchor("mh1", "Day 1", "Walkable Midtown", "Icons near the hotel.", {
-        fromHotelMinutes: 15,
-      }),
+      flexDay(
+        "mh1",
+        "Day 1",
+        "Walkable Midtown",
+        "Icons near the hotel — or swap the vibe.",
+        [
+          {
+            id: "mh1-walk",
+            category: "SIGHTS",
+            title: "Walkable Midtown icons",
+            summary: "Classic first-day landmarks near the hotel.",
+            viatorQuery: "Midtown walking tour",
+          },
+          {
+            id: "mh1-food",
+            category: "FOOD",
+            title: "Midtown food crawl",
+            summary: "Markets, slices, and quick bites.",
+            viatorQuery: "New York food tour",
+          },
+          {
+            id: "mh1-shop",
+            category: "SHOPPING",
+            title: "Fifth Avenue shopping",
+            summary: "Retail spine from the hotel belt.",
+            viatorQuery: "shopping",
+          },
+          {
+            id: "mh1-relax",
+            category: "RELAX",
+            title: "Easy arrival day",
+            summary: "Light walking, cafe time, early night.",
+          },
+        ],
+        { fromHotelMinutes: 15, viatorCitySlug: "new-york" },
+      ),
       flexDay(
         "mh2",
         "Day 2",
         "Choose downtown or leisure",
-        "Harbor sights or a fun day.",
+        "Harbor, culture, food, or a show — pick what fits the group.",
         [
           {
             id: "mh2-sights",
@@ -1271,17 +1307,83 @@ export const tripTemplates: TripTemplate[] = [
             viatorQuery: "Statue of Liberty",
           },
           {
+            id: "mh2-culture",
+            category: "CULTURE",
+            title: "Museum afternoon",
+            summary: "MoMA / Met-style culture day.",
+            viatorQuery: "museum",
+          },
+          {
+            id: "mh2-food",
+            category: "FOOD",
+            title: "Downtown food day",
+            summary: "Chinatown, LES, or ferry-side eats.",
+            viatorQuery: "New York food tour",
+          },
+          {
+            id: "mh2-show",
+            category: "LIVE_ENTERTAINMENT",
+            title: "Broadway / show night",
+            summary: "Book a performance if the group wants it.",
+            viatorQuery: "Broadway",
+          },
+          {
             id: "mh2-fun",
             category: "FAMILY",
             title: "Family leisure day",
             summary: "Lower-stress pacing.",
           },
+          {
+            id: "mh2-nature",
+            category: "NATURE",
+            title: "Long park day",
+            summary: "Central Park deep dive.",
+            viatorQuery: "Central Park",
+          },
+          {
+            id: "mh2-free",
+            category: "FREE_TIME",
+            title: "Free-form day",
+            summary: "Keep the spine; leave slots open.",
+          },
         ],
         { fromHotelMinutes: 35, viatorCitySlug: "new-york" },
       ),
-      anchor("mh3", "Day 3", "Park morning + buffer", "Finish near the hotel.", {
-        fromHotelMinutes: 20,
-      }),
+      flexDay(
+        "mh3",
+        "Day 3",
+        "Park morning + buffer",
+        "Finish near the hotel — or swap the last morning.",
+        [
+          {
+            id: "mh3-park",
+            category: "NATURE",
+            title: "Park morning + buffer",
+            summary: "Finish near the hotel with green space.",
+            viatorQuery: "Central Park",
+          },
+          {
+            id: "mh3-view",
+            category: "SIGHTS",
+            title: "Viewpoint morning",
+            summary: "SUMMIT / Edge-style observation before checkout.",
+            viatorQuery: "SUMMIT",
+          },
+          {
+            id: "mh3-faith",
+            category: "RELIGIOUS",
+            title: "Quiet churches & memorials",
+            summary: "A calmer last morning.",
+          },
+          {
+            id: "mh3-shop",
+            category: "SHOPPING",
+            title: "Last-morning shopping",
+            summary: "Gifts near Midtown before you leave.",
+          },
+        ],
+        { fromHotelMinutes: 20, viatorCitySlug: "new-york" },
+      ),
     ],
   },
 

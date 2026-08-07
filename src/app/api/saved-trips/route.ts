@@ -49,6 +49,12 @@ export async function POST(request: Request) {
       hotelName?: string;
       selections?: Record<string, string>;
       wants?: ExperienceCategory[];
+      routeNodes?: Array<{
+        id: string;
+        label: string;
+        kind: "hotel" | "stop";
+        blockId?: string;
+      }>;
       sourceShareCode?: string;
     };
 
@@ -66,8 +72,10 @@ export async function POST(request: Request) {
       }
       const trip = await updateSavedTrip(body.id, user.id, {
         title: body.title,
+        route: body.route,
         selections: body.selections,
         wants: body.wants,
+        routeNodes: body.routeNodes,
       });
       if (!trip) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -95,6 +103,7 @@ export async function POST(request: Request) {
       hotelName: body.hotelName,
       selections: body.selections,
       wants: body.wants,
+      routeNodes: body.routeNodes,
       sourceShareCode: body.sourceShareCode,
     });
 

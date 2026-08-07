@@ -4,6 +4,14 @@ import { randomBytes } from "crypto";
 import { ensureAppSchema, getSql, hasDatabase } from "@/lib/db";
 import type { ExperienceCategory } from "@/lib/trip-templates";
 
+/** Serializable trip-path node stored with a saved trip */
+export type SavedRouteNode = {
+  id: string;
+  label: string;
+  kind: "hotel" | "stop";
+  blockId?: string;
+};
+
 export type SavedTrip = {
   id: string;
   userId: string;
@@ -17,6 +25,8 @@ export type SavedTrip = {
   hotelName?: string;
   selections: Record<string, string>;
   wants: ExperienceCategory[];
+  /** Editable trip path (node map) */
+  routeNodes?: SavedRouteNode[];
   /** If forked from a live group room */
   sourceShareCode?: string;
   createdAt: string;
@@ -65,6 +75,7 @@ function toPayload(trip: SavedTrip) {
     hotelName: trip.hotelName,
     selections: trip.selections,
     wants: trip.wants,
+    routeNodes: trip.routeNodes || [],
     sourceShareCode: trip.sourceShareCode,
   };
 }
@@ -106,6 +117,7 @@ function fromRow(row: {
     hotelName: payload.hotelName as string | undefined,
     selections: (payload.selections as Record<string, string>) || {},
     wants: (payload.wants as ExperienceCategory[]) || [],
+    routeNodes: (payload.routeNodes as SavedRouteNode[]) || [],
     sourceShareCode: payload.sourceShareCode as string | undefined,
     createdAt,
     updatedAt,
@@ -138,6 +150,7 @@ export async function createSavedTrip(input: {
   hotelName?: string;
   selections?: Record<string, string>;
   wants?: ExperienceCategory[];
+  routeNodes?: SavedRouteNode[];
   sourceShareCode?: string;
 }): Promise<SavedTrip> {
   const now = new Date().toISOString();
@@ -154,6 +167,7 @@ export async function createSavedTrip(input: {
     hotelName: input.hotelName,
     selections: input.selections || {},
     wants: input.wants || [],
+    routeNodes: input.routeNodes || [],
     sourceShareCode: input.sourceShareCode,
     createdAt: now,
     updatedAt: now,
@@ -254,15 +268,19 @@ export async function updateSavedTrip(
   userId: string,
   patch: {
     title?: string;
+    route?: string;
     selections?: Record<string, string>;
     wants?: ExperienceCategory[];
+    routeNodes?: SavedRouteNode[];
   },
 ) {
   const trip = await getSavedTrip(id, userId);
   if (!trip) return null;
   if (patch.title) trip.title = patch.title.slice(0, 120);
+  if (patch.route !== undefined) trip.route = patch.route;
   if (patch.selections) trip.selections = patch.selections;
   if (patch.wants) trip.wants = patch.wants;
+  if (patch.routeNodes) trip.routeNodes = patch.routeNodes;
   trip.updatedAt = new Date().toISOString();
 
   if (hasDatabase()) {

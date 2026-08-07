@@ -192,26 +192,49 @@ export function TemplateWorkspace({
   }, [voterName]);
 
   const runPersonalize = useCallback(() => {
-    // Always personalize from the original template spine so flexible days
-    // stay available even if the trip map was edited.
+    // Personalize from the original flexible spine, then keep trip-path stops.
     const result = personalizeTemplate(initial, wants);
+    const addedStops = routeNodes.filter(
+      (n) => n.blockId && String(n.blockId).startsWith("added_"),
+    );
+
+    const hotel = routeNodes.find((n) => n.kind === "hotel") || {
+      id: "hotel",
+      label: "Hotel",
+      kind: "hotel" as const,
+    };
+    const dayNodes = result.template.blocks.map((b) => ({
+      id: `block:${b.id}`,
+      label: b.title.length > 16 ? `${b.title.slice(0, 14)}…` : b.title,
+      kind: "stop" as const,
+      blockId: b.id,
+    }));
+    const nextNodes = [hotel, ...dayNodes, ...addedStops].slice(
+      0,
+      MAX_ROUTE_NODES,
+    );
+
+    setRouteNodes(nextNodes);
     setTemplate((prev) => {
-      const added = prev.blocks.filter((b) =>
+      const addedBlocks = prev.blocks.filter((b) =>
         String(b.id).startsWith("added_"),
       );
       return {
         ...result.template,
-        route: prev.route,
-        blocks: [...result.template.blocks, ...added],
+        route: nextNodes.map((n) => n.label).join(" → "),
+        blocks: [...result.template.blocks, ...addedBlocks],
       };
     });
+
     setPersonalizeResult(result);
     setStatus(
       result.applied.length
-        ? `Applied ${result.applied.length} change${result.applied.length === 1 ? "" : "s"}. Trip map stops kept.`
-        : "Nothing to apply yet — pick what the group wants.",
+        ? `Applied ${result.applied.length} change${result.applied.length === 1 ? "" : "s"}. Path updated — save to keep it.`
+        : result.unfit.length
+          ? "Some wants need a flexible day — check which options fit this template."
+          : "Nothing to apply yet — pick what the group wants.",
     );
-  }, [initial, wants]);
+  }, [initial, wants, routeNodes]);
 
   const resetPersonalize = useCallback(() => {
     setWants([]);
@@ -374,17 +397,56 @@ export function TemplateWorkspace({
           trip?: {
             id: string;
             title: string;
+            route?: string;
             selections?: Record<string, string>;
             wants?: ExperienceCategory[];
+            routeNodes?: RouteNode[];
           };
         };
         if (!data.trip) return;
         setSavedTripTitle(data.trip.title);
         if (data.trip.wants?.length) setWants(data.trip.wants);
-        if (data.trip.selections) {
-          setTemplate(applySelections(initial, data.trip.selections));
+
+        const nodes = data.trip.routeNodes?.length
+          ? data.trip.routeNodes
+          : null;
+
+        let nextTemplate = data.trip.selections
+          ? applySelections(initial, data.trip.selections)
+          : { ...initial };
+
+        if (nodes) {
+          const addedBlocks = nodes
+            .filter(
+              (n) =>
+                n.blockId &&
+                String(n.blockId).startsWith("added_") &&
+                !nextTemplate.blocks.some((b) => b.id === n.blockId),
+            )
+            .map((n) => ({
+              id: n.blockId as string,
+              kind: "anchor" as const,
+              dayLabel: "Added stop",
+              title: n.label,
+              summary: "Saved stop from your trip path.",
+            }));
+          nextTemplate = {
+            ...nextTemplate,
+            route:
+              data.trip.route || nodes.map((n) => n.label).join(" → "),
+            blocks: [...nextTemplate.blocks, ...addedBlocks],
+          };
+          setRouteNodes(nodes);
+        } else if (data.trip.route) {
+          nextTemplate = { ...nextTemplate, route: data.trip.route };
         }
-        setStatus(`Opened your saved trip: ${data.trip.title}`);
+
+        setTemplate(nextTemplate);
+        setStatus(
+          `Opened your saved trip: ${data.trip.title}${
+            nodes?.length ? ` · ${nodes.length} path stops restored` : ""
+          }`,
+        );
         setAsideTab("personalize");
       })();
     }
@@ -657,14 +719,12 @@ export function TemplateWorkspace({
       for (const swap of personalizeResult?.applied || []) {
         selections[swap.blockId] = swap.optionId;
       }
-      // Prefer current block titles if user used "Use" without personalize apply
       for (const block of template.blocks) {
         const original = initial.blocks.find((b) => b.id === block.id);
-        if (
-          original?.alternatives &&
-          block.title !== original.title
-        ) {
-          const match = original.alternatives.find((a) => a.title === block.title);
+        if (original?.alternatives && block.title !== original.title) {
+          const match = original.alternatives.find(
+            (a) => a.title === block.title,
+          );
           if (match) selections[block.id] = match.id;
         }
       }
@@ -677,12 +737,14 @@ export function TemplateWorkspace({
           templateSlug: initial.slug,
           templateTitle: initial.title,
           title: savedTripTitle.trim() || `${initial.title} — ours`,
-          route: initial.route,
+          route: template.route,
           region: initial.region,
           cityCodes: initial.cityCodes,
-          hotelName: initial.hotelAnchor?.name,
+          hotelName:
+            stayFromHere || initial.hotelAnchor?.name || undefined,
           selections,
           wants,
+          routeNodes,
           sourceShareCode: session?.shareCode,
         }),
       });
@@ -702,13 +764,14 @@ export function TemplateWorkspace({
       }
       setSavedTripId(data.trip.id);
       setSavedTripTitle(data.trip.title);
-      window.history.replaceState(
-        null,
-        "",
-        `?saved=${data.trip.id}${session?.shareCode ? `&share=${session.shareCode}` : ""}`,
-      );
+      const params = new URLSearchParams();
+      params.set("saved", data.trip.id);
+      if (session?.shareCode) params.set("share", session.shareCode);
+      if (fromHereNow) params.set("from", "here");
+      if (stayFromHere) params.set("stay", stayFromHere);
+      window.history.replaceState(null, "", `?${params.toString()}`);
       setStatus(
-        `Saved as your trip. Find it anytime under Account → My trips.`,
+        `Saved your trip path and personalizations. Account → My trips.`,
       );
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Could not save trip");
@@ -728,7 +791,9 @@ export function TemplateWorkspace({
       for (const block of template.blocks) {
         const original = initial.blocks.find((b) => b.id === block.id);
         if (original?.alternatives && block.title !== original.title) {
-          const match = original.alternatives.find((a) => a.title === block.title);
+          const match = original.alternatives.find(
+            (a) => a.title === block.title,
+          );
           if (match) selections[block.id] = match.id;
         }
       }
@@ -739,13 +804,15 @@ export function TemplateWorkspace({
           action: "update",
           id: savedTripId,
           title: savedTripTitle.trim() || undefined,
+          route: template.route,
           selections,
           wants,
+          routeNodes,
         }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error || "Could not update");
-      setStatus("Your saved trip was updated.");
+      setStatus("Saved — trip path, personalize, and stops updated.");
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Could not update trip");
     } finally {
@@ -1229,8 +1296,8 @@ export function TemplateWorkspace({
                     Save as my trip
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-white/75">
-                    Like this template? Fork it as your own — separate from
-                    joining someone else&apos;s group room.
+                    Saves your trip path, added stops, and personalize choices —
+                    separate from joining someone else&apos;s group room.
                   </p>
                   <input
                     value={savedTripTitle}
