@@ -2049,16 +2049,16 @@ export function suggestAddCountry(template: TripTemplate, code: string) {
 
 export const hereNowHotels = [
   {
+    id: "midtown-generic",
+    name: "Aliz Hotel Times Square",
+    area: "Midtown West, New York, NY",
+    blurb: "Midtown West · bus belt, pizza slices, and theater walks",
+  },
+  {
     id: "seneca-niagara",
     name: "Seneca Niagara Resort & Casino",
     area: "Niagara Falls, NY",
     blurb: "Look out the window — here's what to do from the resort.",
-  },
-  {
-    id: "midtown-generic",
-    name: "Midtown Manhattan hotel",
-    area: "New York, NY",
-    blurb: "Hotel-anchored Midtown plans.",
   },
   {
     id: "vegas-strip",

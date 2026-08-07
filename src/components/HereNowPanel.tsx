@@ -98,6 +98,7 @@ export function HereNowPanel() {
 
   async function resolveStay(body: {
     curatedId?: string;
+    nearMePlaceId?: string;
     placeId?: string;
     name?: string;
   }) {
@@ -143,7 +144,7 @@ export function HereNowPanel() {
       try {
         const body =
           stay.source === "curated"
-            ? { curatedId: stay.id }
+            ? { curatedId: stay.id, name: stay.name }
             : {
                 placeId: stay.id.replace(/^google:/, ""),
                 name: stay.name,
@@ -211,32 +212,12 @@ export function HereNowPanel() {
                     type="button"
                     onClick={() => {
                       if (item.source === "curated") {
-                        // Map near-me curated ids aren't our hotel ids — treat as name search fallback
-                        // Prefer google placeId path when available
-                        if (item.placeId) {
-                          void resolveStay({
-                            placeId: item.placeId,
-                            name: item.name,
-                          });
-                          return;
-                        }
-                        // If curated near-me place, try matching by name to featured hotels
-                        const featured = hereNowHotels.find(
-                          (h) =>
-                            h.name
-                              .toLowerCase()
-                              .includes(item.name.toLowerCase().slice(0, 12)) ||
-                            item.name
-                              .toLowerCase()
-                              .includes(h.name.toLowerCase().slice(0, 12)),
-                        );
-                        if (featured) {
-                          void resolveStay({ curatedId: featured.id });
-                          return;
-                        }
-                        setError(
-                          "Pick a Google hotel result, or use a featured stay below.",
-                        );
+                        // Suggested stays (e.g. Aliz) come from near-me places —
+                        // resolve them into Midtown / metro plans.
+                        void resolveStay({
+                          nearMePlaceId: item.id,
+                          name: item.name,
+                        });
                         return;
                       }
                       if (!item.placeId) return;

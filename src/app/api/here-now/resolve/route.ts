@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   curatedStayFromHotelId,
+  curatedStayFromNearMePlace,
   matchHereNowFromStay,
   type ResolvedStay,
 } from "@/lib/here-now";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 type Body = {
   curatedId?: string;
+  nearMePlaceId?: string;
   placeId?: string;
   name?: string;
   timeBucket?: string;
@@ -45,11 +47,29 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Body;
     const filters = { timeBucket: body.timeBucket, mood: body.mood };
 
-    if (body.curatedId) {
-      const stay = curatedStayFromHotelId(body.curatedId);
+    if (body.nearMePlaceId) {
+      const stay = curatedStayFromNearMePlace(body.nearMePlaceId);
       if (!stay) {
         return NextResponse.json({ error: "Stay not found." }, { status: 404 });
       }
+      const match = matchHereNowFromStay(stay, filters);
+      return NextResponse.json({
+        enabled: hasGooglePlacesKey(),
+        match,
+      });
+    }
+
+    if (body.curatedId) {
+      const base =
+        curatedStayFromHotelId(body.curatedId) ||
+        curatedStayFromNearMePlace(body.curatedId);
+      if (!base) {
+        return NextResponse.json({ error: "Stay not found." }, { status: 404 });
+      }
+      const stay =
+        body.name && body.name.trim()
+          ? { ...base, name: body.name.trim() }
+          : base;
       const match = matchHereNowFromStay(stay, filters);
       return NextResponse.json({
         enabled: hasGooglePlacesKey(),

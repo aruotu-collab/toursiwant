@@ -1,4 +1,5 @@
 import { haversineMeters, metroLabel } from "@/lib/places-usa";
+import { getNearMePlace } from "@/lib/near-me";
 import {
   hereNowHotels,
   listTemplates,
@@ -246,6 +247,81 @@ export function curatedStayFromHotelId(hotelId: string): ResolvedStay | null {
     lat: anchor.lat,
     lng: anchor.lng,
     metro: refineMetro(anchor.lat, anchor.lng, hotel.name, hotel.area),
+    source: "curated",
+  };
+}
+
+/** Near-me autocomplete ids → featured here-now hotel templates. */
+const nearMePlaceToHotelId: Record<string, string> = {
+  "aliz-hotel": "midtown-generic",
+  "times-square": "midtown-generic",
+  "bryant-park": "midtown-generic",
+  "battery-park": "midtown-generic",
+  dumbo: "midtown-generic",
+  "met-museum": "midtown-generic",
+  "chinatown-stay": "midtown-generic",
+  jfk: "midtown-generic",
+  "manhattan-cruise": "midtown-generic",
+};
+
+const zoneToHotelId: Record<string, string> = {
+  midtown: "midtown-generic",
+  "lower-manhattan": "midtown-generic",
+  "central-park": "midtown-generic",
+  brooklyn: "midtown-generic",
+  airports: "midtown-generic",
+  harbor: "midtown-generic",
+};
+
+const zoneCoords: Record<string, { lat: number; lng: number }> = {
+  harbor: { lat: 40.76, lng: -74.0 },
+  "lower-manhattan": { lat: 40.703, lng: -74.016 },
+  midtown: { lat: 40.758, lng: -73.9855 },
+  "central-park": { lat: 40.779, lng: -73.963 },
+  brooklyn: { lat: 40.703, lng: -73.99 },
+  airports: { lat: 40.644, lng: -73.782 },
+};
+
+/**
+ * Resolve a Suggested (near-me) autocomplete pick into a stay + Midtown plans.
+ * Keeps the place name travellers typed (e.g. Aliz) while matching hotel templates.
+ */
+export function curatedStayFromNearMePlace(
+  placeId: string,
+): ResolvedStay | null {
+  // Already a featured hotel id
+  const direct = curatedStayFromHotelId(placeId);
+  if (direct) return direct;
+
+  const place = getNearMePlace(placeId);
+  if (!place) return null;
+
+  const hotelId =
+    nearMePlaceToHotelId[place.id] ||
+    zoneToHotelId[place.zoneId] ||
+    "midtown-generic";
+  const base = curatedStayFromHotelId(hotelId);
+  const coords = zoneCoords[place.zoneId] || zoneCoords.midtown;
+
+  if (base) {
+    return {
+      ...base,
+      // Keep featured hotel id so templates match; show the suggested stay name
+      name: place.name,
+      address: place.blurb,
+      lat: coords.lat,
+      lng: coords.lng,
+      metro: refineMetro(coords.lat, coords.lng, place.name, place.blurb),
+    };
+  }
+
+  return {
+    id: hotelId,
+    name: place.name,
+    address: place.blurb,
+    lat: coords.lat,
+    lng: coords.lng,
+    metro: "New York",
     source: "curated",
   };
 }
