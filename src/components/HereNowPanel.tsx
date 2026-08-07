@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { TemplateRouteLoop } from "@/components/TemplateRouteLoop";
 import {
   hereNowHotels,
   moodOptions,
@@ -81,26 +82,29 @@ function PlanCard({
   return (
     <Link
       href={`/trips/${t.slug}?${params.toString()}`}
-      className="group block border border-white/15 bg-white/[0.04] p-5 transition hover:border-amber/50 hover:bg-white/[0.07]"
+      className="group block overflow-hidden border border-white/15 bg-white/[0.04] transition hover:border-amber/50 hover:bg-white/[0.07]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber">
-          {scaleLabel[t.scale]} · {t.days === 1 ? "Same day" : `${t.days} days`}
-        </p>
-        {t.travelledRating ? (
-          <p className="font-mono text-[10px] text-white/55">
-            ★ {t.travelledRating}
+      <TemplateRouteLoop template={t} className="h-[148px] w-full" />
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber">
+            {scaleLabel[t.scale]} ·{" "}
+            {t.days === 1 ? "Same day" : `${t.days} days`}
           </p>
-        ) : null}
+          {t.travelledRating ? (
+            <p className="font-mono text-[10px] text-white/55">
+              ★ {t.travelledRating}
+            </p>
+          ) : null}
+        </div>
+        <h3 className="mt-3 font-display text-2xl tracking-tight text-white transition group-hover:text-amber">
+          {t.title}
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-white/70">{t.blurb}</p>
+        <p className="mt-4 font-mono text-[11px] text-amber opacity-0 transition group-hover:opacity-100">
+          Open plan →
+        </p>
       </div>
-      <h3 className="mt-3 font-display text-2xl tracking-tight text-white transition group-hover:text-amber">
-        {t.title}
-      </h3>
-      <p className="mt-2 text-sm text-white/65">{t.route}</p>
-      <p className="mt-3 text-sm leading-relaxed text-white/75">{t.blurb}</p>
-      <p className="mt-4 font-mono text-[11px] text-amber opacity-0 transition group-hover:opacity-100">
-        Open plan →
-      </p>
     </Link>
   );
 }

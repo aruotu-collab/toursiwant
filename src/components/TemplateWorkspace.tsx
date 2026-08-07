@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  getTemplateRouteNodes,
+  type RouteNode,
+} from "@/components/TemplateRouteLoop";
+import { TripNodeEditor } from "@/components/TripNodeEditor";
+import {
   experienceCategoryLabel,
   personalizeAvailability,
   personalizeTemplate,
@@ -105,6 +110,9 @@ export function TemplateWorkspace({
   initial: TripTemplate;
 }) {
   const [template, setTemplate] = useState(initial);
+  const [routeNodes, setRouteNodes] = useState<RouteNode[]>(() =>
+    getTemplateRouteNodes(initial),
+  );
   const [wants, setWants] = useState<ExperienceCategory[]>([]);
   const [personalizeResult, setPersonalizeResult] =
     useState<PersonalizeResult | null>(null);
@@ -185,7 +193,16 @@ export function TemplateWorkspace({
 
   const runPersonalize = useCallback(() => {
     const result = personalizeTemplate(initial, wants);
-    setTemplate(result.template);
+    setTemplate((prev) => ({
+      ...result.template,
+      route: prev.route,
+      blocks: [
+        ...result.template.blocks.filter(
+          (b) => !String(b.id).startsWith("added_"),
+        ),
+        ...prev.blocks.filter((b) => String(b.id).startsWith("added_")),
+      ],
+    }));
     setPersonalizeResult(result);
     setStatus(
       result.applied.length
@@ -197,9 +214,53 @@ export function TemplateWorkspace({
   const resetPersonalize = useCallback(() => {
     setWants([]);
     setPersonalizeResult(null);
+    setRouteNodes(getTemplateRouteNodes(initial));
     setTemplate(initial);
     setStatus("Trip reset to the original template.");
   }, [initial]);
+
+  function handleRouteNodesChange(next: RouteNode[]) {
+    const prevLinked = new Set(
+      routeNodes.map((n) => n.blockId).filter(Boolean) as string[],
+    );
+    const withIds = next.map((n) => {
+      if (n.kind === "hotel" || n.blockId) return n;
+      return {
+        ...n,
+        blockId: `added_${n.id.replace(/[^a-zA-Z0-9]+/g, "_")}`,
+      };
+    });
+    setRouteNodes(withIds);
+    setTemplate((prev) => {
+      const keep = new Set(
+        withIds.map((n) => n.blockId).filter(Boolean) as string[],
+      );
+      let blocks = prev.blocks.filter((b) => {
+        if (prevLinked.has(b.id) && !keep.has(b.id)) return false;
+        return true;
+      });
+      for (const n of withIds) {
+        if (!n.blockId || n.kind === "hotel") continue;
+        if (blocks.some((b) => b.id === n.blockId)) continue;
+        blocks = [
+          ...blocks,
+          {
+            id: n.blockId,
+            kind: "anchor" as const,
+            dayLabel: "Added stop",
+            title: n.label,
+            summary: "New stop on your trip map — personalize around it.",
+          },
+        ];
+      }
+      return {
+        ...prev,
+        route: withIds.map((n) => n.label).join(" → "),
+        blocks,
+      };
+    });
+    setStatus("Trip map updated.");
+  }
 
   useEffect(() => {
     const blocks = template.blocks.filter((b) => b.viatorQuery);
@@ -255,7 +316,22 @@ export function TemplateWorkspace({
     if (params.get("from") === "here") {
       setFromHereNow(true);
       const stay = params.get("stay");
-      if (stay) setStayFromHere(stay);
+      if (stay) {
+        setStayFromHere(stay);
+        setRouteNodes((prev) =>
+          prev.map((n) =>
+            n.kind === "hotel"
+              ? {
+                  ...n,
+                  label:
+                    stay.length > 14
+                      ? `${stay.slice(0, 12).trim()}…`
+                      : stay,
+                }
+              : n,
+          ),
+        );
+      }
     }
   }, []);
 
@@ -721,6 +797,22 @@ export function TemplateWorkspace({
                   : ""}
               </span>
             </p>
+
+            <TripNodeEditor
+              nodes={routeNodes}
+              onChange={handleRouteNodesChange}
+              suggestions={[
+                "Market",
+                "Restaurant",
+                "Museum",
+                "Park",
+                "Harbor",
+                "Broadway",
+                "Shopping",
+                "Viewpoint",
+                ...(initial.addDestinationHints?.map((h) => h.label) || []),
+              ]}
+            />
 
             {session ? (
               <div className="mt-5 flex flex-wrap items-center gap-3 border border-amber/30 bg-amber/10 px-4 py-3 text-sm">
