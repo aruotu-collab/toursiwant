@@ -694,6 +694,20 @@ export function TemplateWorkspace({
             <p className="mt-4 max-w-2xl leading-relaxed text-white/65">
               {template.blurb}
             </p>
+            <p className="mt-4 text-sm text-white/85">
+              <span className="font-semibold text-amber">
+                {template.groupsUsed.toLocaleString()} groups
+              </span>{" "}
+              already used this trip
+              <span className="text-white/45">
+                {" "}
+                · {template.savedCount.toLocaleString()} saved ·{" "}
+                {template.recommendPercent}% recommend
+                {template.travelledRating
+                  ? ` · ★ ${template.travelledRating}`
+                  : ""}
+              </span>
+            </p>
 
             {session ? (
               <div className="mt-5 flex flex-wrap items-center gap-3 border border-amber/30 bg-amber/10 px-4 py-3 text-sm">

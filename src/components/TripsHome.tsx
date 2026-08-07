@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { HereNowPanel } from "@/components/HereNowPanel";
 import { LiveTripsPanel } from "@/components/LiveTripsPanel";
+import { TemplateRouteLoop } from "@/components/TemplateRouteLoop";
 import {
   combineUsCities,
   listTemplates,
@@ -27,43 +28,46 @@ function TemplateCard({ t }: { t: TripTemplate }) {
   return (
     <Link
       href={`/trips/${t.slug}`}
-      className="group block border border-white/15 bg-white/[0.04] p-5 transition hover:border-amber/50 hover:bg-white/[0.07]"
+      className="group block overflow-hidden border border-white/15 bg-white/[0.04] transition hover:border-amber/50 hover:bg-white/[0.07]"
       style={{ animation: "rise-in 0.45s ease-out both" }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber">
-          {scaleLabel[t.scale]} · {t.days === 1 ? "Same day" : `${t.days} days`}
-          {t.region ? ` · ${t.region}` : ""}
-        </p>
-        {t.travelledRating ? (
-          <p className="font-mono text-[10px] text-white/55">
-            ★ {t.travelledRating} travelled
+      <TemplateRouteLoop template={t} className="h-[148px] w-full" />
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber">
+            {scaleLabel[t.scale]} ·{" "}
+            {t.days === 1 ? "Same day" : `${t.days} days`}
+            {t.region ? ` · ${t.region}` : ""}
           </p>
-        ) : null}
-      </div>
-      <h3 className="mt-3 font-display text-2xl tracking-tight text-white transition group-hover:text-amber">
-        {t.title}
-      </h3>
-      <p className="mt-2 text-sm text-white/65">{t.route}</p>
-      <p className="mt-3 text-sm leading-relaxed text-white/75">{t.blurb}</p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {t.bestFor.slice(0, 3).map((tag) => (
-          <span
-            key={tag}
-            className="border border-white/15 px-2 py-1 text-[11px] text-white/60"
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
-      <p className="mt-4 flex items-center justify-between font-mono text-[11px] text-white/45">
-        <span>
+          {t.travelledRating ? (
+            <p className="shrink-0 font-mono text-[10px] text-white/55">
+              ★ {t.travelledRating}
+            </p>
+          ) : null}
+        </div>
+        <h3 className="mt-3 font-display text-2xl tracking-tight text-white transition group-hover:text-amber">
+          {t.title}
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-white/70">{t.blurb}</p>
+        <p className="mt-4 text-sm text-white/90">
+          <span className="font-semibold text-amber">
+            {t.groupsUsed.toLocaleString()} groups
+          </span>{" "}
+          already used this trip
+          {t.travelledReviews ? (
+            <span className="text-white/45">
+              {" "}
+              · {t.travelledReviews.toLocaleString()} reviews
+            </span>
+          ) : null}
+        </p>
+        <p className="mt-1.5 font-mono text-[11px] text-white/45">
           {t.savedCount.toLocaleString()} saved · {t.recommendPercent}% recommend
-        </span>
-        <span className="text-amber opacity-0 transition group-hover:opacity-100">
-          Open →
-        </span>
-      </p>
+          <span className="ml-2 text-amber opacity-0 transition group-hover:opacity-100">
+            Open →
+          </span>
+        </p>
+      </div>
     </Link>
   );
 }
