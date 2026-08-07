@@ -245,9 +245,8 @@ export function TripNodeEditor({
           <div>
             <h2 className="font-display text-xl">Make it yours</h2>
             <p className="mt-1 text-sm text-white/55">
-              The diagram is a loop from your hotel through the trip, then
-              dashed back home. Add stops below — expand a day to put them on
-              the path.
+              The diagram shows days and stops. Add stops below — they branch
+              off the day you select.
             </p>
           </div>
           <p className="font-mono text-[11px] text-white/40">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { TripTemplate } from "@/lib/trip-templates";
 
 /** A place inside a day (Museum, Market, …). */
@@ -173,97 +173,10 @@ export function shortenLabel(raw: string) {
   return `${s.slice(0, 14).trim()}…`;
 }
 
-type LoopPoint = {
-  key: string;
-  label: string;
-  kind: "hotel" | "day" | "stop";
-  day?: RouteNode;
-  stop?: DayStop;
-  dayIndex?: number;
-};
-
-type XY = { x: number; y: number };
-
-/** Stadium / racetrack outline matching the hand-drawn loop. */
-function stadiumPath(w: number, h: number, pad: number, r: number) {
-  const left = pad;
-  const right = w - pad;
-  const top = pad;
-  const bottom = h - pad;
-  const rr = Math.min(r, (right - left) / 2, (bottom - top) / 2);
-  return {
-    left,
-    right,
-    top,
-    bottom,
-    r: rr,
-    d: [
-      `M ${left + rr} ${top}`,
-      `L ${right - rr} ${top}`,
-      `A ${rr} ${rr} 0 0 1 ${right} ${top + rr}`,
-      `L ${right} ${bottom - rr}`,
-      `A ${rr} ${rr} 0 0 1 ${right - rr} ${bottom}`,
-      `L ${left + rr} ${bottom}`,
-      `A ${rr} ${rr} 0 0 1 ${left} ${bottom - rr}`,
-      `L ${left} ${top + rr}`,
-      `A ${rr} ${rr} 0 0 1 ${left + rr} ${top}`,
-      "Z",
-    ].join(" "),
-  };
-}
-
 /**
- * Place n points along the outward journey (top → right → bottom),
- * leaving the left side free for the dashed return to hotel.
- */
-function placeOnJourney(n: number, track: ReturnType<typeof stadiumPath>): XY[] {
-  if (n <= 0) return [];
-  const { left, right, top, bottom, r } = track;
-  const topLen = Math.max(0, right - left - 2 * r);
-  const rightLen = Math.max(0, bottom - top - 2 * r);
-  const bottomLen = topLen;
-  const arc = (Math.PI / 2) * r;
-  const total = topLen + arc + rightLen + arc + bottomLen;
-
-  const samples: number[] =
-    n === 1
-      ? [0]
-      : Array.from({ length: n }, (_, i) => (i / (n - 1)) * total * 0.98);
-
-  return samples.map((dist) => {
-    let d = dist;
-    if (d <= topLen) {
-      return { x: left + r + d, y: top };
-    }
-    d -= topLen;
-    if (d <= arc) {
-      const a = -Math.PI / 2 + d / r;
-      return {
-        x: right - r + Math.cos(a) * r,
-        y: top + r + Math.sin(a) * r,
-      };
-    }
-    d -= arc;
-    if (d <= rightLen) {
-      return { x: right, y: top + r + d };
-    }
-    d -= rightLen;
-    if (d <= arc) {
-      const a = 0 + d / r;
-      return {
-        x: right - r + Math.cos(a) * r,
-        y: bottom - r + Math.sin(a) * r,
-      };
-    }
-    d -= arc;
-    const along = Math.min(d, bottomLen);
-    return { x: right - r - along, y: bottom };
-  });
-}
-
-/**
- * Journey loop diagram: Hotel → stops/days along a curved path,
- * dashed return home — like a drawn day-loop map.
+ * Vertical journey diagram only: Hotel → days with arrows,
+ * stops branched off each day circle with connector lines.
+ * Add-a-stop UI lives outside this panel.
  */
 export function TemplateRouteLoop({
   template,
@@ -284,6 +197,7 @@ export function TemplateRouteLoop({
   interactive?: boolean;
   selectedNodeId?: string | null;
   selectedStopId?: string | null;
+  /** Controlled set of expanded day ids (independent). */
   expandedDayIds?: string[];
   onExpandedDayIdsChange?: (ids: string[]) => void;
   onSelectNode?: (node: RouteNode) => void;
@@ -324,70 +238,7 @@ export function TemplateRouteLoop({
     setExpandedIds([]);
   }
 
-  const loopPoints: LoopPoint[] = useMemo(() => {
-    const pts: LoopPoint[] = [];
-    const h = nodes.find((n) => n.kind === "hotel");
-    const dayNodes = nodes.filter((n) => n.kind === "day");
-    if (h) {
-      pts.push({
-        key: h.id,
-        label: h.label || "Hotel",
-        kind: "hotel",
-      });
-    }
-    for (const day of dayNodes) {
-      const stops = day.stops || [];
-      if (expandedDayIds.includes(day.id) && stops.length > 0) {
-        for (const stop of stops) {
-          pts.push({
-            key: `${day.id}:${stop.id}`,
-            label: stop.label,
-            kind: "stop",
-            day,
-            stop,
-            dayIndex: day.dayIndex,
-          });
-        }
-      } else {
-        pts.push({
-          key: day.id,
-          label: day.label,
-          kind: "day",
-          day,
-          dayIndex: day.dayIndex,
-        });
-      }
-    }
-    return pts;
-  }, [nodes, expandedDayIds]);
-
-  const vb = { w: 640, h: 320 };
-  const track = stadiumPath(vb.w, vb.h, 56, 72);
-  const positions = placeOnJourney(loopPoints.length, track);
-  const lastPos = positions[positions.length - 1];
-  const hotelPos = positions[0] || { x: track.left + track.r, y: track.top };
-
-  const solidPath =
-    positions.length > 1
-      ? positions
-          .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
-          .join(" ")
-      : "";
-
-  // Dashed return: last stop → curve along left → hotel
-  const returnPath =
-    lastPos && positions.length > 1
-      ? [
-          `M ${lastPos.x.toFixed(1)} ${lastPos.y.toFixed(1)}`,
-          `L ${(track.left + track.r).toFixed(1)} ${track.bottom.toFixed(1)}`,
-          `A ${track.r} ${track.r} 0 0 1 ${track.left.toFixed(1)} ${(track.bottom - track.r).toFixed(1)}`,
-          `L ${track.left.toFixed(1)} ${(track.top + track.r).toFixed(1)}`,
-          `A ${track.r} ${track.r} 0 0 1 ${hotelPos.x.toFixed(1)} ${hotelPos.y.toFixed(1)}`,
-        ].join(" ")
-      : "";
-
   const hotelSelected = selectedNodeId === hotel?.id && !selectedStopId;
-  const anyStops = days.some((d) => (d.stops || []).length > 0);
 
   return (
     <div
@@ -398,254 +249,253 @@ export function TemplateRouteLoop({
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
             Trip diagram
             <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-white/45">
-              · path = journey · dashed = back to hotel
+              · arrows = days · branches = stops
             </span>
           </p>
-          {anyStops || interactive ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={expandAll}
-                className="border border-white/20 px-2 py-1 text-[10px] uppercase tracking-wide text-white/65 hover:border-amber hover:text-amber"
-              >
-                Expand stops
-              </button>
-              <button
-                type="button"
-                onClick={collapseAll}
-                className="border border-white/20 px-2 py-1 text-[10px] uppercase tracking-wide text-white/65 hover:border-amber hover:text-amber"
-              >
-                Days only
-              </button>
-            </div>
-          ) : null}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={expandAll}
+              className="border border-white/20 px-2 py-1 text-[10px] uppercase tracking-wide text-white/65 hover:border-amber hover:text-amber"
+            >
+              Expand all
+            </button>
+            <button
+              type="button"
+              onClick={collapseAll}
+              className="border border-white/20 px-2 py-1 text-[10px] uppercase tracking-wide text-white/65 hover:border-amber hover:text-amber"
+            >
+              Collapse all
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden px-1 py-1 sm:px-2">
-        <svg
-          viewBox={`0 0 ${vb.w} ${vb.h}`}
-          className="h-full w-full"
-          role="img"
-          aria-label="Trip loop from hotel through stops and back"
-        >
-          {/* Soft track ghost */}
-          <path
-            d={track.d}
-            fill="none"
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth={10}
-            strokeLinecap="round"
-          />
-
-          {/* Solid outward journey */}
-          {solidPath ? (
-            <path
-              d={solidPath}
-              fill="none"
-              stroke="rgba(212,160,23,0.85)"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5">
+        <ol className="relative mx-auto max-w-lg">
+          {hotel ? (
+            <li className="relative">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="relative z-10 flex w-12 shrink-0 flex-col items-center sm:w-14">
+                  <button
+                    type="button"
+                    disabled={!onSelectNode}
+                    onClick={() => onSelectNode?.(hotel)}
+                    className={`flex h-12 w-12 items-center justify-center rounded-full border-2 text-sm font-semibold transition sm:h-14 sm:w-14 ${
+                      hotelSelected
+                        ? "scale-105 border-amber bg-amber text-ink shadow-[0_0_0_3px_rgba(212,160,23,0.35)]"
+                        : "border-paper bg-amber text-ink"
+                    } ${onSelectNode ? "cursor-pointer hover:scale-105" : "cursor-default"}`}
+                    aria-label={`Hotel ${hotel.label}`}
+                  >
+                    H
+                  </button>
+                </div>
+                <div className="min-w-0 flex-1 pt-1.5 sm:pt-2.5">
+                  <p className="font-mono text-[9px] uppercase tracking-wider text-amber/80">
+                    Stay
+                  </p>
+                  <p className="truncate font-display text-base text-amber sm:text-lg">
+                    {hotel.label}
+                  </p>
+                </div>
+              </div>
+              {days.length > 0 ? <FlowArrow /> : null}
+            </li>
           ) : null}
 
-          {/* Dashed return to hotel */}
-          {returnPath ? (
-            <path
-              d={returnPath}
-              fill="none"
-              stroke="rgba(212,160,23,0.55)"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray="7 6"
-              markerEnd="url(#loop-arrow)"
-            />
-          ) : null}
-
-          <defs>
-            <marker
-              id="loop-arrow"
-              markerWidth="8"
-              markerHeight="8"
-              refX="6"
-              refY="4"
-              orient="auto"
-            >
-              <path d="M0,0 L8,4 L0,8 Z" fill="rgba(212,160,23,0.7)" />
-            </marker>
-          </defs>
-
-          {loopPoints.map((pt, i) => {
-            const pos = positions[i];
-            if (!pos) return null;
-            const isHotel = pt.kind === "hotel";
-            const day = pt.day;
-            const stop = pt.stop;
+          {days.map((day, i) => {
+            const num = day.dayIndex ?? i + 1;
+            const stops = day.stops || [];
+            const stopCount = stops.length;
+            const expanded = isExpanded(day.id);
             const daySelected =
-              day && selectedNodeId === day.id && !selectedStopId;
-            const stopSelected =
-              day &&
-              stop &&
-              selectedNodeId === day.id &&
-              selectedStopId === stop.id;
-            const expanded = day ? isExpanded(day.id) : false;
-            const active = isHotel
-              ? hotelSelected
-              : Boolean(daySelected || stopSelected || expanded);
-
-            const labelAbove = pos.y < vb.h * 0.45;
-            const labelY = labelAbove ? pos.y - 22 : pos.y + 28;
-            const circleR = isHotel ? 16 : pt.kind === "stop" ? 11 : 14;
+              selectedNodeId === day.id && !selectedStopId;
+            const isLast = i === days.length - 1;
+            const showStops = expanded && stopCount > 0;
 
             return (
-              <g key={pt.key}>
-                <g
-                  className={
-                    onSelectNode || onSelectStop
-                      ? "cursor-pointer"
-                      : undefined
-                  }
-                  onClick={() => {
-                    if (isHotel && hotel) onSelectNode?.(hotel);
-                    else if (pt.kind === "stop" && day && stop)
-                      onSelectStop?.(day, stop);
-                    else if (day) onSelectNode?.(day);
-                  }}
-                >
-                  <circle
-                    cx={pos.x}
-                    cy={pos.y}
-                    r={circleR + (active ? 3 : 0)}
-                    fill="transparent"
-                    stroke={active ? "rgba(212,160,23,0.45)" : "transparent"}
-                    strokeWidth={3}
-                  />
-                  <circle
-                    cx={pos.x}
-                    cy={pos.y}
-                    r={circleR}
-                    fill={
-                      isHotel
-                        ? "#d4a017"
-                        : active
-                          ? "#d4a017"
-                          : "#f4efe4"
-                    }
-                    stroke="#d4a017"
-                    strokeWidth={2}
-                  />
-                  <text
-                    x={pos.x}
-                    y={pos.y + 1}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="select-none"
-                    style={{
-                      fontSize: isHotel ? 13 : pt.kind === "day" ? 12 : 10,
-                      fontWeight: 700,
-                      fill: "#0a1520",
-                      fontFamily: "ui-sans-serif, system-ui, sans-serif",
-                    }}
-                  >
-                    {isHotel
-                      ? "H"
-                      : pt.kind === "day"
-                        ? String(pt.dayIndex ?? i)
-                        : "•"}
-                  </text>
-                </g>
-
-                <text
-                  x={pos.x}
-                  y={labelY}
-                  textAnchor="middle"
-                  className="select-none"
-                  style={{
-                    fontSize: 12,
-                    fontWeight: isHotel || active ? 600 : 500,
-                    fill: isHotel || active ? "#d4a017" : "rgba(255,255,255,0.82)",
-                    fontFamily:
-                      "var(--font-display), Georgia, 'Times New Roman', serif",
-                  }}
-                >
-                  {shortenLabel(pt.label).slice(0, 18)}
-                </text>
-
-                {/* Expand / collapse for days with stops */}
-                {pt.kind === "day" &&
-                day &&
-                (day.stops || []).length > 0 ? (
-                  <g
-                    className="cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleDay(day);
-                    }}
-                  >
-                    <rect
-                      x={pos.x + circleR + 4}
-                      y={pos.y - 9}
-                      width={18}
-                      height={18}
-                      rx={2}
-                      fill={expanded ? "#d4a017" : "rgba(10,21,32,0.85)"}
-                      stroke="rgba(212,160,23,0.7)"
-                      strokeWidth={1}
-                    />
-                    <text
-                      x={pos.x + circleR + 13}
-                      y={pos.y + 1}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 700,
-                        fill: expanded ? "#0a1520" : "#d4a017",
-                      }}
+              <li key={day.id} className="relative">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="relative z-10 flex w-12 shrink-0 flex-col items-center sm:w-14">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNode?.(day)}
+                      className={`flex h-12 w-12 items-center justify-center rounded-full border-2 text-sm font-semibold transition sm:h-14 sm:w-14 ${
+                        daySelected || expanded
+                          ? "scale-105 border-amber bg-amber text-ink shadow-[0_0_0_3px_rgba(212,160,23,0.35)]"
+                          : "border-amber bg-paper text-ink hover:scale-105"
+                      }`}
+                      aria-pressed={daySelected}
+                      aria-label={`${day.dayLabel || `Day ${num}`}: ${day.label}`}
                     >
-                      {expanded ? "−" : "+"}
-                    </text>
-                  </g>
-                ) : null}
+                      {num}
+                    </button>
+                  </div>
 
-                {/* Remove stop (interactive) */}
-                {interactive &&
-                pt.kind === "stop" &&
-                day &&
-                stop &&
-                onRemoveStop ? (
-                  <g
-                    className="cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveStop(day.id, stop.id);
-                    }}
-                  >
-                    <circle
-                      cx={pos.x + 14}
-                      cy={pos.y - 14}
-                      r={8}
-                      fill="rgba(10,21,32,0.9)"
-                      stroke="rgba(255,255,255,0.35)"
-                    />
-                    <text
-                      x={pos.x + 14}
-                      y={pos.y - 13}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      style={{ fontSize: 11, fill: "rgba(255,255,255,0.7)" }}
-                    >
-                      ×
-                    </text>
-                  </g>
-                ) : null}
-              </g>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-2 pt-1.5 sm:pt-2.5">
+                      <button
+                        type="button"
+                        onClick={() => onSelectNode?.(day)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <p className="font-mono text-[9px] uppercase tracking-wider text-amber/80">
+                          {day.dayLabel || `Day ${num}`}
+                        </p>
+                        <p
+                          className={`truncate text-sm sm:text-base ${
+                            daySelected || expanded
+                              ? "font-semibold text-amber"
+                              : "text-white/90"
+                          }`}
+                        >
+                          {day.label}
+                        </p>
+                        {!expanded ? (
+                          <p className="mt-0.5 text-[11px] text-white/40">
+                            {stopCount === 0
+                              ? "No stops"
+                              : `${stopCount} stop${stopCount === 1 ? "" : "s"} · tap +`}
+                          </p>
+                        ) : stopCount === 0 ? (
+                          <p className="mt-0.5 text-[11px] text-white/40">
+                            No stops on this day yet
+                          </p>
+                        ) : null}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center border text-lg leading-none transition ${
+                          expanded
+                            ? "border-amber bg-amber text-ink"
+                            : "border-white/25 text-white/70 hover:border-amber hover:text-amber"
+                        }`}
+                        aria-expanded={expanded}
+                        aria-label={
+                          expanded
+                            ? `Hide stops for ${day.dayLabel || `Day ${num}`}`
+                            : `Show stops for ${day.dayLabel || `Day ${num}`}`
+                        }
+                      >
+                        {expanded ? "−" : "+"}
+                      </button>
+                    </div>
+
+                    {/* Stops branched from the day circle with connector lines */}
+                    {showStops ? (
+                      <ul className="relative mt-3 space-y-2 pl-1">
+                        {stops.map((stop, stopIndex) => {
+                          const stopSelected =
+                            selectedNodeId === day.id &&
+                            selectedStopId === stop.id;
+                          return (
+                            <li
+                              key={stop.id}
+                              className="relative flex items-center gap-0"
+                            >
+                              {/* Branch line from spine toward stop */}
+                              <span
+                                className="relative mr-2 flex h-8 w-6 shrink-0 items-center sm:w-8"
+                                aria-hidden
+                              >
+                                <span className="absolute left-0 top-1/2 h-px w-full bg-amber/55" />
+                                {stopIndex < stops.length - 1 ? (
+                                  <span className="absolute bottom-0 left-0 top-1/2 w-px bg-amber/35" />
+                                ) : null}
+                                {stopIndex > 0 ? (
+                                  <span className="absolute left-0 top-0 h-1/2 w-px bg-amber/35" />
+                                ) : (
+                                  <span className="absolute left-0 top-0 h-1/2 w-px bg-amber/35" />
+                                )}
+                                <span className="absolute right-0 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-amber" />
+                              </span>
+
+                              {onSelectStop ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectStop(day, stop)}
+                                  className={`min-w-0 flex-1 truncate rounded-full border px-3 py-1.5 text-left text-sm transition ${
+                                    stopSelected
+                                      ? "border-amber bg-amber/20 text-amber"
+                                      : "border-white/20 bg-black/20 text-white/85 hover:border-amber/50"
+                                  }`}
+                                >
+                                  {stop.label}
+                                </button>
+                              ) : (
+                                <span className="min-w-0 flex-1 truncate rounded-full border border-white/15 bg-black/20 px-3 py-1.5 text-sm text-white/70">
+                                  {stop.label}
+                                </span>
+                              )}
+                              {interactive && onRemoveStop ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onRemoveStop(day.id, stop.id)
+                                  }
+                                  className="ml-1.5 flex h-7 w-7 shrink-0 items-center justify-center border border-white/20 text-white/45 hover:border-amber hover:text-amber"
+                                  aria-label={`Remove ${stop.label}`}
+                                >
+                                  ×
+                                </button>
+                              ) : null}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                  </div>
+                </div>
+
+                {!isLast ? <FlowArrow /> : null}
+              </li>
             );
           })}
-        </svg>
+
+          {days.length > 0 ? (
+            <li className="relative">
+              <FlowArrow dashed />
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="relative z-10 flex w-12 shrink-0 flex-col items-center sm:w-14">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-amber/50 text-sm text-amber sm:h-11 sm:w-11">
+                    ↩
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1 pt-2">
+                  <p className="text-sm text-white/50">Back to hotel</p>
+                </div>
+              </div>
+            </li>
+          ) : null}
+        </ol>
       </div>
+    </div>
+  );
+}
+
+/** Vertical connector with a down arrow — the diagram day flow. */
+function FlowArrow({ dashed = false }: { dashed?: boolean }) {
+  return (
+    <div
+      className="flex w-12 flex-col items-center py-1 sm:w-14"
+      aria-hidden
+    >
+      <span
+        className={`h-5 w-0.5 sm:h-6 ${
+          dashed
+            ? "border-l-2 border-dashed border-amber/45 bg-transparent"
+            : "bg-amber/70"
+        }`}
+      />
+      <span
+        className={`text-[11px] leading-none ${
+          dashed ? "text-amber/50" : "text-amber"
+        }`}
+      >
+        ▼
+      </span>
     </div>
   );
 }
