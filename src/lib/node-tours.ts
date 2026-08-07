@@ -27,7 +27,13 @@ export function nodeTourQueries(label: string): string[] {
     return ["Midtown", "hop-on", "SUMMIT", "observation"];
   }
   if (/museum|met\b|gallery|moma/.test(l)) {
-    return ["museum", "MoMA", "Metropolitan"];
+    return [
+      "MoMA",
+      "Metropolitan Museum",
+      "museum",
+      "Natural History Museum",
+      "Guggenheim",
+    ];
   }
   if (/market/.test(l)) {
     return ["food", "market", "tasting"];

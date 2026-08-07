@@ -288,10 +288,13 @@ export async function searchViatorProducts(options: {
 
   const query = options.query?.trim();
 
-  // Free-text when user typed a search (e.g. Patterson, museum…)
+  // Free-text when user typed a search (e.g. Museum, MoMA…)
+  // Response shape: { products: { totalCount, results: ProductSummary[] } }
   if (query && query.length >= 2) {
     const freetext = await viatorFetch<{
-      products?: ViatorProductRaw[];
+      products?:
+        | ViatorProductRaw[]
+        | { totalCount?: number; results?: ViatorProductRaw[] };
       totalCount?: number;
     }>("/search/freetext", {
       method: "POST",
@@ -300,15 +303,21 @@ export async function searchViatorProducts(options: {
         productFiltering: {
           destination: dest.destinationId,
         },
-        searchTypes: ["PRODUCTS"],
+        searchTypes: [
+          {
+            searchType: "PRODUCTS",
+            pagination: { start: 1, count },
+          },
+        ],
         currency: "USD",
-        pagination: { start: 1, count },
       }),
     });
 
-    // Some API versions nest differently; also try products/search with destination only + client filter
     if (freetext) {
-      const products = (freetext.products || [])
+      const rawList = Array.isArray(freetext.products)
+        ? freetext.products
+        : freetext.products?.results || [];
+      const products = rawList
         .map((p) => viatorProductToAffiliate(p, citySlug, options.theme))
         .filter((p): p is AffiliateProduct => Boolean(p));
       if (products.length) {
@@ -327,7 +336,7 @@ export async function searchViatorProducts(options: {
     },
     pagination: {
       start: 1,
-      count,
+      count: Math.max(count, 30),
     },
     currency: "USD",
   };
@@ -354,10 +363,30 @@ export async function searchViatorProducts(options: {
     .filter((p): p is AffiliateProduct => Boolean(p));
 
   if (query) {
-    const q = query.toLowerCase();
-    products = products.filter((p) =>
-      `${p.title} ${p.summary}`.toLowerCase().includes(q),
-    );
+    const tokens = query
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 2);
+    if (tokens.length) {
+      const scored = products
+        .map((p) => {
+          const hay = `${p.title} ${p.summary} ${p.themes.join(" ")}`.toLowerCase();
+          const score = tokens.reduce(
+            (n, t) => n + (hay.includes(t) ? 1 : 0),
+            0,
+          );
+          return { p, score };
+        })
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => b.score - a.score);
+      if (scored.length) {
+        products = scored.map(({ p }) => p).slice(0, count);
+      }
+      // If nothing matched tokens, keep destination bestsellers (caller may broaden)
+      else {
+        products = [];
+      }
+    }
   }
 
   if (options.theme && options.theme !== "all") {
@@ -366,7 +395,7 @@ export async function searchViatorProducts(options: {
     );
   }
 
-  return { products, source: "viator", env: viatorEnvLabel() };
+  return { products: products.slice(0, count), source: "viator", env: viatorEnvLabel() };
 }
 
 /** Resolve product page URL for redirect tracking. */

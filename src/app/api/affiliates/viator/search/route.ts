@@ -86,10 +86,14 @@ export async function GET(request: Request) {
         theme,
         count,
       });
-      if (broad.products.length > 0) {
+      if (broad.products.length > 0 || curatedOrCity.length > 0) {
+        const liveIds = new Set(broad.products.map((p) => p.id));
+        const extras = curatedOrCity.filter(
+          (p) => p.partner !== "viator" || !liveIds.has(p.id),
+        );
         return NextResponse.json({
-          products: broad.products.slice(0, 40),
-          source: "viator",
+          products: [...broad.products, ...extras].slice(0, 40),
+          source: broad.products.length ? "viator" : "curated",
           viatorConfigured: true,
           env: broad.env,
           totalLive: broad.products.length,
