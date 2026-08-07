@@ -820,6 +820,7 @@ export function TemplateWorkspace({
 
             <TripNodeEditor
               nodes={routeNodes}
+              template={template}
               onAddStop={addRouteStop}
               onRemoveStop={removeRouteStop}
               suggestions={[

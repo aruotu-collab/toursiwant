@@ -123,13 +123,17 @@ export function TemplateRouteLoop({
   nodes: nodesProp,
   className = "",
   interactive = false,
+  selectedNodeId = null,
   onRemoveNode,
+  onSelectNode,
 }: {
   template?: TripTemplate;
   nodes?: RouteNode[];
   className?: string;
   interactive?: boolean;
+  selectedNodeId?: string | null;
   onRemoveNode?: (id: string) => void;
+  onSelectNode?: (node: RouteNode) => void;
 }) {
   const nodes =
     nodesProp || (template ? getTemplateRouteNodes(template) : []);
@@ -137,15 +141,33 @@ export function TemplateRouteLoop({
   return (
     <div
       className={`route-loop relative overflow-hidden border border-white/10 bg-[radial-gradient(ellipse_at_20%_0%,rgba(212,160,23,0.14),transparent_55%),linear-gradient(165deg,#0a1520_0%,#152433_55%,#0f1c28_100%)] ${className}`}
-      aria-hidden={!interactive}
     >
       <div className="flex h-full min-h-[7.5rem] flex-col justify-center px-4 py-5 sm:px-6">
         <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
           Your day path
+          {interactive ? (
+            <span className="ml-2 normal-case tracking-normal text-white/45">
+              · tap a circle for tours
+            </span>
+          ) : null}
         </p>
         <ol className="flex flex-wrap items-center gap-y-4">
           {nodes.map((node, i) => {
             const isHotel = node.kind === "hotel" || i === 0;
+            const selected = selectedNodeId === node.id;
+            const circle = (
+              <span
+                className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-[11px] font-semibold transition sm:h-12 sm:w-12 ${
+                  selected
+                    ? "scale-110 border-amber bg-amber text-ink shadow-[0_0_0_3px_rgba(212,160,23,0.35)]"
+                    : isHotel
+                      ? "border-paper bg-amber text-ink"
+                      : "border-amber bg-paper text-ink"
+                } ${onSelectNode ? "cursor-pointer hover:scale-105" : ""}`}
+              >
+                {i + 1}
+              </span>
+            );
             return (
               <li key={node.id} className="flex items-center">
                 {i > 0 ? (
@@ -169,22 +191,41 @@ export function TemplateRouteLoop({
                       ×
                     </button>
                   ) : null}
-                  <span
-                    className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-[11px] font-semibold sm:h-12 sm:w-12 ${
-                      isHotel
-                        ? "border-paper bg-amber text-ink"
-                        : "border-amber bg-paper text-ink"
-                    }`}
-                  >
-                    {i + 1}
-                  </span>
-                  <span
-                    className={`max-w-[4.75rem] text-center text-[11px] leading-tight sm:text-xs ${
-                      isHotel ? "font-semibold text-amber" : "text-white/85"
-                    }`}
-                  >
-                    {node.label}
-                  </span>
+                  {onSelectNode ? (
+                    <button
+                      type="button"
+                      onClick={() => onSelectNode(node)}
+                      className="flex flex-col items-center gap-1.5"
+                      aria-pressed={selected}
+                      aria-label={`Show tours for ${node.label}`}
+                    >
+                      {circle}
+                      <span
+                        className={`max-w-[4.75rem] text-center text-[11px] leading-tight sm:text-xs ${
+                          selected
+                            ? "font-semibold text-amber"
+                            : isHotel
+                              ? "font-semibold text-amber"
+                              : "text-white/85"
+                        }`}
+                      >
+                        {node.label}
+                      </span>
+                    </button>
+                  ) : (
+                    <>
+                      {circle}
+                      <span
+                        className={`max-w-[4.75rem] text-center text-[11px] leading-tight sm:text-xs ${
+                          isHotel
+                            ? "font-semibold text-amber"
+                            : "text-white/85"
+                        }`}
+                      >
+                        {node.label}
+                      </span>
+                    </>
+                  )}
                 </div>
               </li>
             );

@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   TemplateRouteLoop,
   type RouteNode,
 } from "@/components/TemplateRouteLoop";
+import {
+  queryForRouteNode,
+  templateViatorCity,
+} from "@/lib/node-tours";
+import type { TripTemplate } from "@/lib/trip-templates";
 
 const SUGGESTED_STOPS = [
   "Market",
@@ -20,6 +25,12 @@ const SUGGESTED_STOPS = [
 ];
 
 export const MAX_ROUTE_NODES = 12;
+
+type TourHit = {
+  id: string;
+  title: string;
+  priceFrom?: string;
+};
 
 function newStopId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -47,25 +58,89 @@ function escapeRegExp(s: string) {
 
 export function TripNodeEditor({
   nodes,
+  template,
   onAddStop,
   onRemoveStop,
   suggestions = SUGGESTED_STOPS,
 }: {
   nodes: RouteNode[];
+  template: TripTemplate;
   onAddStop: (label: string) => void;
   onRemoveStop: (id: string) => void;
   suggestions?: string[];
 }) {
   const [custom, setCustom] = useState("");
+  const [selected, setSelected] = useState<RouteNode | null>(null);
+  const [tours, setTours] = useState<TourHit[]>([]);
+  const [loadingTours, setLoadingTours] = useState(false);
+  const [tourError, setTourError] = useState<string | null>(null);
+
   const atLimit = nodes.length >= MAX_ROUTE_NODES;
-  // Unique chips even if parent passes duplicate hint names
-  const chips = Array.from(new Set(suggestions.map((s) => s.trim()).filter(Boolean)));
+  const chips = Array.from(
+    new Set(suggestions.map((s) => s.trim()).filter(Boolean)),
+  );
+
+  // Keep selection in sync if node was removed
+  useEffect(() => {
+    if (!selected) return;
+    if (!nodes.some((n) => n.id === selected.id)) {
+      setSelected(null);
+      setTours([]);
+    }
+  }, [nodes, selected]);
+
+  useEffect(() => {
+    if (!selected) {
+      setTours([]);
+      setTourError(null);
+      return;
+    }
+    const q = queryForRouteNode(selected, template);
+    const city = templateViatorCity(template);
+    let cancelled = false;
+    setLoadingTours(true);
+    setTourError(null);
+    setTours([]);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/affiliates/viator/search?city=${encodeURIComponent(city)}&q=${encodeURIComponent(q)}&count=6`,
+        );
+        const data = (await res.json()) as {
+          products?: TourHit[];
+          error?: string;
+        };
+        if (cancelled) return;
+        const products = (data.products || []).slice(0, 6);
+        setTours(products);
+        if (!products.length) {
+          setTourError(
+            data.error ||
+              `No tours found yet for “${selected.label}” — try another stop.`,
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setTourError("Could not load tours for this stop.");
+        }
+      } finally {
+        if (!cancelled) setLoadingTours(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, template]);
 
   function add(label: string) {
     const clean = label.trim();
     if (!clean || atLimit) return;
     onAddStop(clean);
     setCustom("");
+  }
+
+  function selectNode(node: RouteNode) {
+    setSelected((prev) => (prev?.id === node.id ? null : node));
   }
 
   return (
@@ -76,8 +151,8 @@ export function TripNodeEditor({
             Trip path
           </p>
           <p className="mt-1 max-w-xl text-sm text-white/65">
-            Read left to right — hotel first, then each stop. Tap × on a circle
-            to remove it, or add another Market / Museum below.
+            Tap a numbered circle to see tours for that stop. Use × to remove a
+            stop, or add another below.
           </p>
         </div>
         <p className="font-mono text-[11px] text-white/40">
@@ -88,9 +163,63 @@ export function TripNodeEditor({
       <TemplateRouteLoop
         nodes={nodes}
         interactive
+        selectedNodeId={selected?.id ?? null}
         onRemoveNode={onRemoveStop}
+        onSelectNode={selectNode}
         className="w-full border-0"
       />
+
+      {selected ? (
+        <div className="border-t border-amber/25 bg-amber/5 px-4 py-4 sm:px-5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
+                Tours for this stop
+              </p>
+              <p className="mt-1 font-display text-xl text-white">
+                {selected.label}
+              </p>
+              <p className="mt-1 text-xs text-white/45">
+                Searching {queryForRouteNode(selected, template)} ·{" "}
+                {templateViatorCity(template)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="text-xs text-white/50 hover:text-amber"
+            >
+              Close
+            </button>
+          </div>
+
+          {loadingTours ? (
+            <p className="mt-4 text-sm text-white/50">Loading tours…</p>
+          ) : null}
+          {tourError && !loadingTours ? (
+            <p className="mt-4 text-sm text-white/55">{tourError}</p>
+          ) : null}
+          {tours.length > 0 ? (
+            <ul className="mt-4 space-y-2">
+              {tours.map((p) => (
+                <li key={p.id}>
+                  <a
+                    href={`/go/viator/${encodeURIComponent(p.id)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between gap-3 border border-white/15 bg-black/20 px-3 py-3 text-sm transition hover:border-amber/50"
+                  >
+                    <span className="line-clamp-2 text-white/90">{p.title}</span>
+                    <span className="shrink-0 font-mono text-[11px] text-amber">
+                      {p.priceFrom || "View"}
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="space-y-3 border-t border-white/10 px-4 py-4 sm:px-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
