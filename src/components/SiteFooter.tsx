@@ -9,27 +9,24 @@ export function SiteFooter() {
             Tours<span className="text-amber">I</span>Want
           </p>
           <p className="mt-2 max-w-md text-sm text-white/70">
-            Tell us the tour you want. Get quotes from local operators.
-            Tours across the USA — New York and 19 more cities.
+            Start with a trip that already works. Then make it yours — countries,
+            multi-country routes, and right-now plans from your hotel.
           </p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-white/75">
-          <Link href="/?menu=pulse" className="hover:text-white">
-            Live board
+          <Link href="/" className="hover:text-white">
+            Templates
           </Link>
-          <Link href="/?menu=rush" className="hover:text-white">
-            Live seats
+          <Link href="/tours" className="hover:text-white">
+            Bookable tours
           </Link>
-          <Link href="/?menu=tours" className="hover:text-white">
-            Find tours
-          </Link>
-          <Link href="/?menu=events" className="hover:text-white">
+          <Link href="/events" className="hover:text-white">
             Events
           </Link>
-          <Link href="/?menu=request" className="hover:text-white">
+          <Link href="/request" className="hover:text-white">
             Request
           </Link>
-          <Link href="/?menu=account" className="hover:text-white">
+          <Link href="/account" className="hover:text-white">
             Account
           </Link>
           <Link href="/operator" className="hover:text-white">

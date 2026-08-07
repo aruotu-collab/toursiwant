@@ -7,12 +7,13 @@ import { AuthGreeting, AuthNav } from "@/components/AuthNav";
 export function SiteHeader() {
   const pathname = usePathname();
   const onHome = pathname === "/";
+  const onTrip = pathname?.startsWith("/trips");
   const onDarkTours = pathname === "/tours";
   const onDarkEvents = pathname === "/events";
   const onDarkBoardPage = onDarkTours || onDarkEvents;
 
-  // Homepage has its own command-center chrome.
-  if (onHome) return null;
+  // Homepage and trip templates have their own chrome.
+  if (onHome || onTrip) return null;
 
   if (onDarkBoardPage) {
     return (
@@ -20,7 +21,7 @@ export function SiteHeader() {
         <div className="mx-auto flex w-full max-w-[90rem] items-center justify-between gap-3 px-4 py-4 sm:px-8 sm:py-5">
           <div className="min-w-0">
             <Link
-              href={onDarkEvents ? "/?menu=events" : "/?menu=tours"}
+              href="/"
               className="font-display text-xl tracking-tight text-white sm:text-2xl"
             >
               Tours<span className="text-amber">I</span>Want
@@ -29,16 +30,13 @@ export function SiteHeader() {
           </div>
           <nav className="flex shrink-0 items-center gap-2 text-sm text-white/70 sm:gap-4">
             <Link
-              href="/?menu=pulse"
+              href="/"
               className="bg-amber px-3 py-2 text-xs font-semibold text-ink transition hover:bg-amber-deep sm:text-sm"
             >
-              Live board
+              Trip templates
             </Link>
-            <Link
-              href="/?menu=request"
-              className="hidden transition hover:text-white sm:inline"
-            >
-              Request
+            <Link href="/tours" className="hidden transition hover:text-white sm:inline">
+              Bookable
             </Link>
             <AuthNav variant="dark" />
           </nav>
@@ -52,7 +50,7 @@ export function SiteHeader() {
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-8 sm:py-5">
         <div className="min-w-0">
           <Link
-            href="/?menu=pulse"
+            href="/"
             className="font-display text-xl tracking-tight text-ink sm:text-2xl"
           >
             Tours<span className="text-amber">I</span>Want
@@ -61,16 +59,16 @@ export function SiteHeader() {
         </div>
         <nav className="flex shrink-0 items-center gap-2 text-sm text-ink-soft sm:gap-4">
           <Link
-            href="/?menu=pulse"
+            href="/"
             className="bg-ink px-3 py-2 text-xs font-semibold text-white transition hover:bg-ink-soft sm:text-sm"
           >
-            Live board
+            Trip templates
           </Link>
           <Link
-            href="/?menu=request"
+            href="/tours"
             className="hidden transition hover:text-ink sm:inline"
           >
-            Request
+            Bookable
           </Link>
           <AuthNav />
         </nav>

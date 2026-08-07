@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { listPublishedCatalogTours } from "@/lib/listings-store";
 import { sampleTours } from "@/lib/sample-tours";
+import { tripTemplates } from "@/lib/trip-templates";
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
@@ -23,6 +24,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: path === "" ? 1 : path === "/tours" ? 0.9 : 0.7,
   }));
 
+  const tripRoutes: MetadataRoute.Sitemap = tripTemplates.map((t) => ({
+    url: `${siteUrl}/trips/${t.slug}`,
+    lastModified: now,
+    changeFrequency: "weekly" as const,
+    priority: 0.9,
+  }));
+
   const operatorTours = await listPublishedCatalogTours().catch(() => []);
   const seen = new Set(sampleTours.map((tour) => tour.slug));
   const allTours = [
@@ -37,5 +45,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  return [...staticRoutes, ...tourRoutes];
+  return [...staticRoutes, ...tripRoutes, ...tourRoutes];
 }

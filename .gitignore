@@ -43,4 +43,6 @@ next-env.d.ts
 
 # local captured requests (seeded mock data stays in code)
 /data/captured-requests.json
+/data/trip-sessions.json
+/data/revenue-events.json
 !/data/.gitkeep
