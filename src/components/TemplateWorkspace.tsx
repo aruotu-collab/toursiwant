@@ -885,26 +885,6 @@ export function TemplateWorkspace({
               </span>
             </p>
 
-            <TripNodeEditor
-              nodes={routeNodes}
-              template={template}
-              onAddStop={addRouteStop}
-              onRemoveStop={removeRouteStop}
-              suggestions={[
-                "Market",
-                "Restaurant",
-                "Museum",
-                "Park",
-                "Harbor",
-                "Broadway",
-                "Shopping",
-                "Viewpoint",
-                "Food hall",
-                "Walk",
-                ...(initial.addDestinationHints?.map((h) => h.label) || []),
-              ]}
-            />
-
             {session ? (
               <div className="mt-5 flex flex-wrap items-center gap-3 border border-amber/30 bg-amber/10 px-4 py-3 text-sm">
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
@@ -1157,7 +1137,7 @@ export function TemplateWorkspace({
             <div className="grid grid-cols-3 border border-white/15">
               {(
                 [
-                  ["personalize", "Personalize"],
+                  ["personalize", "Make it yours"],
                   ["share", "Share & vote"],
                   ["city", "Add city"],
                 ] as const
@@ -1178,126 +1158,136 @@ export function TemplateWorkspace({
             </div>
 
             {asideTab === "personalize" ? (
-              <div className="border border-white/15 bg-white/[0.05] p-5">
-                <h2 className="font-display text-xl">Personalize</h2>
-                <p className="mt-2 text-sm text-white/55">
-                  Tell us what this group wants. We map it onto flexible days —
-                  anchors stay put.
-                </p>
-
-                {flexibleBlocks.length === 0 ? (
-                  <p className="mt-4 text-sm text-white/50">
-                    This template has no flexible slots yet.
+              <TripNodeEditor
+                nodes={routeNodes}
+                template={template}
+                onAddStop={addRouteStop}
+                onRemoveStop={removeRouteStop}
+                suggestions={[
+                  "Market",
+                  "Restaurant",
+                  "Museum",
+                  "Park",
+                  "Harbor",
+                  "Broadway",
+                  "Shopping",
+                  "Viewpoint",
+                  "Food hall",
+                  "Walk",
+                  ...(initial.addDestinationHints?.map((h) => h.label) || []),
+                ]}
+              >
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
+                    Personalize flexible days
                   </p>
-                ) : (
-                  <>
-                    <div className="mt-4 space-y-2">
-                      {availability.map((opt) => {
-                        const on = wants.includes(opt.id);
-                        return (
-                          <label
-                            key={opt.id}
-                            className={`flex cursor-pointer items-start gap-2 border px-3 py-2 text-sm ${
-                              !opt.available
-                                ? "border-white/5 text-white/30"
-                                : on
-                                  ? "border-amber/40 bg-amber/10 text-white"
-                                  : "border-white/10 text-white/75"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={on}
-                              disabled={!opt.available}
-                              onChange={() =>
-                                setWants((prev) =>
-                                  on
-                                    ? prev.filter((x) => x !== opt.id)
-                                    : [...prev, opt.id],
-                                )
-                              }
-                              className="mt-1"
-                            />
-                            <span>
-                              {opt.label}
-                              {opt.available ? (
-                                <span className="mt-0.5 block text-[11px] text-white/40">
-                                  Fits: {opt.slots.join(", ")}
-                                </span>
-                              ) : (
-                                <span className="mt-0.5 block text-[11px] text-white/30">
-                                  No flexible day for this on this template
-                                </span>
-                              )}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
+                  <p className="mt-1 text-sm text-white/55">
+                    Pick what the group wants — we map it onto flexible days.
+                    Your path updates when you Apply.
+                  </p>
 
-                    {preview && wants.length > 0 ? (
-                      <div className="mt-4 border border-white/10 bg-black/20 p-3 text-sm">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-                          Preview
-                        </p>
-                        {preview.canFitWithoutExtend ? (
-                          <p className="mt-2 text-amber">
-                            Fits without extending the trip.
-                          </p>
-                        ) : null}
-                        <ul className="mt-2 space-y-1 text-white/70">
-                          {preview.applied.map((a) => (
-                            <li key={a.blockId}>
-                              {a.dayLabel}: {a.fromTitle} → {a.toTitle}
-                            </li>
-                          ))}
-                          {preview.unfit.map((u) => (
-                            <li key={u} className="text-white/45">
-                              Can&apos;t auto-fit {experienceCategoryLabel[u]}
-                            </li>
-                          ))}
-                        </ul>
-                        {preview.tradeOffs.length ? (
-                          <div className="mt-3 border-t border-white/10 pt-2 text-amber">
-                            <p className="font-mono text-[10px] uppercase tracking-[0.14em]">
-                              Trade-offs
-                            </p>
-                            <ul className="mt-1 space-y-1 text-white/75">
-                              {preview.tradeOffs.map((t) => (
-                                <li key={t}>· {t}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null}
+                  {flexibleBlocks.length === 0 ? (
+                    <p className="mt-4 text-sm text-white/50">
+                      This template has no flexible slots yet.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
+                        {availability.map((opt) => {
+                          const on = wants.includes(opt.id);
+                          return (
+                            <label
+                              key={opt.id}
+                              className={`flex cursor-pointer items-start gap-2 border px-3 py-2 text-sm ${
+                                !opt.available
+                                  ? "border-white/5 text-white/30"
+                                  : on
+                                    ? "border-amber/40 bg-amber/10 text-white"
+                                    : "border-white/10 text-white/75"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                disabled={!opt.available}
+                                onChange={() =>
+                                  setWants((prev) =>
+                                    on
+                                      ? prev.filter((x) => x !== opt.id)
+                                      : [...prev, opt.id],
+                                  )
+                                }
+                                className="mt-1"
+                              />
+                              <span>
+                                {opt.label}
+                                {opt.available ? (
+                                  <span className="mt-0.5 block text-[11px] text-white/40">
+                                    Fits: {opt.slots.join(", ")}
+                                  </span>
+                                ) : (
+                                  <span className="mt-0.5 block text-[11px] text-white/30">
+                                    No flexible day on this template
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+                          );
+                        })}
                       </div>
-                    ) : null}
 
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={runPersonalize}
-                        className="bg-amber px-4 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
-                      >
-                        Apply
-                      </button>
-                      <button
-                        type="button"
-                        onClick={resetPersonalize}
-                        className="border border-white/25 px-4 py-3 text-sm hover:border-amber"
-                      >
-                        Reset
-                      </button>
-                    </div>
-                  </>
-                )}
+                      {preview && wants.length > 0 ? (
+                        <div className="mt-3 border border-white/10 bg-black/20 p-3 text-sm">
+                          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                            Preview
+                          </p>
+                          {preview.canFitWithoutExtend ? (
+                            <p className="mt-2 text-amber">
+                              Fits without extending the trip.
+                            </p>
+                          ) : null}
+                          <ul className="mt-2 space-y-1 text-white/70">
+                            {preview.applied.map((a) => (
+                              <li key={a.blockId}>
+                                {a.dayLabel}: {a.fromTitle} → {a.toTitle}
+                              </li>
+                            ))}
+                            {preview.unfit.map((u) => (
+                              <li key={u} className="text-white/45">
+                                Can&apos;t auto-fit{" "}
+                                {experienceCategoryLabel[u]}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
 
-                <div className="mt-5 border border-amber/30 bg-amber/10 p-4">
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={runPersonalize}
+                          className="bg-amber px-4 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
+                        >
+                          Apply to path
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetPersonalize}
+                          className="border border-white/25 px-4 py-3 text-sm hover:border-amber"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="border border-amber/30 bg-amber/10 p-4">
                   <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
                     Save as my trip
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-white/75">
-                    Saves your trip path, added stops, and personalize choices —
-                    separate from joining someone else&apos;s group room.
+                    Keeps your day path, added stops, and personalize choices.
                   </p>
                   <input
                     value={savedTripTitle}
@@ -1335,7 +1325,7 @@ export function TemplateWorkspace({
                     </button>
                   )}
                 </div>
-              </div>
+              </TripNodeEditor>
             ) : null}
 
             {asideTab === "share" ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   TemplateRouteLoop,
   type RouteNode,
@@ -56,18 +56,24 @@ function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Combined day-path editor: path first, then add stops, tours, then
+ * personalize / save (via children).
+ */
 export function TripNodeEditor({
   nodes,
   template,
   onAddStop,
   onRemoveStop,
   suggestions = SUGGESTED_STOPS,
+  children,
 }: {
   nodes: RouteNode[];
   template: TripTemplate;
   onAddStop: (label: string) => void;
   onRemoveStop: (id: string) => void;
   suggestions?: string[];
+  children?: ReactNode;
 }) {
   const [custom, setCustom] = useState("");
   const [selected, setSelected] = useState<RouteNode | null>(null);
@@ -81,7 +87,6 @@ export function TripNodeEditor({
     new Set(suggestions.map((s) => s.trim()).filter(Boolean)),
   );
 
-  // Keep selection in sync if node was removed
   useEffect(() => {
     if (!selected) return;
     if (!nodes.some((n) => n.id === selected.id)) {
@@ -116,7 +121,6 @@ export function TripNodeEditor({
           );
           const data = (await res.json()) as {
             products?: TourHit[];
-            error?: string;
             broadened?: boolean;
             message?: string;
           };
@@ -135,17 +139,15 @@ export function TripNodeEditor({
         setTours(products);
         if (!products.length) {
           setTourError(
-            `No tours found for “${selected.label}” yet — try another stop or city.`,
+            `No tours found for “${selected.label}” yet — try another stop.`,
           );
         } else if (broadened && usedQuery === "") {
           setTourNote(
-            `No exact match for “${selected.label}” — showing popular tours in this city.`,
+            `No exact match for “${selected.label}” — showing popular tours nearby.`,
           );
         }
       } catch {
-        if (!cancelled) {
-          setTourError("Could not load tours for this stop.");
-        }
+        if (!cancelled) setTourError("Could not load tours for this stop.");
       } finally {
         if (!cancelled) setLoadingTours(false);
       }
@@ -167,25 +169,36 @@ export function TripNodeEditor({
   }
 
   return (
-    <div className="mt-6 border border-amber/25 bg-white/[0.04]">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
-            Trip path
-          </p>
-          <p className="mt-1 max-w-xl text-sm text-white/65">
-            Add stops first, then tap a numbered circle to see tours. Use × to
-            remove a stop.
+    <div className="border border-white/15 bg-white/[0.05]">
+      <div className="border-b border-white/10 px-4 py-4 sm:px-5">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="font-display text-xl">Make it yours</h2>
+            <p className="mt-1 text-sm text-white/55">
+              Shape the day path, add stops, personalize flexible days — then
+              save.
+            </p>
+          </div>
+          <p className="font-mono text-[11px] text-white/40">
+            {nodes.length}/{MAX_ROUTE_NODES}
           </p>
         </div>
-        <p className="font-mono text-[11px] text-white/40">
-          {nodes.length}/{MAX_ROUTE_NODES} stops
-        </p>
       </div>
 
+      {/* 1 · Your day path first */}
+      <TemplateRouteLoop
+        nodes={nodes}
+        interactive
+        selectedNodeId={selected?.id ?? null}
+        onRemoveNode={onRemoveStop}
+        onSelectNode={selectNode}
+        className="w-full border-0 border-b border-white/10"
+      />
+
+      {/* 2 · Add stops */}
       <div className="space-y-3 border-b border-white/10 px-4 py-4 sm:px-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-          Add a stop — tap the same type again for another
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
+          Add a stop
         </p>
         <div className="flex flex-wrap gap-2">
           {chips.map((label) => (
@@ -194,7 +207,7 @@ export function TripNodeEditor({
               type="button"
               disabled={atLimit}
               onClick={() => add(label)}
-              className="border border-white/20 px-3 py-2 text-sm text-white/80 transition hover:border-amber hover:bg-amber/10 hover:text-amber disabled:opacity-40"
+              className="border border-white/20 px-2.5 py-1.5 text-xs text-white/80 transition hover:border-amber hover:bg-amber/10 hover:text-amber disabled:opacity-40 sm:text-sm"
             >
               + {label}
             </button>
@@ -210,46 +223,32 @@ export function TripNodeEditor({
                 add(custom);
               }
             }}
-            placeholder="Custom stop — e.g. Chinatown"
-            className="min-w-[12rem] flex-1 border border-white/20 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-amber"
+            placeholder="Custom — e.g. Chinatown"
+            className="min-w-[10rem] flex-1 border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber"
           />
           <button
             type="button"
             disabled={!custom.trim() || atLimit}
             onClick={() => add(custom)}
-            className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
+            className="bg-amber px-3 py-2 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
           >
-            Add stop
+            Add
           </button>
         </div>
-        {atLimit ? (
-          <p className="text-xs text-white/45">
-            Path is full — remove a stop to add another.
-          </p>
-        ) : null}
       </div>
 
-      <TemplateRouteLoop
-        nodes={nodes}
-        interactive
-        selectedNodeId={selected?.id ?? null}
-        onRemoveNode={onRemoveStop}
-        onSelectNode={selectNode}
-        className="w-full border-0"
-      />
-
       {selected ? (
-        <div className="border-t border-amber/25 bg-amber/5 px-4 py-4 sm:px-5">
+        <div className="border-b border-amber/25 bg-amber/5 px-4 py-4 sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
                 Tours for this stop
               </p>
-              <p className="mt-1 font-display text-xl text-white">
+              <p className="mt-1 font-display text-lg text-white">
                 {selected.label}
               </p>
-              <p className="mt-1 text-xs text-white/45">
-                Bookable near {templateViatorCity(template)}
+              <p className="mt-0.5 text-xs text-white/45">
+                Near {templateViatorCity(template)}
               </p>
             </div>
             <button
@@ -260,26 +259,24 @@ export function TripNodeEditor({
               Close
             </button>
           </div>
-
           {tourNote ? (
-            <p className="mt-3 text-sm text-amber/90">{tourNote}</p>
+            <p className="mt-2 text-sm text-amber/90">{tourNote}</p>
           ) : null}
-
           {loadingTours ? (
-            <p className="mt-4 text-sm text-white/50">Loading tours…</p>
+            <p className="mt-3 text-sm text-white/50">Loading tours…</p>
           ) : null}
           {tourError && !loadingTours ? (
-            <p className="mt-4 text-sm text-white/55">{tourError}</p>
+            <p className="mt-3 text-sm text-white/55">{tourError}</p>
           ) : null}
           {tours.length > 0 ? (
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-3 space-y-2">
               {tours.map((p) => (
                 <li key={p.id}>
                   <a
                     href={`/go/viator/${encodeURIComponent(p.id)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center justify-between gap-3 border border-white/15 bg-black/20 px-3 py-3 text-sm transition hover:border-amber/50"
+                    className="flex items-center justify-between gap-3 border border-white/15 bg-black/20 px-3 py-2.5 text-sm transition hover:border-amber/50"
                   >
                     <span className="line-clamp-2 text-white/90">{p.title}</span>
                     <span className="shrink-0 font-mono text-[11px] text-amber">
@@ -291,6 +288,11 @@ export function TripNodeEditor({
             </ul>
           ) : null}
         </div>
+      ) : null}
+
+      {/* 3 · Personalize + save (from parent) */}
+      {children ? (
+        <div className="space-y-4 px-4 py-4 sm:px-5">{children}</div>
       ) : null}
     </div>
   );

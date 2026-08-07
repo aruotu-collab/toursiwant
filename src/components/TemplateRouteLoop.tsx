@@ -143,10 +143,10 @@ export function TemplateRouteLoop({
       className={`route-loop relative overflow-hidden border border-white/10 bg-[radial-gradient(ellipse_at_20%_0%,rgba(212,160,23,0.14),transparent_55%),linear-gradient(165deg,#0a1520_0%,#152433_55%,#0f1c28_100%)] ${className}`}
     >
       <div className="flex h-full min-h-[7.5rem] flex-col justify-center px-4 py-5 sm:px-6">
-        <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
+        <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
           Your day path
-          {interactive ? (
-            <span className="ml-2 normal-case tracking-normal text-white/45">
+          {onSelectNode ? (
+            <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-white/45">
               · tap a circle for tours
             </span>
           ) : null}
