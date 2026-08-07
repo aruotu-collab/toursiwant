@@ -250,6 +250,56 @@ export function TemplateWorkspace({
     setStatus("Trip reset to the original template.");
   }, [initial]);
 
+  function syncRouteNodesFromTemplate(nextTemplate: TripTemplate) {
+    setRouteNodes((prev) => {
+      const hotel = prev.find((n) => n.kind === "hotel") || {
+        id: "hotel",
+        label: "Hotel" as string,
+        kind: "hotel" as const,
+      };
+      const stopsByBlock = new Map(
+        prev
+          .filter((n) => n.kind === "day" && n.blockId)
+          .map((n) => [n.blockId!, n.stops || []]),
+      );
+      const dayNodes: RouteNode[] = nextTemplate.blocks.map((b, i) => ({
+        id: `block:${b.id}`,
+        label: shortenLabel(b.title),
+        kind: "day" as const,
+        blockId: b.id,
+        dayLabel: b.dayLabel || `Day ${i + 1}`,
+        dayIndex: i + 1,
+        stops: stopsByBlock.get(b.id) || [],
+      }));
+      return [hotel, ...dayNodes];
+    });
+  }
+
+  /** Apply a day vote/use choice and keep the trip diagram in sync. */
+  function applyDayOption(blockId: string, opt: ExperienceOption) {
+    setTemplate((t) => {
+      const next = applyOption(t, blockId, opt);
+      return {
+        ...next,
+        route: next.blocks
+          .map((b) => `${b.dayLabel}: ${b.title}`)
+          .join(" → "),
+      };
+    });
+    setRouteNodes((prev) =>
+      prev.map((n) =>
+        n.kind === "day" && n.blockId === blockId
+          ? {
+              ...n,
+              label: shortenLabel(
+                experienceCategoryLabel[opt.category] || opt.title,
+              ),
+            }
+          : n,
+      ),
+    );
+  }
+
   function syncRouteString(next: RouteNode[]) {
     setTemplate((prev) => ({
       ...prev,
@@ -411,18 +461,30 @@ export function TemplateWorkspace({
 
         if (rawNodes) {
           const nodes = normalizeRouteNodes(rawNodes, nextTemplate);
+          // Prefer live block titles from selections over stale saved labels
+          const synced = nodes.map((n) => {
+            if (n.kind !== "day" || !n.blockId) return n;
+            const block = nextTemplate.blocks.find((b) => b.id === n.blockId);
+            return block
+              ? { ...n, label: shortenLabel(block.title), dayLabel: block.dayLabel || n.dayLabel }
+              : n;
+          });
           nextTemplate = {
             ...nextTemplate,
             route:
               data.trip.route ||
-              nodes
+              synced
                 .filter((n) => n.kind === "day")
                 .map((n) => `${n.dayLabel}: ${n.label}`)
                 .join(" → "),
           };
+          setRouteNodes(synced);
+        } else {
+          const nodes = getTemplateRouteNodes(nextTemplate);
           setRouteNodes(nodes);
-        } else if (data.trip.route) {
-          nextTemplate = { ...nextTemplate, route: data.trip.route };
+          if (data.trip.route) {
+            nextTemplate = { ...nextTemplate, route: data.trip.route };
+          }
         }
 
         setTemplate(nextTemplate);
@@ -449,7 +511,9 @@ export function TemplateWorkspace({
       if (wantJoin) setPendingJoin(true);
       if (data.session.wants?.length) setWants(data.session.wants);
       if (data.session.selections) {
-        setTemplate(applySelections(initial, data.session.selections));
+        const next = applySelections(initial, data.session.selections);
+        setTemplate(next);
+        syncRouteNodesFromTemplate(next);
       }
     })();
   }, [initial]);
@@ -601,7 +665,7 @@ export function TemplateWorkspace({
         const opt = initial.blocks
           .find((b) => b.id === blockId)
           ?.alternatives?.find((a) => a.id === optionId);
-        if (opt) setTemplate((t) => applyOption(t, blockId, opt));
+        if (opt) applyDayOption(blockId, opt);
         setStatus("Vote saved — you can change it anytime.");
       }
     } finally {
@@ -626,6 +690,7 @@ export function TemplateWorkspace({
       }
     }
     setTemplate(next);
+    syncRouteNodesFromTemplate(next);
     setStatus(
       tradeOffs.length
         ? `Applied group winners. Trade-offs: ${tradeOffs.join(" · ")}`
@@ -1061,10 +1126,10 @@ export function TemplateWorkspace({
                                     type="button"
                                     disabled={busy}
                                     onClick={() => {
-                                      setTemplate((t) =>
-                                        applyOption(t, block.id, opt),
+                                      applyDayOption(block.id, opt);
+                                      setStatus(
+                                        `Using “${experienceCategoryLabel[opt.category]}” for ${block.dayLabel}.`,
                                       );
-                                      setStatus(`Using “${opt.title}” for now.`);
                                     }}
                                     className="border border-white/25 px-3 py-2 text-xs hover:border-amber"
                                   >
