@@ -8,6 +8,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim() || "";
 
+  const lodgingOnly = url.searchParams.get("lodging") === "1";
+
   const curated = searchNearMePlaces(q, 5).map((place) => ({
     id: place.id,
     name: place.name,
@@ -29,7 +31,10 @@ export async function GET(request: Request) {
     "https://maps.googleapis.com/maps/api/place/autocomplete/json",
   );
   endpoint.searchParams.set("input", q);
-  endpoint.searchParams.set("types", "establishment");
+  endpoint.searchParams.set(
+    "types",
+    lodgingOnly ? "lodging" : "establishment",
+  );
   endpoint.searchParams.set("components", "country:us");
   endpoint.searchParams.set("key", key);
 

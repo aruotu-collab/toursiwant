@@ -3,13 +3,11 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { HereNowPanel } from "@/components/HereNowPanel";
 import {
   combineUsCities,
-  hereNowHotels,
   listTemplates,
-  moodOptions,
   personalizeOptions,
-  timeBucketOptions,
   usCityOptions,
   type TripTemplate,
 } from "@/lib/trip-templates";
@@ -81,9 +79,6 @@ export function TripsHome() {
     parseDoor(searchParams.get("door")),
   );
   const [combineCodes, setCombineCodes] = useState<string[]>(["NYC", "DC"]);
-  const [hotelId, setHotelId] = useState("seneca-niagara");
-  const [timeBucket, setTimeBucket] = useState("rest_today");
-  const [mood, setMood] = useState("famous");
   const [exploreScale, setExploreScale] = useState<
     "all" | "country" | "multi_city" | "city" | "hotel_area"
   >("all");
@@ -124,23 +119,6 @@ export function TripsHome() {
     [combineCodes],
   );
 
-  const hereList = useMemo(() => {
-    const now = listTemplates({
-      scale: "here_now",
-      hotelId,
-      timeBucket,
-      mood,
-    });
-    if (now.length) return now;
-    const hotelArea = listTemplates({
-      scale: "hotel_area",
-      hotelId,
-    });
-    if (hotelArea.length) return hotelArea;
-    return listTemplates({ scale: "here_now", hotelId });
-  }, [hotelId, timeBucket, mood]);
-
-  const hotel = hereNowHotels.find((h) => h.id === hotelId);
   const featured = useMemo(
     () =>
       listTemplates().filter((t) =>
@@ -237,7 +215,7 @@ export function TripsHome() {
                   {
                     id: "here" as const,
                     title: "I'm here now",
-                    copy: "Hotel → time → mood → ready plans.",
+                    copy: "Type your hotel → time → mood → ready plans.",
                   },
                 ] as const
               ).map((d) => (
@@ -463,97 +441,10 @@ export function TripsHome() {
                 I&apos;m here now
               </h2>
               <p className="mt-2 max-w-xl text-white/60">
-                {hotel?.blurb ||
-                  "Tell us where you are staying in the USA and how much time you have."}
+                Type the hotel you&apos;re in — or pick a featured stay — then
+                tell us how much time you have.
               </p>
-
-              <div className="mt-8 space-y-8">
-                <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">
-                    1 · Your hotel
-                  </p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {hereNowHotels.map((h) => (
-                      <button
-                        key={h.id}
-                        type="button"
-                        onClick={() => setHotelId(h.id)}
-                        className={`border px-4 py-4 text-left transition ${
-                          hotelId === h.id
-                            ? "border-amber bg-amber/15"
-                            : "border-white/15 hover:border-white/30"
-                        }`}
-                      >
-                        <p className="font-display text-lg">{h.name}</p>
-                        <p className="mt-1 text-sm text-white/55">{h.area}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">
-                    2 · How much time?
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {timeBucketOptions.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setTimeBucket(opt.id)}
-                        className={`border px-3 py-2 text-sm transition ${
-                          timeBucket === opt.id
-                            ? "border-amber bg-amber text-ink"
-                            : "border-white/20 text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">
-                    3 · Mood
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {moodOptions.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setMood(opt.id)}
-                        className={`border px-3 py-2 text-sm transition ${
-                          mood === opt.id
-                            ? "border-amber bg-amber text-ink"
-                            : "border-white/20 text-white/70"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">
-                    4 · Ready plans for you
-                  </p>
-                  <p className="mt-2 text-sm text-white/50">
-                    {hereList.length} plan{hereList.length === 1 ? "" : "s"} ·{" "}
-                    {hotel?.name}
-                  </p>
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    {hereList.length ? (
-                      hereList.map((t) => <TemplateCard key={t.id} t={t} />)
-                    ) : (
-                      <p className="text-white/55">
-                        No exact match — try another time or mood.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <HereNowPanel />
             </div>
           ) : null}
 
