@@ -8,7 +8,7 @@ export type RouteNode = {
   blockId?: string;
 };
 
-/** Build stop nodes from a template — hotel + destinations for the loop diagram. */
+/** Build stop nodes from a template — hotel + destinations for the journey strip. */
 export function getTemplateRouteNodes(t: TripTemplate): RouteNode[] {
   const fromRoute = t.route
     .split(/→|->|—|–/)
@@ -24,16 +24,14 @@ export function getTemplateRouteNodes(t: TripTemplate): RouteNode[] {
       kind: "stop" as const,
       blockId: b.id,
     }))
-    .filter(
-      (n, i, arr) => arr.findIndex((x) => x.label === n.label) === i,
-    );
+    .filter((n, i, arr) => arr.findIndex((x) => x.label === n.label) === i);
 
-  // Prefer multi-stop route string when it has real hops
   if (fromRoute.length >= 2) {
     const nodes: RouteNode[] = fromRoute.slice(0, 5).map((label, i) => ({
       id: `route:${i}:${label}`,
       label,
-      kind: i === 0 && (t.hotelAnchor || looksLikeHotel(label)) ? "hotel" : "stop",
+      kind:
+        i === 0 && (t.hotelAnchor || looksLikeHotel(label)) ? "hotel" : "stop",
     }));
     if (t.hotelAnchor && nodes[0]?.kind !== "hotel") {
       return [
@@ -49,7 +47,6 @@ export function getTemplateRouteNodes(t: TripTemplate): RouteNode[] {
     return nodes;
   }
 
-  // Single-phrase routes (e.g. "Midtown hotel anchor") → use day blocks as nodes
   if (t.hotelAnchor || fromBlocks.length >= 1) {
     const hotelLabel = t.hotelAnchor
       ? shortenStop(t.hotelAnchor.name) || "Hotel"
@@ -73,7 +70,7 @@ export function getTemplateRouteNodes(t: TripTemplate): RouteNode[] {
     return [
       { id: "hotel", label: "Hotel", kind: "hotel" },
       { id: "route:1", label: fromRoute[0], kind: "stop" },
-      { id: "route:2", label: "Return", kind: "stop" },
+      { id: "route:2", label: "Explore", kind: "stop" },
     ];
   }
 
@@ -117,52 +114,10 @@ function shortenStop(raw: string) {
   return `${s.slice(0, 12).trim()}…`;
 }
 
-type Point = { x: number; y: number; labelY: number };
-
-/** Stops laid out like the hand sketch: top row → right curve → bottom → dashed home. */
-function layoutStops(n: number): Point[] {
-  const ring: Point[] = [
-    { x: 36, y: 48, labelY: 24 },
-    { x: 90, y: 32, labelY: 14 },
-    { x: 145, y: 28, labelY: 12 },
-    { x: 195, y: 40, labelY: 22 },
-    { x: 230, y: 72, labelY: 58 },
-    { x: 235, y: 110, labelY: 98 },
-    { x: 200, y: 142, labelY: 162 },
-    { x: 145, y: 152, labelY: 172 },
-    { x: 90, y: 148, labelY: 168 },
-    { x: 45, y: 125, labelY: 145 },
-    { x: 28, y: 90, labelY: 78 },
-    { x: 32, y: 65, labelY: 52 },
-  ];
-  if (n <= 0) return [ring[0]];
-  if (n >= ring.length) return ring;
-  // Pick evenly spaced points around the ring for fewer stops
-  if (n === 1) return [ring[0]];
-  if (n === 2) return [ring[0], ring[5]];
-  if (n === 3) return [ring[0], ring[4], ring[7]];
-  if (n === 4) return [ring[0], ring[2], ring[5], ring[8]];
-  if (n === 5) return [ring[0], ring[2], ring[4], ring[6], ring[8]];
-  if (n === 6) return [ring[0], ring[2], ring[4], ring[6], ring[8], ring[10]];
-  return ring.slice(0, n);
-}
-
-function solidPath(points: Point[]) {
-  if (points.length < 2) return "";
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 1; i < points.length; i++) {
-    d += ` L ${points[i].x} ${points[i].y}`;
-  }
-  return d;
-}
-
-function returnPath(points: Point[]) {
-  if (points.length < 2) return "";
-  const first = points[0];
-  const last = points[points.length - 1];
-  return `M ${last.x} ${last.y} L ${first.x} ${first.y}`;
-}
-
+/**
+ * Simple left-to-right journey strip — easier to read than an oval map.
+ * Hotel → stop → stop → …  then a soft “back to hotel” cue.
+ */
 export function TemplateRouteLoop({
   template,
   nodes: nodesProp,
@@ -177,123 +132,81 @@ export function TemplateRouteLoop({
   onRemoveNode?: (id: string) => void;
 }) {
   const nodes =
-    nodesProp ||
-    (template ? getTemplateRouteNodes(template) : []);
-  const points = layoutStops(Math.max(nodes.length, 1));
-  const solid = solidPath(points.slice(0, nodes.length));
-  const dashed = returnPath(points.slice(0, nodes.length));
+    nodesProp || (template ? getTemplateRouteNodes(template) : []);
 
   return (
     <div
-      className={`route-loop relative overflow-hidden border border-white/10 bg-[radial-gradient(ellipse_at_25%_15%,rgba(212,160,23,0.16),transparent_50%),linear-gradient(165deg,#0a1520_0%,#152433_55%,#0f1c28_100%)] ${className}`}
+      className={`route-loop relative overflow-hidden border border-white/10 bg-[radial-gradient(ellipse_at_20%_0%,rgba(212,160,23,0.14),transparent_55%),linear-gradient(165deg,#0a1520_0%,#152433_55%,#0f1c28_100%)] ${className}`}
       aria-hidden={!interactive}
     >
-      <svg
-        viewBox="0 0 260 180"
-        className="h-full w-full"
-        preserveAspectRatio="xMidYMid meet"
-      >
-        <path
-          d={solid}
-          fill="none"
-          stroke="rgba(212,160,23,0.7)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="route-loop-solid"
-        />
-        <path
-          d={dashed}
-          fill="none"
-          stroke="rgba(255,255,255,0.4)"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeDasharray="5 4"
-          className="route-loop-return"
-        />
-        {nodes.map((node, i) => {
-          const p = points[i];
-          if (!p) return null;
-          const isHotel = node.kind === "hotel" || i === 0;
-          const r = isHotel ? 14 : 12;
-          return (
-            <g key={node.id}>
-              {/* Outer ring — reads as a node */}
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={r + 5}
-                fill="none"
-                stroke={
-                  isHotel
-                    ? "rgba(212,160,23,0.5)"
-                    : "rgba(243,239,230,0.28)"
-                }
-                strokeWidth="1.4"
-              />
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={r}
-                fill={isHotel ? "#d4a017" : "#f3efe6"}
-                stroke={isHotel ? "#f3efe6" : "rgba(212,160,23,0.95)"}
-                strokeWidth="1.8"
-              />
-              {/* Tiny center dot */}
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={2.8}
-                fill={isHotel ? "#0a1520" : "#d4a017"}
-              />
-              <text
-                x={p.x}
-                y={p.labelY}
-                textAnchor="middle"
-                fill="rgba(243,239,230,0.95)"
-                style={{
-                  fontSize: "12px",
-                  fontFamily: "var(--font-body), Georgia, serif",
-                  fontWeight: 600,
-                  letterSpacing: "0.01em",
-                }}
-              >
-                {node.label}
-              </text>
-              {interactive && !isHotel && onRemoveNode ? (
-                <g
-                  className="cursor-pointer"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onRemoveNode(node.id);
-                  }}
-                  role="button"
-                  aria-label={`Remove ${node.label}`}
-                >
-                  <circle
-                    cx={p.x + r + 4}
-                    cy={p.y - r - 4}
-                    r={9}
-                    fill="#0a1520"
-                    stroke="rgba(255,255,255,0.55)"
-                    strokeWidth="1.2"
+      <div className="flex h-full min-h-[7.5rem] flex-col justify-center px-4 py-5 sm:px-6">
+        <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
+          Your day path
+        </p>
+        <ol className="flex flex-wrap items-center gap-y-4">
+          {nodes.map((node, i) => {
+            const isHotel = node.kind === "hotel" || i === 0;
+            return (
+              <li key={node.id} className="flex items-center">
+                {i > 0 ? (
+                  <span
+                    className="mx-1.5 h-0.5 w-5 shrink-0 rounded-full bg-amber/70 sm:mx-2 sm:w-7"
+                    aria-hidden
                   />
-                  <text
-                    x={p.x + r + 4}
-                    y={p.y - r + 0.5}
-                    textAnchor="middle"
-                    fill="rgba(243,239,230,0.9)"
-                    style={{ fontSize: "11px", fontWeight: 700 }}
+                ) : null}
+                <div className="relative flex flex-col items-center gap-1.5">
+                  {interactive && !isHotel && onRemoveNode ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onRemoveNode(node.id);
+                      }}
+                      className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-white/30 bg-ink text-[11px] leading-none text-white/80 hover:border-amber hover:text-amber"
+                      aria-label={`Remove ${node.label}`}
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                  <span
+                    className={`flex h-11 w-11 items-center justify-center rounded-full border-2 text-[11px] font-semibold sm:h-12 sm:w-12 ${
+                      isHotel
+                        ? "border-paper bg-amber text-ink"
+                        : "border-amber bg-paper text-ink"
+                    }`}
                   >
-                    ×
-                  </text>
-                </g>
-              ) : null}
-            </g>
-          );
-        })}
-      </svg>
+                    {i + 1}
+                  </span>
+                  <span
+                    className={`max-w-[4.75rem] text-center text-[11px] leading-tight sm:text-xs ${
+                      isHotel ? "font-semibold text-amber" : "text-white/85"
+                    }`}
+                  >
+                    {node.label}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+          {nodes.length > 1 ? (
+            <li className="flex items-center pl-1 sm:pl-2">
+              <span
+                className="mx-1.5 h-0.5 w-5 shrink-0 rounded-full border-t border-dashed border-white/40 bg-transparent sm:w-6"
+                aria-hidden
+              />
+              <div className="flex flex-col items-center gap-1.5 opacity-70">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-amber/50 text-[10px] text-amber">
+                  ↩
+                </span>
+                <span className="max-w-[4.5rem] text-center text-[10px] leading-tight text-white/50">
+                  back to hotel
+                </span>
+              </div>
+            </li>
+          ) : null}
+        </ol>
+      </div>
     </div>
   );
 }

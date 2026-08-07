@@ -73,11 +73,11 @@ export function TripNodeEditor({
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
-            Trip map
+            Trip path
           </p>
           <p className="mt-1 max-w-xl text-sm text-white/65">
-            Tap + Market or + Museum as many times as you like — each tap adds
-            another stop. Hotel stays as the start.
+            Read left to right — hotel first, then each stop. Tap × on a circle
+            to remove it, or add another Market / Museum below.
           </p>
         </div>
         <p className="font-mono text-[11px] text-white/40">
@@ -89,42 +89,12 @@ export function TripNodeEditor({
         nodes={nodes}
         interactive
         onRemoveNode={onRemoveStop}
-        className="h-[240px] w-full border-0 sm:h-[280px]"
+        className="w-full border-0"
       />
-
-      <ul className="flex flex-wrap gap-2 border-t border-white/10 px-4 py-3 sm:px-5">
-        {nodes.map((node, i) => (
-          <li
-            key={node.id}
-            className={`flex items-center gap-2 border px-3 py-2 text-sm ${
-              node.kind === "hotel"
-                ? "border-amber/40 bg-amber/15 text-amber"
-                : "border-white/20 bg-black/20 text-white/85"
-            }`}
-          >
-            <span className="font-mono text-[10px] text-white/40">{i + 1}</span>
-            <span className="font-medium">{node.label}</span>
-            {node.kind === "hotel" ? (
-              <span className="font-mono text-[10px] uppercase tracking-wider text-amber/70">
-                start
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onRemoveStop(node.id)}
-                className="ml-1 text-white/45 hover:text-amber"
-                aria-label={`Remove ${node.label}`}
-              >
-                Remove
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
 
       <div className="space-y-3 border-t border-white/10 px-4 py-4 sm:px-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-          Add another stop — tap again for a second Market, Museum, etc.
+          Add a stop — tap the same type again for another
         </p>
         <div className="flex flex-wrap gap-2">
           {chips.map((label) => (
@@ -158,12 +128,12 @@ export function TripNodeEditor({
             onClick={() => add(custom)}
             className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
           >
-            Add node
+            Add stop
           </button>
         </div>
         {atLimit ? (
           <p className="text-xs text-white/45">
-            Map is full — remove a stop to add another.
+            Path is full — remove a stop to add another.
           </p>
         ) : null}
       </div>

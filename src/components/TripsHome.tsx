@@ -31,7 +31,7 @@ function TemplateCard({ t }: { t: TripTemplate }) {
       className="group block overflow-hidden border border-white/15 bg-white/[0.04] transition hover:border-amber/50 hover:bg-white/[0.07]"
       style={{ animation: "rise-in 0.45s ease-out both" }}
     >
-      <TemplateRouteLoop template={t} className="h-[148px] w-full" />
+      <TemplateRouteLoop template={t} className="min-h-[7.5rem] w-full" />
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber">
