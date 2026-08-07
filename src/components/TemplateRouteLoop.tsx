@@ -187,6 +187,7 @@ const DEFAULT_SUGGESTIONS = [
 /**
  * Vertical day map: H + Day 1/2/3 with +/− expand for stops.
  * Fixed panel height; list scrolls inside so the border stays stable.
+ * Days expand independently — expand/collapse any combination.
  */
 export function TemplateRouteLoop({
   template,
@@ -195,8 +196,8 @@ export function TemplateRouteLoop({
   interactive = false,
   selectedNodeId = null,
   selectedStopId = null,
-  expandedDayId: expandedDayIdProp,
-  onExpandedDayIdChange,
+  expandedDayIds: expandedDayIdsProp,
+  onExpandedDayIdsChange,
   onSelectNode,
   onSelectStop,
   onRemoveStop,
@@ -210,9 +211,9 @@ export function TemplateRouteLoop({
   interactive?: boolean;
   selectedNodeId?: string | null;
   selectedStopId?: string | null;
-  /** Controlled expanded day (one at a time). */
-  expandedDayId?: string | null;
-  onExpandedDayIdChange?: (id: string | null) => void;
+  /** Controlled set of expanded day ids (independent). */
+  expandedDayIds?: string[];
+  onExpandedDayIdsChange?: (ids: string[]) => void;
   onSelectNode?: (node: RouteNode) => void;
   onSelectStop?: (day: RouteNode, stop: DayStop) => void;
   onRemoveStop?: (dayId: string, stopId: string) => void;
@@ -226,19 +227,16 @@ export function TemplateRouteLoop({
   const hotel = nodes.find((n) => n.kind === "hotel");
   const days = nodes.filter((n) => n.kind === "day");
 
-  const [internalExpanded, setInternalExpanded] = useState<string | null>(
-    null,
-  );
-  const controlled = expandedDayIdProp !== undefined;
-  const expandedDayId = controlled ? expandedDayIdProp : internalExpanded;
+  const [internalExpanded, setInternalExpanded] = useState<string[]>([]);
+  const controlled = expandedDayIdsProp !== undefined;
+  const expandedDayIds = controlled ? expandedDayIdsProp : internalExpanded;
 
-  function setExpanded(id: string | null) {
-    if (controlled) onExpandedDayIdChange?.(id);
-    else setInternalExpanded(id);
+  function setExpandedIds(ids: string[]) {
+    if (controlled) onExpandedDayIdsChange?.(ids);
+    else setInternalExpanded(ids);
   }
 
-  // custom input is shared; only one day is expanded at a time
-  const [custom, setCustom] = useState("");
+  const [customByDay, setCustomByDay] = useState<Record<string, string>>({});
   const chips = Array.from(
     new Set(
       (addSuggestions || DEFAULT_SUGGESTIONS)
@@ -247,10 +245,24 @@ export function TemplateRouteLoop({
     ),
   );
 
+  function isExpanded(dayId: string) {
+    return expandedDayIds.includes(dayId);
+  }
+
   function toggleDay(day: RouteNode) {
-    const next = expandedDayId === day.id ? null : day.id;
-    setExpanded(next);
-    onSelectNode?.(day);
+    if (isExpanded(day.id)) {
+      setExpandedIds(expandedDayIds.filter((id) => id !== day.id));
+    } else {
+      setExpandedIds([...expandedDayIds, day.id]);
+    }
+  }
+
+  function expandAll() {
+    setExpandedIds(days.map((d) => d.id));
+  }
+
+  function collapseAll() {
+    setExpandedIds([]);
   }
 
   function selectDayRow(day: RouteNode) {
@@ -262,14 +274,30 @@ export function TemplateRouteLoop({
       className={`route-loop relative flex flex-col overflow-hidden border border-white/10 bg-[radial-gradient(ellipse_at_20%_0%,rgba(212,160,23,0.14),transparent_55%),linear-gradient(165deg,#0a1520_0%,#152433_55%,#0f1c28_100%)] ${className}`}
     >
       <div className="shrink-0 border-b border-white/10 px-4 py-3 sm:px-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
-          Your days
-          {interactive ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
+            Your days
             <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-white/45">
-              · + opens stops on that day
+              · + / − each day
             </span>
-          ) : null}
-        </p>
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={expandAll}
+              className="border border-white/20 px-2 py-1 text-[10px] uppercase tracking-wide text-white/65 hover:border-amber hover:text-amber"
+            >
+              Expand all
+            </button>
+            <button
+              type="button"
+              onClick={collapseAll}
+              className="border border-white/20 px-2 py-1 text-[10px] uppercase tracking-wide text-white/65 hover:border-amber hover:text-amber"
+            >
+              Collapse all
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Sticky hotel */}
@@ -309,13 +337,14 @@ export function TemplateRouteLoop({
         {days.map((day, i) => {
           const num = day.dayIndex ?? i + 1;
           const stopCount = day.stops?.length || 0;
-          const expanded = expandedDayId === day.id;
+          const expanded = isExpanded(day.id);
           const daySelected =
             selectedNodeId === day.id && !selectedStopId;
           const allowAdd =
             interactive &&
             onAddStop &&
             (canAddStop ? canAddStop(day) : true);
+          const custom = customByDay[day.id] || "";
 
           return (
             <li
@@ -456,7 +485,12 @@ export function TemplateRouteLoop({
                       <div className="flex gap-2">
                         <input
                           value={custom}
-                          onChange={(e) => setCustom(e.target.value)}
+                          onChange={(e) =>
+                            setCustomByDay((prev) => ({
+                              ...prev,
+                              [day.id]: e.target.value,
+                            }))
+                          }
                           onFocus={() => onSelectNode?.(day)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
@@ -464,7 +498,10 @@ export function TemplateRouteLoop({
                               const v = custom.trim();
                               if (!v || !allowAdd) return;
                               onAddStop(day.id, v);
-                              setCustom("");
+                              setCustomByDay((prev) => ({
+                                ...prev,
+                                [day.id]: "",
+                              }));
                             }
                           }}
                           placeholder="Custom stop"
@@ -478,7 +515,10 @@ export function TemplateRouteLoop({
                             const v = custom.trim();
                             if (!v || !allowAdd) return;
                             onAddStop(day.id, v);
-                            setCustom("");
+                            setCustomByDay((prev) => ({
+                              ...prev,
+                              [day.id]: "",
+                            }));
                           }}
                           className="bg-amber px-2.5 py-1.5 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
                         >

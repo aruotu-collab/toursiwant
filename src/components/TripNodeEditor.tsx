@@ -91,7 +91,7 @@ export function TripNodeEditor({
     () => days[0]?.id ?? null,
   );
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
-  const [expandedDayId, setExpandedDayId] = useState<string | null>(null);
+  const [expandedDayIds, setExpandedDayIds] = useState<string[]>([]);
   const [tours, setTours] = useState<TourHit[]>([]);
   const [loadingTours, setLoadingTours] = useState(false);
   const [tourError, setTourError] = useState<string | null>(null);
@@ -113,7 +113,7 @@ export function TripNodeEditor({
     if (!nodes.some((n) => n.id === selectedDayId)) {
       setSelectedDayId(days[0]?.id ?? null);
       setSelectedStopId(null);
-      setExpandedDayId(null);
+      setExpandedDayIds([]);
       setTours([]);
     } else if (
       selectedStopId &&
@@ -123,6 +123,13 @@ export function TripNodeEditor({
       setSelectedStopId(null);
     }
   }, [nodes, selectedDayId, selectedStopId, selectedDay, days]);
+
+  useEffect(() => {
+    // Drop expanded ids that no longer exist
+    setExpandedDayIds((prev) =>
+      prev.filter((id) => days.some((d) => d.id === id)),
+    );
+  }, [days]);
 
   useEffect(() => {
     if (!selectedDay) {
@@ -193,23 +200,15 @@ export function TripNodeEditor({
   function selectNode(node: RouteNode) {
     setSelectedDayId(node.id);
     setSelectedStopId(null);
-    if (node.kind === "day") {
-      setExpandedDayId(node.id);
-    }
+    // Selection does not force expand/collapse
   }
 
   function selectStop(day: RouteNode, stop: DayStop) {
     setSelectedDayId(day.id);
-    setExpandedDayId(day.id);
+    setExpandedDayIds((prev) =>
+      prev.includes(day.id) ? prev : [...prev, day.id],
+    );
     setSelectedStopId((prev) => (prev === stop.id ? null : stop.id));
-  }
-
-  function handleExpandedChange(id: string | null) {
-    setExpandedDayId(id);
-    if (id) {
-      setSelectedDayId(id);
-      setSelectedStopId(null);
-    }
   }
 
   const tourHeading = selectedStop
@@ -225,7 +224,7 @@ export function TripNodeEditor({
           <div>
             <h2 className="font-display text-xl">Make it yours</h2>
             <p className="mt-1 text-sm text-white/55">
-              Numbers are days. Open a day with +, add stops inside, then
+              Numbers are days. Expand any day with +, add stops inside, then
               personalize and save.
             </p>
           </div>
@@ -240,8 +239,8 @@ export function TripNodeEditor({
         interactive
         selectedNodeId={selectedDayId}
         selectedStopId={selectedStopId}
-        expandedDayId={expandedDayId}
-        onExpandedDayIdChange={handleExpandedChange}
+        expandedDayIds={expandedDayIds}
+        onExpandedDayIdsChange={setExpandedDayIds}
         onSelectNode={selectNode}
         onSelectStop={selectStop}
         onRemoveStop={onRemoveStop}
