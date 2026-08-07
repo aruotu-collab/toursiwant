@@ -4,30 +4,24 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
-  combineCountryTemplates,
+  combineUsCities,
   hereNowHotels,
   listTemplates,
   moodOptions,
   personalizeOptions,
   timeBucketOptions,
+  usCityOptions,
   type TripTemplate,
 } from "@/lib/trip-templates";
 
 type Door = "home" | "explore" | "combine" | "here";
 
 const scaleLabel: Record<TripTemplate["scale"], string> = {
-  multi_country: "Multi-country",
-  country: "Country",
+  multi_city: "Multi-city",
+  country: "USA route",
   city: "City",
   hotel_area: "Hotel area",
   here_now: "I'm here now",
-};
-
-const countryNames: Record<string, string> = {
-  JP: "Japan",
-  KR: "South Korea",
-  TH: "Thailand",
-  US: "United States",
 };
 
 function TemplateCard({ t }: { t: TripTemplate }) {
@@ -40,6 +34,7 @@ function TemplateCard({ t }: { t: TripTemplate }) {
       <div className="flex items-start justify-between gap-3">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber">
           {scaleLabel[t.scale]} · {t.days === 1 ? "Same day" : `${t.days} days`}
+          {t.region ? ` · ${t.region}` : ""}
         </p>
         {t.travelledRating ? (
           <p className="font-mono text-[10px] text-white/55">
@@ -85,13 +80,14 @@ export function TripsHome() {
   const [door, setDoorState] = useState<Door>(() =>
     parseDoor(searchParams.get("door")),
   );
-  const [combineCodes, setCombineCodes] = useState<string[]>(["JP", "KR"]);
+  const [combineCodes, setCombineCodes] = useState<string[]>(["NYC", "DC"]);
   const [hotelId, setHotelId] = useState("seneca-niagara");
   const [timeBucket, setTimeBucket] = useState("rest_today");
   const [mood, setMood] = useState("famous");
   const [exploreScale, setExploreScale] = useState<
-    "all" | "country" | "multi_country" | "city" | "hotel_area"
+    "all" | "country" | "multi_city" | "city" | "hotel_area"
   >("all");
+  const [exploreRegion, setExploreRegion] = useState<string>("all");
 
   useEffect(() => {
     setDoorState(parseDoor(searchParams.get("door")));
@@ -103,15 +99,28 @@ export function TripsHome() {
     router.replace(url, { scroll: false });
   }
 
+  const regions = useMemo(() => {
+    const set = new Set(
+      listTemplates()
+        .map((t) => t.region)
+        .filter(Boolean) as string[],
+    );
+    return ["all", ...Array.from(set).sort()];
+  }, []);
+
   const exploreList = useMemo(() => {
-    if (exploreScale === "all") {
-      return listTemplates().filter((t) => t.scale !== "here_now");
+    let list =
+      exploreScale === "all"
+        ? listTemplates().filter((t) => t.scale !== "here_now")
+        : listTemplates({ scale: exploreScale });
+    if (exploreRegion !== "all") {
+      list = list.filter((t) => t.region === exploreRegion);
     }
-    return listTemplates({ scale: exploreScale });
-  }, [exploreScale]);
+    return list;
+  }, [exploreScale, exploreRegion]);
 
   const combineList = useMemo(
-    () => combineCountryTemplates(combineCodes),
+    () => combineUsCities(combineCodes),
     [combineCodes],
   );
 
@@ -135,9 +144,7 @@ export function TripsHome() {
   const featured = useMemo(
     () =>
       listTemplates().filter((t) =>
-        ["jp-first-timer", "jp-kr-essentials", "niagara-evening"].includes(
-          t.id,
-        ),
+        ["nyc-4", "east-coast-classics", "niagara-evening"].includes(t.id),
       ),
     [],
   );
@@ -165,7 +172,7 @@ export function TripsHome() {
             Tours<span className="text-amber">I</span>Want
           </p>
           <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
-            Proven trips · Make them yours
+            United States · Proven trips
           </p>
         </button>
         <nav className="flex items-center gap-3 text-sm text-white/70">
@@ -202,14 +209,14 @@ export function TripsHome() {
               className="mt-6 max-w-2xl font-display text-[clamp(1.35rem,3.5vw,2.15rem)] leading-snug text-white/90"
               style={{ animation: "rise-in 0.7s ease-out 0.08s both" }}
             >
-              Start with a trip that already works. Then make it yours.
+              Start with a USA trip that already works. Then make it yours.
             </h1>
             <p
               className="mt-4 max-w-xl text-base leading-relaxed text-white/65 sm:text-lg"
               style={{ animation: "rise-in 0.7s ease-out 0.14s both" }}
             >
-              Proven templates — not a blank itinerary. Countries, multi-country
-              routes, or plans from the hotel you&apos;re in right now.
+              Proven templates for American cities, multi-city routes, and
+              right-now plans from your hotel — not a blank itinerary.
             </p>
             <div
               className="mt-10 grid gap-3 sm:grid-cols-3"
@@ -219,13 +226,13 @@ export function TripsHome() {
                 [
                   {
                     id: "explore" as const,
-                    title: "Explore trips",
-                    copy: "Browse proven country & city templates.",
+                    title: "Explore USA trips",
+                    copy: "City, region, and coast-to-coast spines.",
                   },
                   {
                     id: "combine" as const,
-                    title: "Combine countries",
-                    copy: "Japan + Korea and other multi-country spines.",
+                    title: "Combine cities",
+                    copy: "NYC + D.C., California, Florida, and more.",
                   },
                   {
                     id: "here" as const,
@@ -252,14 +259,14 @@ export function TripsHome() {
               How it works
             </h2>
             <p className="mt-2 max-w-xl text-white/60">
-              Structure stays. Experiences swap. Optional bookings only when they
-              fit.
+              Built for travel across the United States — structure stays,
+              experiences swap.
             </p>
             <ol className="mt-10 grid gap-6 sm:grid-cols-3">
               {[
                 {
                   n: "01",
-                  t: "Pick a proven trip",
+                  t: "Pick a proven USA trip",
                   c: "Start from a template people already travel — not an empty calendar.",
                 },
                 {
@@ -291,7 +298,7 @@ export function TripsHome() {
                   Start here
                 </h2>
                 <p className="mt-2 text-white/60">
-                  Three templates that show the product.
+                  Three USA templates that show the product.
                 </p>
               </div>
               <button
@@ -299,7 +306,7 @@ export function TripsHome() {
                 onClick={() => setDoor("explore")}
                 className="font-mono text-xs uppercase tracking-[0.16em] text-amber hover:text-white"
               >
-                See all →
+                See all USA trips →
               </button>
             </div>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -324,8 +331,8 @@ export function TripsHome() {
             <div className="flex flex-wrap gap-2">
               {(
                 [
-                  ["explore", "Explore"],
-                  ["combine", "Combine"],
+                  ["explore", "Explore USA"],
+                  ["combine", "Combine cities"],
                   ["here", "I'm here now"],
                 ] as const
               ).map(([id, label]) => (
@@ -348,18 +355,18 @@ export function TripsHome() {
           {door === "explore" ? (
             <div className="mt-8">
               <h2 className="font-display text-3xl tracking-tight sm:text-4xl">
-                Explore trips
+                Explore USA trips
               </h2>
               <p className="mt-2 max-w-xl text-white/60">
-                Pick a template that already works. Personalize flexible days on
-                the next screen.
+                Pick a template that already works across American cities and
+                regions. Personalize flexible days next.
               </p>
               <div className="mt-6 flex flex-wrap gap-2">
                 {(
                   [
                     ["all", "All"],
-                    ["country", "Country"],
-                    ["multi_country", "Multi-country"],
+                    ["country", "USA routes"],
+                    ["multi_city", "Multi-city"],
                     ["city", "City"],
                     ["hotel_area", "Hotel area"],
                   ] as const
@@ -378,6 +385,22 @@ export function TripsHome() {
                   </button>
                 ))}
               </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {regions.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setExploreRegion(r)}
+                    className={`border px-3 py-1.5 text-xs transition ${
+                      exploreRegion === r
+                        ? "border-white/50 bg-white/10 text-white"
+                        : "border-white/10 text-white/50 hover:border-white/30"
+                    }`}
+                  >
+                    {r === "all" ? "All regions" : r}
+                  </button>
+                ))}
+              </div>
               <div className="mt-8 grid gap-4 md:grid-cols-2">
                 {exploreList.map((t) => (
                   <TemplateCard key={t.id} t={t} />
@@ -389,14 +412,14 @@ export function TripsHome() {
           {door === "combine" ? (
             <div className="mt-8">
               <h2 className="font-display text-3xl tracking-tight sm:text-4xl">
-                Combine countries
+                Combine cities
               </h2>
               <p className="mt-2 max-w-xl text-white/60">
-                Multi-country templates first — not single-country trips glued
-                together later.
+                Multi-city USA templates first — not single cities glued together
+                later.
               </p>
               <div className="mt-6 flex flex-wrap gap-2">
-                {["JP", "KR", "TH", "US"].map((code) => {
+                {usCityOptions.map(({ code, label }) => {
                   const on = combineCodes.includes(code);
                   return (
                     <button
@@ -416,9 +439,7 @@ export function TripsHome() {
                       }`}
                     >
                       <span className="font-mono">{code}</span>
-                      <span className="ml-2 opacity-80">
-                        {countryNames[code]}
-                      </span>
+                      <span className="ml-2 opacity-80">{label}</span>
                     </button>
                   );
                 })}
@@ -428,8 +449,8 @@ export function TripsHome() {
                   combineList.map((t) => <TemplateCard key={t.id} t={t} />)
                 ) : (
                   <p className="text-white/55">
-                    Select countries — try Japan + South Korea for multi-country
-                    samples.
+                    Select cities — try New York + Washington, D.C. or San
+                    Francisco + Los Angeles + San Diego.
                   </p>
                 )}
               </div>
@@ -443,7 +464,7 @@ export function TripsHome() {
               </h2>
               <p className="mt-2 max-w-xl text-white/60">
                 {hotel?.blurb ||
-                  "Tell us where you are staying and how much time you have."}
+                  "Tell us where you are staying in the USA and how much time you have."}
               </p>
 
               <div className="mt-8 space-y-8">
@@ -451,7 +472,7 @@ export function TripsHome() {
                   <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">
                     1 · Your hotel
                   </p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {hereNowHotels.map((h) => (
                       <button
                         key={h.id}

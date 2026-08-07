@@ -42,8 +42,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <p className="mt-3 max-w-xl text-ink-soft">
               Signed in as{" "}
               <span className="font-medium text-ink">{user.email}</span>
-              {user.role === "admin" ? " · Admin" : ""}. Save and share trip
-              templates with your group from any plan page.
+              {user.role === "admin" ? " · Admin" : ""}. Browse proven USA trip
+              templates and share plans with your group.
             </p>
           </div>
           <AccountLogoutButton />

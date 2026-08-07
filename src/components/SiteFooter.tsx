@@ -9,15 +9,16 @@ export function SiteFooter() {
             Tours<span className="text-amber">I</span>Want
           </p>
           <p className="mt-2 max-w-md text-sm text-white/70">
-            Start with a trip that already works. Then make it yours.
+            Proven USA trips. Make them yours — cities, multi-city routes, and
+            right-now plans from your hotel.
           </p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-white/75">
           <Link href="/?door=explore" className="hover:text-white">
-            Explore trips
+            Explore USA
           </Link>
           <Link href="/?door=combine" className="hover:text-white">
-            Combine countries
+            Combine cities
           </Link>
           <Link href="/?door=here" className="hover:text-white">
             I&apos;m here now

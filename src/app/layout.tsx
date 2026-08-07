@@ -34,11 +34,11 @@ const searchConsoleVerification =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "ToursIWant — Start with a trip that already works",
+    default: "ToursIWant — Proven USA trips, then make them yours",
     template: "%s · ToursIWant",
   },
   description:
-    "Proven trip templates for countries, multi-country routes, and right-now plans from your hotel. Make them yours — then book optional experiences.",
+    "Proven trip templates for American cities, multi-city routes, and right-now plans from your hotel. Make them yours — then book optional experiences.",
   alternates: {
     canonical: "/",
   },
@@ -47,15 +47,15 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: siteUrl,
     siteName: "ToursIWant",
-    title: "ToursIWant — Start with a trip that already works",
+    title: "ToursIWant — Proven USA trips, then make them yours",
     description:
-      "Proven trip templates for countries, multi-country routes, and right-now plans from your hotel. Make them yours — then book optional experiences.",
+      "Proven trip templates for American cities, multi-city routes, and right-now plans from your hotel. Make them yours — then book optional experiences.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ToursIWant — Start with a trip that already works",
+    title: "ToursIWant — Proven USA trips, then make them yours",
     description:
-      "Proven trip templates for countries, multi-country routes, and right-now plans from your hotel. Make them yours — then book optional experiences.",
+      "Proven trip templates for American cities, multi-city routes, and right-now plans from your hotel. Make them yours — then book optional experiences.",
   },
   verification: searchConsoleVerification
     ? { google: searchConsoleVerification }

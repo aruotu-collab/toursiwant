@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import {
-  combineCountryTemplates,
+  combineUsCities,
   getTemplateBySlug,
   listTemplates,
   personalizeTemplate,
-  suggestAddCountry,
+  suggestAddDestination,
   type ExperienceCategory,
   type TemplateScale,
 } from "@/lib/trip-templates";
@@ -23,15 +23,25 @@ export async function GET(request: Request) {
   }
 
   const scale = (searchParams.get("scale") || "all") as TemplateScale | "all";
+  const cities = searchParams.getAll("city");
   const countries = searchParams.getAll("country");
   const hotelId = searchParams.get("hotelId") || undefined;
   const timeBucket = searchParams.get("time") || undefined;
   const mood = searchParams.get("mood") || undefined;
+  const region = searchParams.get("region") || undefined;
   const combine = searchParams.get("combine") === "1";
 
   const templates = combine
-    ? combineCountryTemplates(countries)
-    : listTemplates({ scale, countries, hotelId, timeBucket, mood });
+    ? combineUsCities(cities.length ? cities : countries)
+    : listTemplates({
+        scale,
+        countries,
+        cityCodes: cities,
+        hotelId,
+        timeBucket,
+        mood,
+        region,
+      });
 
   return NextResponse.json({ templates });
 }
@@ -40,6 +50,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     slug?: string;
     wants?: ExperienceCategory[];
+    addCity?: string;
     addCountry?: string;
   };
   const template = body.slug ? getTemplateBySlug(body.slug) : null;
@@ -47,9 +58,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Template required" }, { status: 400 });
   }
 
-  if (body.addCountry) {
+  const addCode = body.addCity || body.addCountry;
+  if (addCode) {
     return NextResponse.json({
-      suggestion: suggestAddCountry(template, body.addCountry),
+      suggestion: suggestAddDestination(template, addCode),
     });
   }
 

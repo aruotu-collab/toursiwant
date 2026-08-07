@@ -6,7 +6,8 @@ import {
   experienceCategoryLabel,
   personalizeOptions,
   personalizeTemplate,
-  suggestAddCountry,
+  suggestAddDestination,
+  usCityOptions,
   type ExperienceCategory,
   type ExperienceOption,
   type TripTemplate,
@@ -71,9 +72,9 @@ export function TemplateWorkspace({
   const [viatorByBlock, setViatorByBlock] = useState<
     Record<string, ViatorHit[]>
   >({});
-  const [addCountry, setAddCountry] = useState("KR");
-  const [countryHint, setCountryHint] = useState<ReturnType<
-    typeof suggestAddCountry
+  const [addCity, setAddCity] = useState("DC");
+  const [cityHint, setCityHint] = useState<ReturnType<
+    typeof suggestAddDestination
   > | null>(null);
   const [specialNote, setSpecialNote] = useState("");
   const [specialKind, setSpecialKind] = useState<
@@ -568,45 +569,48 @@ export function TemplateWorkspace({
             </div>
 
             <div className="border border-white/15 bg-white/[0.05] p-5">
-              <h2 className="font-display text-xl">Add another country</h2>
+              <h2 className="font-display text-xl">Add another city</h2>
               <p className="mt-2 text-sm text-white/55">
-                Suggested trip length if you extend this template.
+                Suggested trip length if you extend this USA template.
               </p>
-              <div className="mt-3 flex gap-2">
-                {["KR", "TH", "JP", "US"].map((c) => (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {usCityOptions.slice(0, 8).map((c) => (
                   <button
-                    key={c}
+                    key={c.code}
                     type="button"
-                    onClick={() => setAddCountry(c)}
+                    onClick={() => setAddCity(c.code)}
                     className={`border px-3 py-2 font-mono text-sm ${
-                      addCountry === c
+                      addCity === c.code
                         ? "border-amber bg-amber text-ink"
                         : "border-white/20"
                     }`}
                   >
-                    {c}
+                    {c.code}
                   </button>
                 ))}
               </div>
               <button
                 type="button"
-                onClick={() => setCountryHint(suggestAddCountry(template, addCountry))}
+                onClick={() =>
+                  setCityHint(suggestAddDestination(template, addCity))
+                }
                 className="mt-3 w-full border border-white/25 px-4 py-3 text-sm hover:border-amber"
               >
                 Suggest length
               </button>
-              {countryHint ? (
+              {cityHint ? (
                 <div className="mt-3 text-sm text-white/70">
                   <p>
-                    Recommended total: {countryHint.recommendedDays[0]}–
-                    {countryHint.recommendedDays[1]} days
+                    Add {cityHint.label}: recommended total{" "}
+                    {cityHint.recommendedDays[0]}–{cityHint.recommendedDays[1]}{" "}
+                    days
                   </p>
                   <p className="mt-1 text-white/55">
-                    Route: {countryHint.suggestedRoute}
+                    Route: {cityHint.suggestedRoute}
                   </p>
-                  {countryHint.relatedTemplates.length ? (
+                  {cityHint.relatedTemplates.length ? (
                     <ul className="mt-3 space-y-1">
-                      {countryHint.relatedTemplates.slice(0, 4).map((t) => (
+                      {cityHint.relatedTemplates.slice(0, 4).map((t) => (
                         <li key={t.id}>
                           <Link
                             href={`/trips/${t.slug}`}
