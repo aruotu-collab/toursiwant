@@ -4,9 +4,16 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getTemplateRouteNodes,
+  normalizeRouteNodes,
+  shortenLabel,
   type RouteNode,
 } from "@/components/TemplateRouteLoop";
-import { TripNodeEditor, createAddedStopNode, MAX_ROUTE_NODES } from "@/components/TripNodeEditor";
+import {
+  TripNodeEditor,
+  createDayStop,
+  MAX_DAY_STOPS,
+  MAX_STOPS_PER_DAY,
+} from "@/components/TripNodeEditor";
 import {
   experienceCategoryLabel,
   personalizeAvailability,
@@ -192,44 +199,43 @@ export function TemplateWorkspace({
   }, [voterName]);
 
   const runPersonalize = useCallback(() => {
-    // Personalize from the original flexible spine, then keep trip-path stops.
+    // Personalize flexible days; keep nested stops on matching day blocks.
     const result = personalizeTemplate(initial, wants);
-    const addedStops = routeNodes.filter(
-      (n) => n.blockId && String(n.blockId).startsWith("added_"),
-    );
-
     const hotel = routeNodes.find((n) => n.kind === "hotel") || {
       id: "hotel",
       label: "Hotel",
       kind: "hotel" as const,
     };
-    const dayNodes = result.template.blocks.map((b) => ({
-      id: `block:${b.id}`,
-      label: b.title.length > 16 ? `${b.title.slice(0, 14)}…` : b.title,
-      kind: "stop" as const,
-      blockId: b.id,
-    }));
-    const nextNodes = [hotel, ...dayNodes, ...addedStops].slice(
-      0,
-      MAX_ROUTE_NODES,
+    const stopsByBlock = new Map(
+      routeNodes
+        .filter((n) => n.kind === "day" && n.blockId)
+        .map((n) => [n.blockId!, n.stops || []]),
     );
 
+    const dayNodes: RouteNode[] = result.template.blocks.map((b, i) => ({
+      id: `block:${b.id}`,
+      label: shortenLabel(b.title),
+      kind: "day" as const,
+      blockId: b.id,
+      dayLabel: b.dayLabel || `Day ${i + 1}`,
+      dayIndex: i + 1,
+      stops: stopsByBlock.get(b.id) || [],
+    }));
+
+    const nextNodes = [hotel, ...dayNodes];
     setRouteNodes(nextNodes);
-    setTemplate((prev) => {
-      const addedBlocks = prev.blocks.filter((b) =>
-        String(b.id).startsWith("added_"),
-      );
-      return {
-        ...result.template,
-        route: nextNodes.map((n) => n.label).join(" → "),
-        blocks: [...result.template.blocks, ...addedBlocks],
-      };
+    setTemplate({
+      ...result.template,
+      route: nextNodes
+        .filter((n) => n.kind === "day")
+        .map((n) => `${n.dayLabel}: ${n.label}`)
+        .join(" → "),
     });
 
     setPersonalizeResult(result);
     setStatus(
       result.applied.length
-        ? `Applied ${result.applied.length} change${result.applied.length === 1 ? "" : "s"}. Path updated — save to keep it.`
+        ? `Applied ${result.applied.length} change${result.applied.length === 1 ? "" : "s"}. Days updated — save to keep it.`
         : result.unfit.length
           ? "Some wants need a flexible day — check which options fit this template."
           : "Nothing to apply yet — pick what the group wants.",
@@ -244,62 +250,50 @@ export function TemplateWorkspace({
     setStatus("Trip reset to the original template.");
   }, [initial]);
 
-  function syncTemplateToNodes(next: RouteNode[]) {
-    setTemplate((prev) => {
-      const keepAdded = new Set(
-        next
-          .map((n) => n.blockId)
-          .filter((id): id is string => Boolean(id && id.startsWith("added_"))),
-      );
-
-      let blocks = prev.blocks.filter((b) => {
-        if (String(b.id).startsWith("added_")) return keepAdded.has(b.id);
-        return true;
-      });
-
-      for (const n of next) {
-        if (!n.blockId || n.kind === "hotel") continue;
-        if (!String(n.blockId).startsWith("added_")) continue;
-        if (blocks.some((b) => b.id === n.blockId)) continue;
-        blocks = [
-          ...blocks,
-          {
-            id: n.blockId,
-            kind: "anchor" as const,
-            dayLabel: "Added stop",
-            title: n.label,
-            summary: "New stop on your trip map — personalize around it.",
-          },
-        ];
-      }
-
-      return {
-        ...prev,
-        route: next.map((n) => n.label).join(" → "),
-        blocks,
-      };
-    });
+  function syncRouteString(next: RouteNode[]) {
+    setTemplate((prev) => ({
+      ...prev,
+      route: next
+        .filter((n) => n.kind === "day")
+        .map((n) => {
+          const extras = n.stops?.length
+            ? ` (${n.stops.map((s) => s.label).join(", ")})`
+            : "";
+          return `${n.dayLabel || "Day"}: ${n.label}${extras}`;
+        })
+        .join(" → "),
+    }));
   }
 
-  function addRouteStop(baseLabel: string) {
+  function addRouteStop(dayId: string, baseLabel: string) {
     setRouteNodes((prev) => {
-      if (prev.length >= MAX_ROUTE_NODES) return prev;
-      const next = [...prev, createAddedStopNode(baseLabel, prev)];
-      syncTemplateToNodes(next);
+      const total = prev.reduce((n, d) => n + (d.stops?.length || 0), 0);
+      if (total >= MAX_DAY_STOPS) return prev;
+      const next = prev.map((n) => {
+        if (n.id !== dayId || n.kind !== "day") return n;
+        const existing = n.stops || [];
+        if (existing.length >= MAX_STOPS_PER_DAY) return n;
+        return {
+          ...n,
+          stops: [...existing, createDayStop(baseLabel, existing)],
+        };
+      });
+      syncRouteString(next);
       return next;
     });
-    setStatus("Stop added — tap again to add another of the same type.");
+    setStatus("Stop added under that day.");
   }
 
-  function removeRouteStop(id: string) {
+  function removeRouteStop(dayId: string, stopId: string) {
     setRouteNodes((prev) => {
-      const target = prev.find((n) => n.id === id);
-      if (!target || target.kind === "hotel") return prev;
-      let next = prev.filter((n) => n.id !== id);
-      if (!next.some((n) => n.kind === "hotel")) {
-        next = [{ id: "hotel", label: "Hotel", kind: "hotel" }, ...next];
-      }
-      syncTemplateToNodes(next);
+      const next = prev.map((n) => {
+        if (n.id !== dayId || n.kind !== "day") return n;
+        return {
+          ...n,
+          stops: (n.stops || []).filter((s) => s.id !== stopId),
+        };
+      });
+      syncRouteString(next);
       return next;
     });
     setStatus("Stop removed.");
@@ -407,34 +401,24 @@ export function TemplateWorkspace({
         setSavedTripTitle(data.trip.title);
         if (data.trip.wants?.length) setWants(data.trip.wants);
 
-        const nodes = data.trip.routeNodes?.length
-          ? data.trip.routeNodes
+        const rawNodes = data.trip.routeNodes?.length
+          ? (data.trip.routeNodes as RouteNode[])
           : null;
 
         let nextTemplate = data.trip.selections
           ? applySelections(initial, data.trip.selections)
           : { ...initial };
 
-        if (nodes) {
-          const addedBlocks = nodes
-            .filter(
-              (n) =>
-                n.blockId &&
-                String(n.blockId).startsWith("added_") &&
-                !nextTemplate.blocks.some((b) => b.id === n.blockId),
-            )
-            .map((n) => ({
-              id: n.blockId as string,
-              kind: "anchor" as const,
-              dayLabel: "Added stop",
-              title: n.label,
-              summary: "Saved stop from your trip path.",
-            }));
+        if (rawNodes) {
+          const nodes = normalizeRouteNodes(rawNodes, nextTemplate);
           nextTemplate = {
             ...nextTemplate,
             route:
-              data.trip.route || nodes.map((n) => n.label).join(" → "),
-            blocks: [...nextTemplate.blocks, ...addedBlocks],
+              data.trip.route ||
+              nodes
+                .filter((n) => n.kind === "day")
+                .map((n) => `${n.dayLabel}: ${n.label}`)
+                .join(" → "),
           };
           setRouteNodes(nodes);
         } else if (data.trip.route) {
@@ -442,9 +426,13 @@ export function TemplateWorkspace({
         }
 
         setTemplate(nextTemplate);
+        const dayCount = rawNodes
+          ? normalizeRouteNodes(rawNodes, initial).filter((n) => n.kind === "day")
+              .length
+          : 0;
         setStatus(
           `Opened your saved trip: ${data.trip.title}${
-            nodes?.length ? ` · ${nodes.length} path stops restored` : ""
+            dayCount ? ` · ${dayCount} days restored` : ""
           }`,
         );
         setAsideTab("personalize");
@@ -1182,8 +1170,8 @@ export function TemplateWorkspace({
                     Personalize flexible days
                   </p>
                   <p className="mt-1 text-sm text-white/55">
-                    Pick what the group wants — we map it onto flexible days.
-                    Your path updates when you Apply.
+                    Pick what the group wants — we map it onto Day 1 / Day 2 /
+                    Day 3. Nested stops under each day stay put.
                   </p>
 
                   {flexibleBlocks.length === 0 ? (
@@ -1287,7 +1275,7 @@ export function TemplateWorkspace({
                     Save as my trip
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-white/75">
-                    Keeps your day path, added stops, and personalize choices.
+                    Keeps your days, nested stops, and personalize choices.
                   </p>
                   <input
                     value={savedTripTitle}

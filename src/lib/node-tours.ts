@@ -19,6 +19,11 @@ const cityCodeToViator: Record<string, string> = {
 };
 
 /** Primary + broader fallbacks so every stop can still show bookable options. */
+export function queriesForLabel(label: string): string[] {
+  return nodeTourQueries(label);
+}
+
+/** Primary + broader fallbacks so every stop can still show bookable options. */
 export function nodeTourQueries(label: string): string[] {
   const l = label.toLowerCase().replace(/\s+\d+$/, "").trim();
   const bare = label.replace(/\s+\d+$/, "").trim();

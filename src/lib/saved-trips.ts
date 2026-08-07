@@ -4,12 +4,21 @@ import { randomBytes } from "crypto";
 import { ensureAppSchema, getSql, hasDatabase } from "@/lib/db";
 import type { ExperienceCategory } from "@/lib/trip-templates";
 
-/** Serializable trip-path node stored with a saved trip */
+/** Serializable nested stop under a day */
+export type SavedDayStop = {
+  id: string;
+  label: string;
+};
+
+/** Serializable trip-path node stored with a saved trip (hotel + days) */
 export type SavedRouteNode = {
   id: string;
   label: string;
-  kind: "hotel" | "stop";
+  kind: "hotel" | "day" | "stop";
   blockId?: string;
+  dayLabel?: string;
+  dayIndex?: number;
+  stops?: SavedDayStop[];
 };
 
 export type SavedTrip = {

@@ -52,8 +52,11 @@ export async function POST(request: Request) {
       routeNodes?: Array<{
         id: string;
         label: string;
-        kind: "hotel" | "stop";
+        kind: "hotel" | "day" | "stop";
         blockId?: string;
+        dayLabel?: string;
+        dayIndex?: number;
+        stops?: Array<{ id: string; label: string }>;
       }>;
       sourceShareCode?: string;
     };

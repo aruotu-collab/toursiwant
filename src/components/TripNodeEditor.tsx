@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   TemplateRouteLoop,
+  type DayStop,
   type RouteNode,
 } from "@/components/TemplateRouteLoop";
 import {
+  queriesForLabel,
   queriesForRouteNode,
   templateViatorCity,
 } from "@/lib/node-tours";
@@ -24,7 +26,13 @@ const SUGGESTED_STOPS = [
   "Walk",
 ];
 
-export const MAX_ROUTE_NODES = 12;
+/** Max nested stops across the whole trip */
+export const MAX_DAY_STOPS = 12;
+/** Max nested stops on a single day */
+export const MAX_STOPS_PER_DAY = 5;
+
+/** @deprecated kept for imports; days aren't capped this way anymore */
+export const MAX_ROUTE_NODES = MAX_DAY_STOPS;
 
 type TourHit = {
   id: string;
@@ -39,12 +47,12 @@ function newStopId() {
   return `custom:${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** Number duplicate labels: Market, Market 2, Market 3… */
-export function labelForNewStop(base: string, nodes: RouteNode[]) {
+/** Number duplicate labels within one day's stops: Market, Market 2… */
+export function labelForNewStop(base: string, existing: DayStop[]) {
   const clean = base.trim().slice(0, 18);
   if (!clean) return "Stop";
   const lower = clean.toLowerCase();
-  const count = nodes.filter((n) => {
+  const count = existing.filter((n) => {
     const l = n.label.toLowerCase();
     return l === lower || l.match(new RegExp(`^${escapeRegExp(lower)} \\d+$`));
   }).length;
@@ -56,8 +64,12 @@ function escapeRegExp(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function countAllStops(nodes: RouteNode[]) {
+  return nodes.reduce((n, d) => n + (d.stops?.length || 0), 0);
+}
+
 /**
- * Combined day-path editor: path first, then add stops, tours, then
+ * Combined editor: days first, add stops under a day, tours, then
  * personalize / save (via children).
  */
 export function TripNodeEditor({
@@ -70,40 +82,71 @@ export function TripNodeEditor({
 }: {
   nodes: RouteNode[];
   template: TripTemplate;
-  onAddStop: (label: string) => void;
-  onRemoveStop: (id: string) => void;
+  onAddStop: (dayId: string, label: string) => void;
+  onRemoveStop: (dayId: string, stopId: string) => void;
   suggestions?: string[];
   children?: ReactNode;
 }) {
+  const days = useMemo(() => nodes.filter((n) => n.kind === "day"), [nodes]);
   const [custom, setCustom] = useState("");
-  const [selected, setSelected] = useState<RouteNode | null>(null);
+  const [selectedDayId, setSelectedDayId] = useState<string | null>(
+    () => days[0]?.id ?? null,
+  );
+  const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
   const [tours, setTours] = useState<TourHit[]>([]);
   const [loadingTours, setLoadingTours] = useState(false);
   const [tourError, setTourError] = useState<string | null>(null);
   const [tourNote, setTourNote] = useState<string | null>(null);
 
-  const atLimit = nodes.length >= MAX_ROUTE_NODES;
+  const selectedDay =
+    days.find((d) => d.id === selectedDayId) ||
+    nodes.find((n) => n.id === selectedDayId && n.kind === "hotel") ||
+    null;
+  const selectedStop =
+    selectedDay?.kind === "day"
+      ? selectedDay.stops?.find((s) => s.id === selectedStopId) || null
+      : null;
+
+  const totalStops = countAllStops(nodes);
+  const dayStopCount = selectedDay?.stops?.length || 0;
+  const atLimit =
+    totalStops >= MAX_DAY_STOPS ||
+    dayStopCount >= MAX_STOPS_PER_DAY ||
+    !selectedDay ||
+    selectedDay.kind !== "day";
+
   const chips = Array.from(
     new Set(suggestions.map((s) => s.trim()).filter(Boolean)),
   );
 
   useEffect(() => {
-    if (!selected) return;
-    if (!nodes.some((n) => n.id === selected.id)) {
-      setSelected(null);
+    if (!selectedDayId) return;
+    if (!nodes.some((n) => n.id === selectedDayId)) {
+      setSelectedDayId(days[0]?.id ?? null);
+      setSelectedStopId(null);
       setTours([]);
+    } else if (
+      selectedStopId &&
+      selectedDay?.kind === "day" &&
+      !selectedDay.stops?.some((s) => s.id === selectedStopId)
+    ) {
+      setSelectedStopId(null);
     }
-  }, [nodes, selected]);
+  }, [nodes, selectedDayId, selectedStopId, selectedDay, days]);
 
   useEffect(() => {
-    if (!selected) {
+    if (!selectedDay) {
       setTours([]);
       setTourError(null);
       setTourNote(null);
       return;
     }
-    const queries = queriesForRouteNode(selected, template);
+
+    const queries = selectedStop
+      ? [...queriesForLabel(selectedStop.label), ""]
+      : queriesForRouteNode(selectedDay, template);
     const city = templateViatorCity(template);
+    const focusLabel = selectedStop?.label || selectedDay.label;
     let cancelled = false;
     setLoadingTours(true);
     setTourError(null);
@@ -139,11 +182,11 @@ export function TripNodeEditor({
         setTours(products);
         if (!products.length) {
           setTourError(
-            `No tours found for “${selected.label}” yet — try another stop.`,
+            `No tours found for “${focusLabel}” yet — try another stop.`,
           );
         } else if (broadened && usedQuery === "") {
           setTourNote(
-            `No exact match for “${selected.label}” — showing popular tours nearby.`,
+            `No exact match for “${focusLabel}” — showing popular tours nearby.`,
           );
         }
       } catch {
@@ -155,18 +198,33 @@ export function TripNodeEditor({
     return () => {
       cancelled = true;
     };
-  }, [selected, template]);
+  }, [selectedDay, selectedStop, template]);
 
   function add(label: string) {
     const clean = label.trim();
-    if (!clean || atLimit) return;
-    onAddStop(clean);
+    if (!clean || atLimit || !selectedDay || selectedDay.kind !== "day") return;
+    onAddStop(selectedDay.id, clean);
     setCustom("");
   }
 
   function selectNode(node: RouteNode) {
-    setSelected((prev) => (prev?.id === node.id ? null : node));
+    setSelectedDayId((prev) => {
+      if (prev === node.id && !selectedStopId) return prev;
+      return node.id;
+    });
+    setSelectedStopId(null);
   }
+
+  function selectStop(day: RouteNode, stop: DayStop) {
+    setSelectedDayId(day.id);
+    setSelectedStopId((prev) => (prev === stop.id ? null : stop.id));
+  }
+
+  const tourHeading = selectedStop
+    ? selectedStop.label
+    : selectedDay?.kind === "day"
+      ? `${selectedDay.dayLabel || "Day"} · ${selectedDay.label}`
+      : selectedDay?.label || "";
 
   return (
     <div className="border border-white/15 bg-white/[0.05]">
@@ -175,30 +233,39 @@ export function TripNodeEditor({
           <div>
             <h2 className="font-display text-xl">Make it yours</h2>
             <p className="mt-1 text-sm text-white/55">
-              Shape the day path, add stops, personalize flexible days — then
-              save.
+              Numbers are days. Add stops under a day, personalize the vibe,
+              then save.
             </p>
           </div>
           <p className="font-mono text-[11px] text-white/40">
-            {nodes.length}/{MAX_ROUTE_NODES}
+            {totalStops}/{MAX_DAY_STOPS} stops
           </p>
         </div>
       </div>
 
-      {/* 1 · Your day path first */}
       <TemplateRouteLoop
         nodes={nodes}
         interactive
-        selectedNodeId={selected?.id ?? null}
-        onRemoveNode={onRemoveStop}
+        selectedNodeId={selectedDayId}
+        selectedStopId={selectedStopId}
         onSelectNode={selectNode}
+        onSelectStop={selectStop}
+        onRemoveStop={onRemoveStop}
         className="w-full border-0 border-b border-white/10"
       />
 
-      {/* 2 · Add stops */}
       <div className="space-y-3 border-b border-white/10 px-4 py-4 sm:px-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
           Add a stop
+          {selectedDay?.kind === "day" ? (
+            <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-white/50">
+              → {selectedDay.dayLabel || "Day"}
+            </span>
+          ) : (
+            <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-white/45">
+              · tap a day first
+            </span>
+          )}
         </p>
         <div className="flex flex-wrap gap-2">
           {chips.map((label) => (
@@ -237,15 +304,15 @@ export function TripNodeEditor({
         </div>
       </div>
 
-      {selected ? (
+      {selectedDay ? (
         <div className="border-b border-amber/25 bg-amber/5 px-4 py-4 sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
-                Tours for this stop
+                {selectedStop ? "Tours for this stop" : "Tours for this day"}
               </p>
               <p className="mt-1 font-display text-lg text-white">
-                {selected.label}
+                {tourHeading}
               </p>
               <p className="mt-0.5 text-xs text-white/45">
                 Near {templateViatorCity(template)}
@@ -253,7 +320,10 @@ export function TripNodeEditor({
             </div>
             <button
               type="button"
-              onClick={() => setSelected(null)}
+              onClick={() => {
+                setSelectedStopId(null);
+                if (selectedDay.kind === "hotel") setSelectedDayId(days[0]?.id ?? null);
+              }}
               className="text-xs text-white/50 hover:text-amber"
             >
               Close
@@ -290,7 +360,6 @@ export function TripNodeEditor({
         </div>
       ) : null}
 
-      {/* 3 · Personalize + save (from parent) */}
       {children ? (
         <div className="space-y-4 px-4 py-4 sm:px-5">{children}</div>
       ) : null}
@@ -298,15 +367,29 @@ export function TripNodeEditor({
   );
 }
 
+export function createDayStop(
+  baseLabel: string,
+  existingOnDay: DayStop[],
+): DayStop {
+  return {
+    id: newStopId(),
+    label: labelForNewStop(baseLabel, existingOnDay),
+  };
+}
+
+/** @deprecated use createDayStop */
 export function createAddedStopNode(
   baseLabel: string,
   existing: RouteNode[],
 ): RouteNode {
-  const id = newStopId();
+  const flat = existing.flatMap((n) => n.stops || []);
+  const stop = createDayStop(baseLabel, flat);
   return {
-    id,
-    label: labelForNewStop(baseLabel, existing),
-    kind: "stop",
-    blockId: `added_${id.replace(/[^a-zA-Z0-9]+/g, "_")}`,
+    id: stop.id,
+    label: stop.label,
+    kind: "day",
+    dayLabel: "Added",
+    dayIndex: existing.filter((n) => n.kind === "day").length + 1,
+    stops: [],
   };
 }
