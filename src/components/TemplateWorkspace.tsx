@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   experienceCategoryLabel,
-  personalizeOptions,
+  personalizeAvailability,
   personalizeTemplate,
   suggestAddDestination,
   usCityOptions,
   type ExperienceCategory,
   type ExperienceOption,
+  type PersonalizeResult,
   type TripTemplate,
 } from "@/lib/trip-templates";
 
@@ -17,7 +18,14 @@ type Session = {
   id: string;
   shareCode: string;
   votes: Record<string, Record<string, number>>;
+  voters?: Array<{
+    key: string;
+    name: string;
+    votes: Record<string, string>;
+  }>;
   voterNames: string[];
+  wants?: ExperienceCategory[];
+  selections?: Record<string, string>;
   specialEventRequests: Array<{
     id: string;
     kind: string;
@@ -27,12 +35,31 @@ type Session = {
   travelledRating?: number;
 };
 
+type Winners = Record<string, { optionId: string; count: number }>;
+
 type ViatorHit = {
   id: string;
   title: string;
   priceFrom?: string;
-  partner?: string;
 };
+
+function voterStorageKey() {
+  return "tiw_voter_key";
+}
+
+function voterNameStorageKey() {
+  return "tiw_voter_name";
+}
+
+function ensureVoterKey() {
+  if (typeof window === "undefined") return "server";
+  let key = localStorage.getItem(voterStorageKey());
+  if (!key) {
+    key = `v_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(voterStorageKey(), key);
+  }
+  return key;
+}
 
 function applyOption(
   template: TripTemplate,
@@ -56,6 +83,20 @@ function applyOption(
   };
 }
 
+function applySelections(
+  base: TripTemplate,
+  selections: Record<string, string>,
+): TripTemplate {
+  let next = base;
+  for (const [blockId, optionId] of Object.entries(selections)) {
+    const opt = base.blocks
+      .find((b) => b.id === blockId)
+      ?.alternatives?.find((a) => a.id === optionId);
+    if (opt) next = applyOption(next, blockId, opt);
+  }
+  return next;
+}
+
 export function TemplateWorkspace({
   initial,
 }: {
@@ -63,19 +104,22 @@ export function TemplateWorkspace({
 }) {
   const [template, setTemplate] = useState(initial);
   const [wants, setWants] = useState<ExperienceCategory[]>([]);
-  const [messages, setMessages] = useState<string[]>([]);
-  const [tradeOffs, setTradeOffs] = useState<string[]>([]);
+  const [personalizeResult, setPersonalizeResult] =
+    useState<PersonalizeResult | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [winners, setWinners] = useState<Winners>({});
   const [shareUrl, setShareUrl] = useState("");
   const [voterName, setVoterName] = useState("");
+  const [voterKey, setVoterKey] = useState("");
+  const [joined, setJoined] = useState(false);
   const [busy, setBusy] = useState(false);
   const [viatorByBlock, setViatorByBlock] = useState<
     Record<string, ViatorHit[]>
   >({});
-  const [addCity, setAddCity] = useState("DC");
-  const [cityHint, setCityHint] = useState<ReturnType<
-    typeof suggestAddDestination
-  > | null>(null);
+  const [addCity, setAddCity] = useState(() => {
+    const first = usCityOptions.find((c) => !initial.cityCodes.includes(c.code));
+    return first?.code || "DC";
+  });
   const [specialNote, setSpecialNote] = useState("");
   const [specialKind, setSpecialKind] = useState<
     "band" | "private_dinner" | "other"
@@ -83,18 +127,69 @@ export function TemplateWorkspace({
   const [rating, setRating] = useState(5);
   const [ratingNote, setRatingNote] = useState("");
   const [status, setStatus] = useState("");
+  const [asideTab, setAsideTab] = useState<
+    "personalize" | "share" | "city"
+  >("personalize");
+
+  const availability = useMemo(
+    () => personalizeAvailability(initial),
+    [initial],
+  );
 
   const flexibleBlocks = useMemo(
-    () => template.blocks.filter((b) => b.alternatives?.length),
-    [template],
+    () => initial.blocks.filter((b) => b.alternatives?.length),
+    [initial],
   );
+
+  const preview = useMemo(
+    () => (wants.length ? personalizeTemplate(initial, wants) : null),
+    [initial, wants],
+  );
+
+  const cityHint = useMemo(
+    () => suggestAddDestination(initial, addCity),
+    [initial, addCity],
+  );
+
+  const addableCities = useMemo(
+    () => usCityOptions.filter((c) => !initial.cityCodes.includes(c.code)),
+    [initial.cityCodes],
+  );
+
+  const myVotes = useMemo(() => {
+    if (!session?.voters || !voterKey) return {} as Record<string, string>;
+    return session.voters.find((v) => v.key === voterKey)?.votes || {};
+  }, [session, voterKey]);
+
+  useEffect(() => {
+    setVoterKey(ensureVoterKey());
+    const saved = localStorage.getItem(voterNameStorageKey());
+    if (saved) setVoterName(saved);
+  }, []);
+
+  useEffect(() => {
+    if (voterName.trim()) {
+      localStorage.setItem(voterNameStorageKey(), voterName.trim());
+    }
+  }, [voterName]);
 
   const runPersonalize = useCallback(() => {
     const result = personalizeTemplate(initial, wants);
     setTemplate(result.template);
-    setMessages(result.messages);
-    setTradeOffs(result.tradeOffs);
+    setPersonalizeResult(result);
+    setStatus(
+      result.applied.length
+        ? `Applied ${result.applied.length} change${result.applied.length === 1 ? "" : "s"}.`
+        : "Nothing to apply yet — pick what the group wants.",
+    );
   }, [initial, wants]);
+
+  const resetPersonalize = useCallback(() => {
+    setWants([]);
+    setPersonalizeResult(null);
+    setTemplate(initial);
+    setStatus("Trip reset to the original template.");
+  }, [initial]);
 
   useEffect(() => {
     const blocks = template.blocks.filter((b) => b.viatorQuery);
@@ -122,28 +217,88 @@ export function TemplateWorkspace({
     };
   }, [template]);
 
+  async function refreshSession(code: string) {
+    const res = await fetch(
+      `/api/trip-sessions?code=${encodeURIComponent(code)}`,
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      session: Session;
+      winners?: Winners;
+    };
+    setSession(data.session);
+    setWinners(data.winners || {});
+    return data;
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("share");
+    if (!code) return;
+    (async () => {
+      const data = await refreshSession(code);
+      if (!data) return;
+      setShareUrl(
+        `${window.location.origin}/trips/${initial.slug}?share=${code}`,
+      );
+      setAsideTab("share");
+      if (data.session.wants?.length) setWants(data.session.wants);
+      if (data.session.selections) {
+        setTemplate(applySelections(initial, data.session.selections));
+      }
+    })();
+  }, [initial]);
+
+  // Live poll while a share session is open
+  useEffect(() => {
+    if (!session?.shareCode) return;
+    const id = window.setInterval(() => {
+      void refreshSession(session.shareCode);
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [session?.shareCode]);
+
   async function createShare() {
+    if (!voterName.trim()) {
+      setStatus("Enter your name before creating a share link.");
+      return;
+    }
     setBusy(true);
     setStatus("");
     try {
+      const selections: Record<string, string> = {};
+      for (const swap of personalizeResult?.applied || []) {
+        selections[swap.blockId] = swap.optionId;
+      }
       const res = await fetch("/api/trip-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "create",
-          templateSlug: template.slug,
-          templateTitle: template.title,
-          hotelName: template.hotelAnchor?.name,
+          templateSlug: initial.slug,
+          templateTitle: initial.title,
+          hotelName: initial.hotelAnchor?.name,
           wants,
+          selections,
+          hostName: voterName.trim(),
+          hostKey: voterKey || ensureVoterKey(),
         }),
       });
-      const data = (await res.json()) as { session?: Session; error?: string };
+      const data = (await res.json()) as {
+        session?: Session;
+        winners?: Winners;
+        error?: string;
+      };
       if (!res.ok || !data.session) throw new Error(data.error || "Failed");
       setSession(data.session);
-      const url = `${window.location.origin}/trips/${template.slug}?share=${data.session.shareCode}`;
+      setWinners(data.winners || {});
+      setJoined(true);
+      const url = `${window.location.origin}/trips/${initial.slug}?share=${data.session.shareCode}`;
       setShareUrl(url);
+      window.history.replaceState(null, "", `?share=${data.session.shareCode}`);
       await navigator.clipboard?.writeText(url).catch(() => undefined);
-      setStatus("Share link created and copied.");
+      setStatus("Share link created and copied. Send it to your group.");
+      setAsideTab("share");
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Could not create share");
     } finally {
@@ -151,10 +306,51 @@ export function TemplateWorkspace({
     }
   }
 
+  async function joinShare() {
+    if (!session || !voterName.trim()) {
+      setStatus("Enter your name to join the group vote.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/trip-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "join",
+          shareCode: session.shareCode,
+          voterName: voterName.trim(),
+          voterKey: voterKey || ensureVoterKey(),
+        }),
+      });
+      const data = (await res.json()) as {
+        session?: Session;
+        winners?: Winners;
+      };
+      if (data.session) {
+        setSession(data.session);
+        setWinners(data.winners || {});
+        setJoined(true);
+        setStatus(`Joined as ${voterName.trim()}. Vote on flexible days below.`);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function castVote(blockId: string, optionId: string) {
     if (!session) {
-      setStatus("Create a share link first so the group can vote.");
+      setStatus("Create or open a share link first.");
+      setAsideTab("share");
       return;
+    }
+    if (!voterName.trim()) {
+      setStatus("Enter your name, then vote.");
+      setAsideTab("share");
+      return;
+    }
+    if (!joined) {
+      await joinShare();
     }
     setBusy(true);
     try {
@@ -166,33 +362,57 @@ export function TemplateWorkspace({
           shareCode: session.shareCode,
           blockId,
           optionId,
-          voterName: voterName || "Guest",
+          voterName: voterName.trim(),
+          voterKey: voterKey || ensureVoterKey(),
         }),
       });
-      const data = (await res.json()) as { session?: Session };
+      const data = (await res.json()) as {
+        session?: Session;
+        winners?: Winners;
+      };
       if (data.session) {
         setSession(data.session);
-        const opt = template.blocks
+        setWinners(data.winners || {});
+        setJoined(true);
+        const opt = initial.blocks
           .find((b) => b.id === blockId)
           ?.alternatives?.find((a) => a.id === optionId);
-        if (opt) {
-          setTemplate((t) => applyOption(t, blockId, opt));
-          if (opt.tradeOff) {
-            setTradeOffs((prev) =>
-              prev.includes(opt.tradeOff!) ? prev : [...prev, opt.tradeOff!],
-            );
-          }
-        }
-        setStatus("Vote recorded.");
+        if (opt) setTemplate((t) => applyOption(t, blockId, opt));
+        setStatus("Vote saved — you can change it anytime.");
       }
     } finally {
       setBusy(false);
     }
   }
 
+  function applyWinners() {
+    if (!Object.keys(winners).length) {
+      setStatus("No votes yet.");
+      return;
+    }
+    let next = initial;
+    const tradeOffs: string[] = [];
+    for (const [blockId, win] of Object.entries(winners)) {
+      const opt = initial.blocks
+        .find((b) => b.id === blockId)
+        ?.alternatives?.find((a) => a.id === win.optionId);
+      if (opt) {
+        next = applyOption(next, blockId, opt);
+        if (opt.tradeOff) tradeOffs.push(opt.tradeOff);
+      }
+    }
+    setTemplate(next);
+    setStatus(
+      tradeOffs.length
+        ? `Applied group winners. Trade-offs: ${tradeOffs.join(" · ")}`
+        : "Applied the group's winning choices to this trip.",
+    );
+  }
+
   async function requestSpecial() {
     if (!session) {
       setStatus("Create a share session first.");
+      setAsideTab("share");
       return;
     }
     setBusy(true);
@@ -210,7 +430,7 @@ export function TemplateWorkspace({
       const data = (await res.json()) as { session?: Session };
       if (data.session) {
         setSession(data.session);
-        setStatus("Special experience requested — provider follow-up.");
+        setStatus("Special experience requested.");
         setSpecialNote("");
       }
     } finally {
@@ -221,6 +441,7 @@ export function TemplateWorkspace({
   async function submitRating() {
     if (!session) {
       setStatus("Create a share session to leave a travelled rating.");
+      setAsideTab("share");
       return;
     }
     setBusy(true);
@@ -238,25 +459,18 @@ export function TemplateWorkspace({
       const data = (await res.json()) as { session?: Session };
       if (data.session) {
         setSession(data.session);
-        setStatus("Thanks — rating saved as “actually travelled” feedback.");
+        setStatus("Travelled rating saved.");
       }
     } finally {
       setBusy(false);
     }
   }
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("share");
-    if (!code) return;
-    (async () => {
-      const res = await fetch(`/api/trip-sessions?code=${encodeURIComponent(code)}`);
-      if (!res.ok) return;
-      const data = (await res.json()) as { session: Session };
-      setSession(data.session);
-      setShareUrl(`${window.location.origin}/trips/${template.slug}?share=${code}`);
-    })();
-  }, [template.slug]);
+  async function copyShare() {
+    if (!shareUrl) return;
+    await navigator.clipboard?.writeText(shareUrl).catch(() => undefined);
+    setStatus("Link copied.");
+  }
 
   return (
     <div className="relative min-h-screen bg-[#071018] text-white">
@@ -277,17 +491,18 @@ export function TemplateWorkspace({
             Tours<span className="text-amber">I</span>Want
           </Link>
           <Link
-            href="/"
+            href="/?door=explore"
             className="font-mono text-xs uppercase tracking-[0.16em] text-white/50 hover:text-amber"
           >
-            ← Templates
+            ← USA templates
           </Link>
         </div>
 
-        <div className="mt-10 grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="mt-10 grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
               {template.scale.replace("_", " ")} · {template.days} days
+              {template.region ? ` · ${template.region}` : ""}
               {template.hotelAnchor
                 ? ` · from ${template.hotelAnchor.name}`
                 : ""}
@@ -299,422 +514,612 @@ export function TemplateWorkspace({
             <p className="mt-4 max-w-2xl leading-relaxed text-white/65">
               {template.blurb}
             </p>
-            <div className="mt-5 flex flex-wrap gap-4 font-mono text-[11px] text-white/45">
-              <span>{template.savedCount.toLocaleString()} saved</span>
-              <span>{template.groupsUsed} groups used</span>
-              <span>{template.recommendPercent}% recommend</span>
-              <span>{template.keptOrderPercent}% kept this order</span>
-              {template.travelledRating ? (
-                <span>
-                  ★ {template.travelledRating} from{" "}
-                  {template.travelledReviews} who travelled
-                </span>
-              ) : null}
-            </div>
 
-            {template.hotelAnchor ? (
-              <p className="mt-6 border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/70">
-                Hotel anchor: {template.hotelAnchor.name} (
-                {template.hotelAnchor.area}). Walking times shown from this
-                stay.
-              </p>
+            {session ? (
+              <div className="mt-5 flex flex-wrap items-center gap-3 border border-amber/30 bg-amber/10 px-4 py-3 text-sm">
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
+                  Group live
+                </span>
+                <span className="text-white/75">
+                  {(session.voters || []).length} in room · code{" "}
+                  <span className="font-mono text-amber">{session.shareCode}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={applyWinners}
+                  className="border border-amber/50 px-3 py-1.5 text-xs text-amber hover:bg-amber/20"
+                >
+                  Apply winning votes
+                </button>
+              </div>
+            ) : null}
+
+            {personalizeResult?.applied.length ? (
+              <div className="mt-5 border border-white/15 bg-white/[0.04] px-4 py-3 text-sm text-white/70">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
+                  Personalized
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {personalizeResult.applied.map((a) => (
+                    <li key={a.blockId}>
+                      {a.dayLabel}: {a.toTitle}
+                      {a.tradeOff ? (
+                        <span className="text-white/45"> — {a.tradeOff}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             <ol className="mt-10 space-y-4">
-              {template.blocks.map((block) => (
-                <li
-                  key={block.id}
-                  className="border border-white/15 bg-white/[0.04] p-5"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
-                        {block.dayLabel}
-                        {block.kind !== "anchor" ? ` · ${block.kind}` : ""}
-                      </p>
-                      <h2 className="mt-2 font-display text-2xl">
-                        {block.title}
-                      </h2>
-                    </div>
-                    <div className="flex flex-wrap gap-2 text-[11px] text-white/50">
-                      {typeof block.fromHotelMinutes === "number" ? (
-                        <span className="border border-white/15 px-2 py-1">
-                          ~{block.fromHotelMinutes} min from hotel
-                        </span>
-                      ) : null}
-                      {block.free === true ? (
-                        <span className="border border-white/15 px-2 py-1">
-                          Free
-                        </span>
-                      ) : null}
-                      {block.free === false ? (
-                        <span className="border border-white/15 px-2 py-1">
-                          Paid optional
-                        </span>
-                      ) : null}
-                      {block.walking ? (
-                        <span className="border border-white/15 px-2 py-1">
-                          Walk: {block.walking}
-                        </span>
-                      ) : null}
-                      {block.specialProviderRequired ? (
-                        <span className="border border-amber/40 px-2 py-1 text-amber">
-                          Provider required
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <p className="mt-2 text-sm text-white/65">{block.summary}</p>
+              {template.blocks.map((block) => {
+                const blockVotes = session?.votes?.[block.id] || {};
+                const totalVotes = Object.values(blockVotes).reduce(
+                  (s, n) => s + n,
+                  0,
+                );
+                const winnerId = winners[block.id]?.optionId;
+                const myPick = myVotes[block.id];
 
-                  {block.alternatives?.length ? (
-                    <div className="mt-4 space-y-2">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-                        Swap this slot
-                      </p>
-                      {block.alternatives.map((opt) => {
-                        const votes =
-                          session?.votes?.[block.id]?.[opt.id] || 0;
-                        return (
-                          <div
-                            key={opt.id}
-                            className="flex flex-col gap-2 border border-white/10 bg-black/20 p-3 sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <div>
-                              <p className="text-sm text-white">
-                                {opt.title}
-                                <span className="ml-2 text-white/40">
-                                  {experienceCategoryLabel[opt.category]}
-                                </span>
-                              </p>
-                              <p className="mt-1 text-xs text-white/50">
-                                {opt.summary}
-                                {opt.tradeOff ? ` · ${opt.tradeOff}` : ""}
-                              </p>
-                              {votes > 0 ? (
-                                <p className="mt-1 font-mono text-[10px] text-amber">
-                                  {votes} group vote{votes === 1 ? "" : "s"}
-                                </p>
-                              ) : null}
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => {
-                                  setTemplate((t) =>
-                                    applyOption(t, block.id, opt),
-                                  );
-                                  if (opt.tradeOff) {
-                                    setTradeOffs((prev) =>
-                                      prev.includes(opt.tradeOff!)
-                                        ? prev
-                                        : [...prev, opt.tradeOff!],
-                                    );
-                                  }
-                                }}
-                                className="border border-white/25 px-3 py-2 text-xs hover:border-amber"
-                              >
-                                Use
-                              </button>
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => castVote(block.id, opt.id)}
-                                className="border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-amber hover:bg-amber/20"
-                              >
-                                Vote
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                return (
+                  <li
+                    key={block.id}
+                    className="border border-white/15 bg-white/[0.04] p-5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
+                          {block.dayLabel}
+                          {block.kind !== "anchor" ? ` · ${block.kind}` : ""}
+                        </p>
+                        <h2 className="mt-2 font-display text-2xl">
+                          {block.title}
+                        </h2>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-[11px] text-white/50">
+                        {typeof block.fromHotelMinutes === "number" ? (
+                          <span className="border border-white/15 px-2 py-1">
+                            ~{block.fromHotelMinutes} min from hotel
+                          </span>
+                        ) : null}
+                        {block.free === true ? (
+                          <span className="border border-white/15 px-2 py-1">
+                            Free
+                          </span>
+                        ) : null}
+                        {block.specialProviderRequired ? (
+                          <span className="border border-amber/40 px-2 py-1 text-amber">
+                            Provider required
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                  ) : null}
+                    <p className="mt-2 text-sm text-white/65">{block.summary}</p>
 
-                  {viatorByBlock[block.id]?.length ? (
-                    <div className="mt-4">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-                        Optional bookable (Viator)
-                      </p>
-                      <ul className="mt-2 space-y-2">
-                        {viatorByBlock[block.id].map((p) => (
-                          <li key={p.id}>
-                            <a
-                              href={`/go/viator/${encodeURIComponent(p.id)}`}
-                              className="flex items-center justify-between gap-3 border border-white/10 px-3 py-2 text-sm hover:border-amber/50"
+                    {block.alternatives?.length ? (
+                      <div className="mt-4 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                            Group vote on this slot
+                          </p>
+                          {totalVotes > 0 ? (
+                            <p className="font-mono text-[10px] text-white/40">
+                              {totalVotes} vote{totalVotes === 1 ? "" : "s"}
+                            </p>
+                          ) : null}
+                        </div>
+                        {block.alternatives.map((opt) => {
+                          const votes = blockVotes[opt.id] || 0;
+                          const pct =
+                            totalVotes > 0
+                              ? Math.round((votes / totalVotes) * 100)
+                              : 0;
+                          const isMine = myPick === opt.id;
+                          const isWinner = winnerId === opt.id && votes > 0;
+                          return (
+                            <div
+                              key={opt.id}
+                              className={`relative overflow-hidden border p-3 ${
+                                isWinner
+                                  ? "border-amber/50 bg-amber/10"
+                                  : isMine
+                                    ? "border-white/40 bg-white/[0.06]"
+                                    : "border-white/10 bg-black/20"
+                              }`}
                             >
-                              <span className="line-clamp-1">{p.title}</span>
-                              <span className="shrink-0 font-mono text-[11px] text-amber">
-                                {p.priceFrom || "View"}
-                              </span>
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : block.viatorQuery ? (
-                    <p className="mt-3 text-xs text-white/40">
-                      Bookable options load when Viator is available for “
-                      {block.viatorQuery}”.
-                    </p>
-                  ) : null}
-                </li>
-              ))}
+                              {totalVotes > 0 ? (
+                                <div
+                                  className="pointer-events-none absolute inset-y-0 left-0 bg-amber/15"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              ) : null}
+                              <div className="relative flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <p className="text-sm text-white">
+                                    {opt.title}
+                                    <span className="ml-2 text-white/40">
+                                      {experienceCategoryLabel[opt.category]}
+                                    </span>
+                                    {isWinner ? (
+                                      <span className="ml-2 font-mono text-[10px] text-amber">
+                                        LEADING
+                                      </span>
+                                    ) : null}
+                                    {isMine ? (
+                                      <span className="ml-2 font-mono text-[10px] text-white/50">
+                                        YOUR VOTE
+                                      </span>
+                                    ) : null}
+                                  </p>
+                                  <p className="mt-1 text-xs text-white/50">
+                                    {opt.summary}
+                                    {opt.tradeOff ? ` · ${opt.tradeOff}` : ""}
+                                  </p>
+                                  {votes > 0 ? (
+                                    <p className="mt-1 font-mono text-[10px] text-amber">
+                                      {votes} · {pct}%
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      setTemplate((t) =>
+                                        applyOption(t, block.id, opt),
+                                      );
+                                      setStatus(`Using “${opt.title}” for now.`);
+                                    }}
+                                    className="border border-white/25 px-3 py-2 text-xs hover:border-amber"
+                                  >
+                                    Use
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => castVote(block.id, opt.id)}
+                                    className={`px-3 py-2 text-xs ${
+                                      isMine
+                                        ? "bg-amber text-ink"
+                                        : "border border-amber/40 bg-amber/10 text-amber hover:bg-amber/20"
+                                    }`}
+                                  >
+                                    {isMine ? "Voted" : "Vote"}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    {viatorByBlock[block.id]?.length ? (
+                      <div className="mt-4">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                          Optional bookable (Viator)
+                        </p>
+                        <ul className="mt-2 space-y-2">
+                          {viatorByBlock[block.id].map((p) => (
+                            <li key={p.id}>
+                              <a
+                                href={`/go/viator/${encodeURIComponent(p.id)}`}
+                                className="flex items-center justify-between gap-3 border border-white/10 px-3 py-2 text-sm hover:border-amber/50"
+                              >
+                                <span className="line-clamp-1">{p.title}</span>
+                                <span className="shrink-0 font-mono text-[11px] text-amber">
+                                  {p.priceFrom || "View"}
+                                </span>
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ol>
           </div>
 
-          <aside className="space-y-6 lg:sticky lg:top-8 lg:self-start">
-            <div className="border border-amber/30 bg-amber/10 p-5">
-              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
-                Make it yours
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-white/80">
-                Anchors stay. Flexible days swap. Share one link so the group can
-                vote — then book paid pieces only when they fit.
-              </p>
+          <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
+            <div className="grid grid-cols-3 border border-white/15">
+              {(
+                [
+                  ["personalize", "Personalize"],
+                  ["share", "Share & vote"],
+                  ["city", "Add city"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setAsideTab(id)}
+                  className={`px-2 py-3 text-xs font-semibold transition sm:text-sm ${
+                    asideTab === id
+                      ? "bg-amber text-ink"
+                      : "bg-white/[0.03] text-white/65 hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            <div className="border border-white/15 bg-white/[0.05] p-5">
-              <h2 className="font-display text-xl">Personalize</h2>
-              <p className="mt-2 text-sm text-white/55">
-                Select what this group wants. Flexible days swap; anchors stay.
-              </p>
-              <div className="mt-4 space-y-2">
-                {personalizeOptions.map((opt) => {
-                  const on = wants.includes(opt.id);
-                  return (
-                    <label
-                      key={opt.id}
-                      className="flex cursor-pointer items-start gap-2 text-sm text-white/75"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={on}
-                        onChange={() =>
-                          setWants((prev) =>
-                            on
-                              ? prev.filter((x) => x !== opt.id)
-                              : [...prev, opt.id],
-                          )
-                        }
-                        className="mt-1"
-                      />
-                      {opt.label}
-                    </label>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                onClick={runPersonalize}
-                className="mt-5 w-full bg-amber px-4 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
-              >
-                Apply to this trip
-              </button>
-              {messages.length ? (
-                <ul className="mt-4 space-y-2 text-sm text-white/70">
-                  {messages.map((m) => (
-                    <li key={m}>· {m}</li>
-                  ))}
-                </ul>
-              ) : null}
-              {tradeOffs.length ? (
-                <div className="mt-4 border border-amber/30 bg-amber/10 p-3 text-sm text-amber">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em]">
-                    Trade-offs
+            {asideTab === "personalize" ? (
+              <div className="border border-white/15 bg-white/[0.05] p-5">
+                <h2 className="font-display text-xl">Personalize</h2>
+                <p className="mt-2 text-sm text-white/55">
+                  Tell us what this group wants. We map it onto flexible days —
+                  anchors stay put.
+                </p>
+
+                {flexibleBlocks.length === 0 ? (
+                  <p className="mt-4 text-sm text-white/50">
+                    This template has no flexible slots yet.
                   </p>
-                  <ul className="mt-2 space-y-1 text-white/80">
-                    {tradeOffs.map((t) => (
-                      <li key={t}>· {t}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
+                ) : (
+                  <>
+                    <div className="mt-4 space-y-2">
+                      {availability.map((opt) => {
+                        const on = wants.includes(opt.id);
+                        return (
+                          <label
+                            key={opt.id}
+                            className={`flex cursor-pointer items-start gap-2 border px-3 py-2 text-sm ${
+                              !opt.available
+                                ? "border-white/5 text-white/30"
+                                : on
+                                  ? "border-amber/40 bg-amber/10 text-white"
+                                  : "border-white/10 text-white/75"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={on}
+                              disabled={!opt.available}
+                              onChange={() =>
+                                setWants((prev) =>
+                                  on
+                                    ? prev.filter((x) => x !== opt.id)
+                                    : [...prev, opt.id],
+                                )
+                              }
+                              className="mt-1"
+                            />
+                            <span>
+                              {opt.label}
+                              {opt.available ? (
+                                <span className="mt-0.5 block text-[11px] text-white/40">
+                                  Fits: {opt.slots.join(", ")}
+                                </span>
+                              ) : (
+                                <span className="mt-0.5 block text-[11px] text-white/30">
+                                  No flexible day for this on this template
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
 
-            <div className="border border-white/15 bg-white/[0.05] p-5">
-              <h2 className="font-display text-xl">Group share & vote</h2>
-              <p className="mt-2 text-sm text-white/55">
-                Share one link. Everyone votes on flexible slots.
-              </p>
-              <input
-                value={voterName}
-                onChange={(e) => setVoterName(e.target.value)}
-                placeholder="Your name"
-                className="mt-3 w-full border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber"
-              />
-              <button
-                type="button"
-                disabled={busy}
-                onClick={createShare}
-                className="mt-3 w-full border border-white/25 px-4 py-3 text-sm hover:border-amber"
-              >
-                Create share link
-              </button>
-              {shareUrl ? (
-                <p className="mt-3 break-all font-mono text-[11px] text-amber">
-                  {shareUrl}
-                </p>
-              ) : null}
-              {session?.voterNames?.length ? (
-                <p className="mt-2 text-xs text-white/45">
-                  Voters: {session.voterNames.join(", ")}
-                </p>
-              ) : null}
-              {flexibleBlocks.length === 0 ? (
-                <p className="mt-2 text-xs text-white/40">
-                  This template has no flexible slots to vote on.
-                </p>
-              ) : null}
-            </div>
+                    {preview && wants.length > 0 ? (
+                      <div className="mt-4 border border-white/10 bg-black/20 p-3 text-sm">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                          Preview
+                        </p>
+                        {preview.canFitWithoutExtend ? (
+                          <p className="mt-2 text-amber">
+                            Fits without extending the trip.
+                          </p>
+                        ) : null}
+                        <ul className="mt-2 space-y-1 text-white/70">
+                          {preview.applied.map((a) => (
+                            <li key={a.blockId}>
+                              {a.dayLabel}: {a.fromTitle} → {a.toTitle}
+                            </li>
+                          ))}
+                          {preview.unfit.map((u) => (
+                            <li key={u} className="text-white/45">
+                              Can&apos;t auto-fit {experienceCategoryLabel[u]}
+                            </li>
+                          ))}
+                        </ul>
+                        {preview.tradeOffs.length ? (
+                          <div className="mt-3 border-t border-white/10 pt-2 text-amber">
+                            <p className="font-mono text-[10px] uppercase tracking-[0.14em]">
+                              Trade-offs
+                            </p>
+                            <ul className="mt-1 space-y-1 text-white/75">
+                              {preview.tradeOffs.map((t) => (
+                                <li key={t}>· {t}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
 
-            <div className="border border-white/15 bg-white/[0.05] p-5">
-              <h2 className="font-display text-xl">Add another city</h2>
-              <p className="mt-2 text-sm text-white/55">
-                Suggested trip length if you extend this USA template.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {usCityOptions.slice(0, 8).map((c) => (
-                  <button
-                    key={c.code}
-                    type="button"
-                    onClick={() => setAddCity(c.code)}
-                    className={`border px-3 py-2 font-mono text-sm ${
-                      addCity === c.code
-                        ? "border-amber bg-amber text-ink"
-                        : "border-white/20"
-                    }`}
-                  >
-                    {c.code}
-                  </button>
-                ))}
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={runPersonalize}
+                        className="bg-amber px-4 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
+                      >
+                        Apply
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetPersonalize}
+                        className="border border-white/25 px-4 py-3 text-sm hover:border-amber"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setCityHint(suggestAddDestination(template, addCity))
-                }
-                className="mt-3 w-full border border-white/25 px-4 py-3 text-sm hover:border-amber"
-              >
-                Suggest length
-              </button>
-              {cityHint ? (
-                <div className="mt-3 text-sm text-white/70">
-                  <p>
-                    Add {cityHint.label}: recommended total{" "}
+            ) : null}
+
+            {asideTab === "share" ? (
+              <div className="border border-white/15 bg-white/[0.05] p-5">
+                <h2 className="font-display text-xl">Group share & vote</h2>
+                <p className="mt-2 text-sm text-white/55">
+                  One link for the group. Everyone enters a name, votes once per
+                  flexible day, and can change their mind.
+                </p>
+
+                <label className="mt-4 block">
+                  <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                    Your name
+                  </span>
+                  <input
+                    value={voterName}
+                    onChange={(e) => setVoterName(e.target.value)}
+                    placeholder="Alex"
+                    className="w-full border border-white/20 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-amber"
+                  />
+                </label>
+
+                {!session ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={createShare}
+                    className="mt-4 w-full bg-amber px-4 py-3 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-60"
+                  >
+                    Create share link
+                  </button>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {!joined ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={joinShare}
+                        className="w-full bg-amber px-4 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
+                      >
+                        Join this group vote
+                      </button>
+                    ) : (
+                      <p className="text-sm text-amber">
+                        You&apos;re in as {voterName || "Guest"}. Vote on slots
+                        in the itinerary.
+                      </p>
+                    )}
+                    <div className="border border-white/10 bg-black/20 p-3">
+                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                        Share link
+                      </p>
+                      <p className="mt-2 break-all font-mono text-[11px] text-amber">
+                        {shareUrl}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={copyShare}
+                        className="mt-3 border border-white/25 px-3 py-2 text-xs hover:border-amber"
+                      >
+                        Copy link
+                      </button>
+                    </div>
+                    {(session.voters || []).length ? (
+                      <div>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                          In the room
+                        </p>
+                        <ul className="mt-2 flex flex-wrap gap-2">
+                          {(session.voters || []).map((v) => (
+                            <li
+                              key={v.key}
+                              className="border border-white/15 px-2 py-1 text-xs text-white/70"
+                            >
+                              {v.name}
+                              {Object.keys(v.votes).length
+                                ? ` · ${Object.keys(v.votes).length} vote${Object.keys(v.votes).length === 1 ? "" : "s"}`
+                                : ""}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {flexibleBlocks.length ? (
+                      <button
+                        type="button"
+                        onClick={applyWinners}
+                        className="w-full border border-amber/40 bg-amber/10 px-4 py-3 text-sm text-amber"
+                      >
+                        Apply winning votes to trip
+                      </button>
+                    ) : (
+                      <p className="text-xs text-white/40">
+                        No flexible slots to vote on for this template.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {asideTab === "city" ? (
+              <div className="border border-white/15 bg-white/[0.05] p-5">
+                <h2 className="font-display text-xl">Add another city</h2>
+                <p className="mt-2 text-sm text-white/55">
+                  Currently {initial.days} days · {initial.route}
+                </p>
+                <p className="mt-1 font-mono text-[11px] text-white/40">
+                  On this trip: {initial.cityCodes.join(" · ")}
+                </p>
+
+                <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                  Add
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {addableCities.map((c) => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => setAddCity(c.code)}
+                      className={`border px-3 py-2 text-left text-sm transition ${
+                        addCity === c.code
+                          ? "border-amber bg-amber text-ink"
+                          : "border-white/20 text-white/70"
+                      }`}
+                    >
+                      <span className="font-mono">{c.code}</span>
+                      <span className="ml-1.5 opacity-80">{c.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-5 border border-amber/30 bg-amber/10 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
+                    Suggested length
+                  </p>
+                  <p className="mt-2 font-display text-2xl text-white">
                     {cityHint.recommendedDays[0]}–{cityHint.recommendedDays[1]}{" "}
                     days
                   </p>
-                  <p className="mt-1 text-white/55">
+                  <p className="mt-1 text-sm text-white/65">
+                    +{cityHint.extraDays[0]}–{cityHint.extraDays[1]} days to add{" "}
+                    {cityHint.label}
+                  </p>
+                  <p className="mt-3 text-sm text-white/70">
                     Route: {cityHint.suggestedRoute}
                   </p>
-                  {cityHint.relatedTemplates.length ? (
-                    <ul className="mt-3 space-y-1">
-                      {cityHint.relatedTemplates.slice(0, 4).map((t) => (
+                </div>
+
+                {cityHint.relatedTemplates.length ? (
+                  <div className="mt-5">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                      Ready-made templates that include this
+                    </p>
+                    <ul className="mt-3 space-y-2">
+                      {cityHint.relatedTemplates.slice(0, 5).map((t) => (
                         <li key={t.id}>
                           <Link
                             href={`/trips/${t.slug}`}
-                            className="text-amber hover:underline"
+                            className="block border border-white/15 px-3 py-3 transition hover:border-amber/50"
                           >
-                            {t.title}
+                            <p className="font-display text-lg text-white">
+                              {t.title}
+                            </p>
+                            <p className="mt-1 text-xs text-white/50">
+                              {t.days} days · {t.route}
+                            </p>
                           </Link>
                         </li>
                       ))}
                     </ul>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="border border-white/15 bg-white/[0.05] p-5">
-              <h2 className="font-display text-xl">Special experiences</h2>
-              <p className="mt-2 text-sm text-white/55">
-                Band evenings and private dinners may need a provider — we
-                reserve the time block.
-              </p>
-              <select
-                value={specialKind}
-                onChange={(e) =>
-                  setSpecialKind(e.target.value as typeof specialKind)
-                }
-                className="mt-3 w-full border border-white/20 bg-black/30 px-3 py-2 text-sm"
-              >
-                <option value="band">Live entertainment / band</option>
-                <option value="private_dinner">Private group dinner</option>
-                <option value="other">Other</option>
-              </select>
-              <textarea
-                value={specialNote}
-                onChange={(e) => setSpecialNote(e.target.value)}
-                placeholder="Group size, date window, vibe…"
-                rows={3}
-                className="mt-2 w-full border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber"
-              />
-              <button
-                type="button"
-                disabled={busy}
-                onClick={requestSpecial}
-                className="mt-3 w-full border border-amber/40 bg-amber/10 px-4 py-3 text-sm text-amber"
-              >
-                Request provider
-              </button>
-              {session?.specialEventRequests?.length ? (
-                <ul className="mt-3 space-y-1 text-xs text-white/50">
-                  {session.specialEventRequests.map((r) => (
-                    <li key={r.id}>
-                      {r.kind} · {r.status}
-                      {r.note ? ` — ${r.note}` : ""}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-
-            <div className="border border-white/15 bg-white/[0.05] p-5">
-              <h2 className="font-display text-xl">Actually travelled?</h2>
-              <p className="mt-2 text-sm text-white/55">
-                Rate this template after the trip — not just a wishlist.
-              </p>
-              <div className="mt-3 flex gap-2">
-                {[5, 4, 3, 2, 1].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setRating(n)}
-                    className={`border px-3 py-2 text-sm ${
-                      rating === n
-                        ? "border-amber bg-amber text-ink"
-                        : "border-white/20"
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-white/50">
+                    No multi-city template covers this combo yet. Use the length
+                    suggestion above, or{" "}
+                    <Link href="/?door=combine" className="text-amber underline">
+                      combine cities
+                    </Link>{" "}
+                    from the home page.
+                  </p>
+                )}
               </div>
-              <textarea
-                value={ratingNote}
-                onChange={(e) => setRatingNote(e.target.value)}
-                placeholder="What worked / what you’d change"
-                rows={2}
-                className="mt-2 w-full border border-white/20 bg-black/30 px-3 py-2 text-sm"
-              />
-              <button
-                type="button"
-                disabled={busy}
-                onClick={submitRating}
-                className="mt-3 w-full border border-white/25 px-4 py-3 text-sm hover:border-amber"
-              >
-                Submit travelled rating
-              </button>
-              {session?.travelledRating ? (
-                <p className="mt-2 text-xs text-amber">
-                  You rated {session.travelledRating}/5
-                </p>
-              ) : null}
-            </div>
+            ) : null}
+
+            <details className="border border-white/10 bg-white/[0.03] p-4">
+              <summary className="cursor-pointer font-display text-base text-white/70">
+                Special experiences & travelled rating
+              </summary>
+              <div className="mt-4 space-y-4">
+                <div>
+                  <select
+                    value={specialKind}
+                    onChange={(e) =>
+                      setSpecialKind(e.target.value as typeof specialKind)
+                    }
+                    className="w-full border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                  >
+                    <option value="band">Live entertainment / band</option>
+                    <option value="private_dinner">Private group dinner</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <textarea
+                    value={specialNote}
+                    onChange={(e) => setSpecialNote(e.target.value)}
+                    placeholder="Group size, date window, vibe…"
+                    rows={2}
+                    className="mt-2 w-full border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={requestSpecial}
+                    className="mt-2 w-full border border-amber/40 px-3 py-2 text-sm text-amber"
+                  >
+                    Request provider
+                  </button>
+                </div>
+                <div>
+                  <div className="flex gap-2">
+                    {[5, 4, 3, 2, 1].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setRating(n)}
+                        className={`border px-3 py-2 text-sm ${
+                          rating === n
+                            ? "border-amber bg-amber text-ink"
+                            : "border-white/20"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={ratingNote}
+                    onChange={(e) => setRatingNote(e.target.value)}
+                    placeholder="What worked / what you’d change"
+                    rows={2}
+                    className="mt-2 w-full border border-white/20 bg-black/30 px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={submitRating}
+                    className="mt-2 w-full border border-white/25 px-3 py-2 text-sm"
+                  >
+                    Submit travelled rating
+                  </button>
+                </div>
+              </div>
+            </details>
 
             {status ? (
-              <p className="text-sm text-amber">{status}</p>
+              <p className="border border-amber/20 bg-amber/5 px-3 py-2 text-sm text-amber">
+                {status}
+              </p>
             ) : null}
           </aside>
         </div>

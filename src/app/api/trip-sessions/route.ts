@@ -3,8 +3,11 @@ import {
   addSpecialEventRequest,
   createTripSession,
   getSessionByShareCode,
+  joinTripSession,
   saveSessionVotes,
   saveTravelledRating,
+  updateSessionWants,
+  winningOptions,
 } from "@/lib/trip-sessions";
 import type { ExperienceCategory } from "@/lib/trip-templates";
 
@@ -19,12 +22,15 @@ export async function GET(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ session });
+  return NextResponse.json({
+    session,
+    winners: winningOptions(session),
+  });
 }
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
-    action?: "create" | "vote" | "rate" | "special";
+    action?: "create" | "join" | "vote" | "rate" | "special" | "sync";
     templateSlug?: string;
     templateTitle?: string;
     hotelName?: string;
@@ -34,6 +40,9 @@ export async function POST(request: Request) {
     blockId?: string;
     optionId?: string;
     voterName?: string;
+    voterKey?: string;
+    hostName?: string;
+    hostKey?: string;
     rating?: number;
     note?: string;
     kind?: "band" | "private_dinner" | "other";
@@ -49,12 +58,29 @@ export async function POST(request: Request) {
       hotelName: body.hotelName,
       selections: body.selections,
       wants: body.wants,
+      hostName: body.hostName || body.voterName,
+      hostKey: body.hostKey || body.voterKey,
     });
-    return NextResponse.json({ session });
+    return NextResponse.json({ session, winners: winningOptions(session) });
+  }
+
+  if (body.action === "join") {
+    if (!body.shareCode || !body.voterKey) {
+      return NextResponse.json({ error: "Missing join fields" }, { status: 400 });
+    }
+    const session = await joinTripSession(
+      body.shareCode,
+      body.voterKey,
+      body.voterName || "Guest",
+    );
+    if (!session) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({ session, winners: winningOptions(session) });
   }
 
   if (body.action === "vote") {
-    if (!body.shareCode || !body.blockId || !body.optionId) {
+    if (!body.shareCode || !body.blockId || !body.optionId || !body.voterKey) {
       return NextResponse.json({ error: "Missing vote fields" }, { status: 400 });
     }
     const session = await saveSessionVotes(
@@ -62,11 +88,27 @@ export async function POST(request: Request) {
       body.blockId,
       body.optionId,
       body.voterName || "Guest",
+      body.voterKey,
     );
     if (!session) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json({ session });
+    return NextResponse.json({ session, winners: winningOptions(session) });
+  }
+
+  if (body.action === "sync") {
+    if (!body.shareCode) {
+      return NextResponse.json({ error: "Missing share code" }, { status: 400 });
+    }
+    const session = await updateSessionWants(
+      body.shareCode,
+      body.wants || [],
+      body.selections || {},
+    );
+    if (!session) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({ session, winners: winningOptions(session) });
   }
 
   if (body.action === "rate") {
@@ -81,7 +123,7 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json({ session });
+    return NextResponse.json({ session, winners: winningOptions(session) });
   }
 
   if (body.action === "special") {
@@ -96,7 +138,7 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json({ session });
+    return NextResponse.json({ session, winners: winningOptions(session) });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

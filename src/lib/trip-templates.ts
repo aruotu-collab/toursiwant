@@ -1878,14 +1878,21 @@ export function combineCountryTemplates(codes: string[]) {
 export type AppliedSwap = {
   blockId: string;
   optionId: string;
+  dayLabel: string;
+  want: ExperienceCategory;
+  fromTitle: string;
+  toTitle: string;
+  tradeOff?: string;
 };
 
 export type PersonalizeResult = {
   template: TripTemplate;
   applied: AppliedSwap[];
+  unfit: ExperienceCategory[];
   messages: string[];
   tradeOffs: string[];
   specialEvents: Array<{ blockId: string; title: string; note: string }>;
+  canFitWithoutExtend: boolean;
 };
 
 export function personalizeTemplate(
@@ -1905,10 +1912,18 @@ export function personalizeTemplate(
     );
     if (!match) return block;
     remaining.splice(remaining.indexOf(match.category), 1);
-    applied.push({ blockId: block.id, optionId: match.id });
+    applied.push({
+      blockId: block.id,
+      optionId: match.id,
+      dayLabel: block.dayLabel,
+      want: match.category,
+      fromTitle: block.title,
+      toTitle: match.title,
+      tradeOff: match.tradeOff,
+    });
     if (match.tradeOff) tradeOffs.push(match.tradeOff);
     messages.push(
-      `${block.dayLabel}: “${block.title}” becomes “${match.title}”.`,
+      `${block.dayLabel}: “${block.title}” → “${match.title}”.`,
     );
     if (match.specialProviderRequired) {
       specialEvents.push({
@@ -1929,51 +1944,101 @@ export function personalizeTemplate(
 
   for (const left of remaining) {
     messages.push(
-      `Could not auto-fit ${experienceCategoryLabel[left]} without extending the trip — add a day or replace another flexible block.`,
+      `No open flexible day for ${experienceCategoryLabel[left]} — swap a slot manually or add a day.`,
     );
   }
 
-  if (wants.length && !tradeOffs.length && applied.length) {
-    messages.unshift("We can fit your selections without extending the trip.");
+  const canFitWithoutExtend = wants.length > 0 && remaining.length === 0;
+
+  if (canFitWithoutExtend && !tradeOffs.length) {
+    messages.unshift("Fits without extending the trip.");
+  } else if (canFitWithoutExtend && tradeOffs.length) {
+    messages.unshift("Fits without extending — see trade-offs below.");
   }
 
   return {
     template: { ...template, blocks },
     applied,
+    unfit: remaining,
     messages,
     tradeOffs,
     specialEvents,
+    canFitWithoutExtend,
   };
 }
 
+/** Which personalize options can map onto at least one flexible slot. */
+export function personalizeAvailability(template: TripTemplate) {
+  const available = new Set<ExperienceCategory>();
+  for (const block of template.blocks) {
+    for (const alt of block.alternatives || []) {
+      available.add(alt.category);
+    }
+  }
+  return personalizeOptions.map((opt) => ({
+    ...opt,
+    available: available.has(opt.id),
+    slots: template.blocks
+      .filter((b) => b.alternatives?.some((a) => a.category === opt.id))
+      .map((b) => b.dayLabel),
+  }));
+}
+
 export function suggestAddDestination(template: TripTemplate, code: string) {
+  const normalized = code.toUpperCase();
+  const alreadyOnTrip = template.cityCodes.includes(normalized);
   const hint = template.addDestinationHints?.find(
-    (h) => h.code.toUpperCase() === code.toUpperCase(),
+    (h) => h.code.toUpperCase() === normalized,
   );
   const label =
     hint?.label ||
-    usCityOptions.find((c) => c.code === code.toUpperCase())?.label ||
+    usCityOptions.find((c) => c.code === normalized)?.label ||
     code;
 
-  if (hint) {
-    return {
-      label,
-      code: hint.code,
-      recommendedDays: [
+  const exactCombine = combineUsCities([...template.cityCodes, normalized]).filter(
+    (t) => t.id !== template.id,
+  );
+
+  const overlapping = listTemplates({ scale: "multi_city" }).filter(
+    (t) =>
+      t.id !== template.id &&
+      t.cityCodes.includes(normalized) &&
+      t.cityCodes.some((c) => template.cityCodes.includes(c)),
+  );
+
+  const relatedMap = new Map<string, TripTemplate>();
+  for (const t of [...exactCombine, ...overlapping]) {
+    relatedMap.set(t.id, t);
+  }
+  const relatedTemplates = Array.from(relatedMap.values()).sort(
+    (a, b) => b.savedCount - a.savedCount,
+  );
+
+  const recommendedDays: [number, number] = hint
+    ? [
         template.days + hint.recommendedExtraDays[0],
         template.days + hint.recommendedExtraDays[1],
-      ] as [number, number],
-      suggestedRoute: hint.suggestedRoute,
-      relatedTemplates: combineUsCities([...template.cityCodes, hint.code]),
-    };
-  }
+      ]
+    : [template.days + 2, template.days + 4];
+
+  const suggestedRoute =
+    hint?.suggestedRoute ||
+    relatedTemplates[0]?.route ||
+    `${template.route} → ${label}`;
 
   return {
     label,
-    code,
-    recommendedDays: [template.days + 2, template.days + 4] as [number, number],
-    suggestedRoute: `${template.route} → (add ${label})`,
-    relatedTemplates: combineUsCities([...template.cityCodes, code]),
+    code: normalized,
+    alreadyOnTrip,
+    recommendedDays,
+    extraDays: [
+      recommendedDays[0] - template.days,
+      recommendedDays[1] - template.days,
+    ] as [number, number],
+    suggestedRoute,
+    relatedTemplates,
+    currentDays: template.days,
+    currentRoute: template.route,
   };
 }
 
