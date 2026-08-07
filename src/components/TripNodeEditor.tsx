@@ -91,9 +91,7 @@ export function TripNodeEditor({
     () => days[0]?.id ?? null,
   );
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
-  const [expandedDayId, setExpandedDayId] = useState<string | null>(
-    () => days[0]?.id ?? null,
-  );
+  const [expandedDayId, setExpandedDayId] = useState<string | null>(null);
   const [tours, setTours] = useState<TourHit[]>([]);
   const [loadingTours, setLoadingTours] = useState(false);
   const [tourError, setTourError] = useState<string | null>(null);
@@ -115,7 +113,7 @@ export function TripNodeEditor({
     if (!nodes.some((n) => n.id === selectedDayId)) {
       setSelectedDayId(days[0]?.id ?? null);
       setSelectedStopId(null);
-      setExpandedDayId(days[0]?.id ?? null);
+      setExpandedDayId(null);
       setTours([]);
     } else if (
       selectedStopId &&
