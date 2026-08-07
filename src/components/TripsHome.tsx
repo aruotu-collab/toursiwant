@@ -40,7 +40,7 @@ function TemplateCard({
       style={{ animation: "rise-in 0.45s ease-out both" }}
     >
       {diagram === "loop" ? (
-        <ExploreRouteLoop template={t} className="h-52 w-full" />
+        <ExploreRouteLoop template={t} className="h-64 w-full sm:h-72" />
       ) : (
         <TemplateRouteLoop template={t} className="h-52 w-full" />
       )}

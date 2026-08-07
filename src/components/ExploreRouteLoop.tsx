@@ -132,7 +132,7 @@ export function ExploreRouteLoop({
   }, [nodes]);
 
   const vb = { w: 640, h: 320 };
-  const track = stadiumPath(vb.w, vb.h, 56, 72);
+  const track = stadiumPath(vb.w, vb.h, 64, 68);
   const positions = placeOnJourney(loopPoints.length, track);
   const lastPos = positions[positions.length - 1];
   const hotelPos = positions[0] || { x: track.left + track.r, y: track.top };
@@ -163,9 +163,9 @@ export function ExploreRouteLoop({
       className={`route-loop relative flex flex-col overflow-hidden border border-white/10 bg-[radial-gradient(ellipse_at_20%_0%,rgba(212,160,23,0.14),transparent_55%),linear-gradient(165deg,#0a1520_0%,#152433_55%,#0f1c28_100%)] ${className}`}
     >
       <div className="shrink-0 border-b border-white/10 px-4 py-3 sm:px-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
+        <p className="font-mono text-xs uppercase tracking-[0.14em] text-amber sm:text-sm">
           Trip diagram
-          <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-white/45">
+          <span className="ml-2 font-sans text-xs normal-case tracking-normal text-white/55 sm:text-sm">
             · path = journey · dashed = back to hotel
           </span>
         </p>
@@ -228,8 +228,8 @@ export function ExploreRouteLoop({
             if (!pos) return null;
             const isHotel = pt.kind === "hotel";
             const labelAbove = pos.y < vb.h * 0.45;
-            const labelY = labelAbove ? pos.y - 22 : pos.y + 28;
-            const circleR = isHotel ? 16 : 14;
+            const labelY = labelAbove ? pos.y - 30 : pos.y + 36;
+            const circleR = isHotel ? 20 : 17;
 
             return (
               <g key={pt.key}>
@@ -248,7 +248,7 @@ export function ExploreRouteLoop({
                   dominantBaseline="middle"
                   className="select-none"
                   style={{
-                    fontSize: isHotel ? 13 : 12,
+                    fontSize: isHotel ? 16 : 15,
                     fontWeight: 700,
                     fill: "#0a1520",
                     fontFamily: "ui-sans-serif, system-ui, sans-serif",
@@ -262,14 +262,14 @@ export function ExploreRouteLoop({
                   textAnchor="middle"
                   className="select-none"
                   style={{
-                    fontSize: 12,
-                    fontWeight: isHotel ? 600 : 500,
-                    fill: isHotel ? "#d4a017" : "rgba(255,255,255,0.82)",
+                    fontSize: 18,
+                    fontWeight: isHotel ? 700 : 650,
+                    fill: isHotel ? "#f0c14b" : "rgba(255,255,255,0.95)",
                     fontFamily:
                       "var(--font-display), Georgia, 'Times New Roman', serif",
                   }}
                 >
-                  {shortenLabel(pt.label).slice(0, 18)}
+                  {shortenLabel(pt.label).slice(0, 20)}
                 </text>
               </g>
             );
