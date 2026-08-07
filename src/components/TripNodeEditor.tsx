@@ -174,13 +174,59 @@ export function TripNodeEditor({
             Trip path
           </p>
           <p className="mt-1 max-w-xl text-sm text-white/65">
-            Tap a numbered circle to see tours for that stop. Use × to remove a
-            stop, or add another below.
+            Add stops first, then tap a numbered circle to see tours. Use × to
+            remove a stop.
           </p>
         </div>
         <p className="font-mono text-[11px] text-white/40">
           {nodes.length}/{MAX_ROUTE_NODES} stops
         </p>
+      </div>
+
+      <div className="space-y-3 border-b border-white/10 px-4 py-4 sm:px-5">
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+          Add a stop — tap the same type again for another
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {chips.map((label) => (
+            <button
+              key={label}
+              type="button"
+              disabled={atLimit}
+              onClick={() => add(label)}
+              className="border border-white/20 px-3 py-2 text-sm text-white/80 transition hover:border-amber hover:bg-amber/10 hover:text-amber disabled:opacity-40"
+            >
+              + {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add(custom);
+              }
+            }}
+            placeholder="Custom stop — e.g. Chinatown"
+            className="min-w-[12rem] flex-1 border border-white/20 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-amber"
+          />
+          <button
+            type="button"
+            disabled={!custom.trim() || atLimit}
+            onClick={() => add(custom)}
+            className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
+          >
+            Add stop
+          </button>
+        </div>
+        {atLimit ? (
+          <p className="text-xs text-white/45">
+            Path is full — remove a stop to add another.
+          </p>
+        ) : null}
       </div>
 
       <TemplateRouteLoop
@@ -246,52 +292,6 @@ export function TripNodeEditor({
           ) : null}
         </div>
       ) : null}
-
-      <div className="space-y-3 border-t border-white/10 px-4 py-4 sm:px-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
-          Add a stop — tap the same type again for another
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {chips.map((label) => (
-            <button
-              key={label}
-              type="button"
-              disabled={atLimit}
-              onClick={() => add(label)}
-              className="border border-white/20 px-3 py-2 text-sm text-white/80 transition hover:border-amber hover:bg-amber/10 hover:text-amber disabled:opacity-40"
-            >
-              + {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            value={custom}
-            onChange={(e) => setCustom(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                add(custom);
-              }
-            }}
-            placeholder="Custom stop — e.g. Chinatown"
-            className="min-w-[12rem] flex-1 border border-white/20 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-amber"
-          />
-          <button
-            type="button"
-            disabled={!custom.trim() || atLimit}
-            onClick={() => add(custom)}
-            className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
-          >
-            Add stop
-          </button>
-        </div>
-        {atLimit ? (
-          <p className="text-xs text-white/45">
-            Path is full — remove a stop to add another.
-          </p>
-        ) : null}
-      </div>
     </div>
   );
 }
