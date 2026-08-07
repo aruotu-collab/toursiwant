@@ -2,6 +2,7 @@
  * ToursIWant — proven US trip templates with flexible experience blocks.
  * Structure stays; activities swap. Viator fills paid optional blocks.
  */
+import { nycInspireTemplates } from "@/lib/nyc-inspire-templates";
 
 export type ExperienceCategory =
   | "RELIGIOUS"
@@ -2308,6 +2309,7 @@ export const tripTemplates: TripTemplate[] = [
       }),
     ],
   },
+  ...nycInspireTemplates,
 ];
 
 export function getTemplateBySlug(slug: string) {
