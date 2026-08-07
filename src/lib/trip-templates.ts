@@ -153,6 +153,10 @@ export const usCityOptions = [
   { code: "NIA", label: "Niagara Falls" },
 ] as const;
 
+/**
+ * Flexible day: vote/personalize options always use shared category labels
+ * as headings so they match the Personalize list.
+ */
 function flexDay(
   id: string,
   dayLabel: string,
@@ -161,14 +165,32 @@ function flexDay(
   alternatives: ExperienceOption[],
   extra?: Partial<TripBlock>,
 ): TripBlock {
+  const alts = alternatives.map((a) => {
+    const catTitle = experienceCategoryLabel[a.category];
+    const placeDetail =
+      a.title &&
+      a.title !== catTitle &&
+      !a.summary.toLowerCase().includes(a.title.toLowerCase())
+        ? a.title
+        : null;
+    return {
+      ...a,
+      title: catTitle,
+      summary: placeDetail ? `${placeDetail} — ${a.summary}` : a.summary,
+    };
+  });
+  const defaultCat = extra?.category || alts[0]?.category;
+
   return {
     id,
     kind: "flexible",
     dayLabel,
-    title,
     summary,
-    alternatives,
     ...extra,
+    // Keep category headings aligned even if callers pass a place nickname title
+    title: defaultCat ? experienceCategoryLabel[defaultCat] : title,
+    category: defaultCat,
+    alternatives: alts,
   };
 }
 
@@ -225,7 +247,7 @@ export const tripTemplates: TripTemplate[] = [
         "ee2",
         "Day 2",
         "Boston flexible day",
-        "History, food, or free time.",
+        "History, food, faith sites, or an easy day.",
         [
           {
             id: "ee2-culture",
@@ -247,15 +269,34 @@ export const tripTemplates: TripTemplate[] = [
             title: "Historic churches & memorials",
             summary: "Quiet heritage walking.",
           },
+          {
+            id: "ee2-sights",
+            category: "SIGHTS",
+            title: "Harbor & icons",
+            summary: "Waterfront landmarks.",
+            viatorQuery: "Boston sightseeing",
+          },
+          {
+            id: "ee2-nature",
+            category: "NATURE",
+            title: "Parks & harbour walk",
+            summary: "Outdoor Boston.",
+          },
+          {
+            id: "ee2-free",
+            category: "FREE_TIME",
+            title: "Free-form day",
+            summary: "Keep the spine; leave slots open.",
+          },
         ],
-        { viatorCitySlug: "boston" },
+        { viatorCitySlug: "boston", category: "CULTURE" },
       ),
       anchor("ee3", "Days 4–7", "New York", "Manhattan core + one flexible day."),
       flexDay(
         "ee4",
         "Day 6",
         "NYC flexible day",
-        "Harbor, Broadway, or family fun.",
+        "Harbor, Broadway, culture, food, or family fun.",
         [
           {
             id: "ee4-sights",
@@ -277,8 +318,28 @@ export const tripTemplates: TripTemplate[] = [
             title: "Family-friendly NYC",
             summary: "Lower walking, more breaks.",
           },
+          {
+            id: "ee4-culture",
+            category: "CULTURE",
+            title: "Museum day",
+            summary: "MoMA / Met-style culture.",
+            viatorQuery: "museum",
+          },
+          {
+            id: "ee4-food",
+            category: "FOOD",
+            title: "NYC food day",
+            summary: "Neighbourhood tasting.",
+            viatorQuery: "New York food tour",
+          },
+          {
+            id: "ee4-free",
+            category: "FREE_TIME",
+            title: "Free-form day",
+            summary: "Keep the spine; leave slots open.",
+          },
         ],
-        { viatorCitySlug: "new-york" },
+        { viatorCitySlug: "new-york", category: "SIGHTS" },
       ),
       anchor(
         "ee5",
@@ -792,14 +853,28 @@ export const tripTemplates: TripTemplate[] = [
         "nyc2",
         "Day 2",
         "Downtown / harbor day",
-        "Liberty area or culture swap.",
+        "Liberty area, culture, food, or a quieter day.",
         [
           {
             id: "nyc2-liberty",
             category: "SIGHTS",
             title: "Statue of Liberty / harbor",
-            summary: "Classic first-timer day.",
+            summary: "Classic first-timer harbor day.",
             viatorQuery: "Statue of Liberty",
+          },
+          {
+            id: "nyc2-culture",
+            category: "CULTURE",
+            title: "Downtown museums",
+            summary: "9/11 Memorial Museum or nearby culture.",
+            viatorQuery: "museum",
+          },
+          {
+            id: "nyc2-food",
+            category: "FOOD",
+            title: "Downtown food",
+            summary: "Chinatown, LES, or ferry-side eats.",
+            viatorQuery: "New York food tour",
           },
           {
             id: "nyc2-faith",
@@ -811,23 +886,47 @@ export const tripTemplates: TripTemplate[] = [
             id: "nyc2-family",
             category: "FAMILY",
             title: "Family fun day",
-            summary: "Kid-friendly pacing.",
+            summary: "Kid-friendly pacing downtown.",
+          },
+          {
+            id: "nyc2-shop",
+            category: "SHOPPING",
+            title: "Downtown shopping",
+            summary: "SoHo / street retail afternoon.",
+            viatorQuery: "shopping",
+          },
+          {
+            id: "nyc2-free",
+            category: "FREE_TIME",
+            title: "Free-form downtown",
+            summary: "Keep the spine; leave slots open.",
           },
         ],
-        { viatorQuery: "Statue of Liberty", viatorCitySlug: "new-york" },
+        {
+          viatorQuery: "Statue of Liberty",
+          viatorCitySlug: "new-york",
+          category: "SIGHTS",
+        },
       ),
       flexDay(
         "nyc3",
         "Day 3",
         "Park + museums or free time",
-        "Central Park belt.",
+        "Central Park belt — culture, food, shows, or green space.",
         [
           {
             id: "nyc3-culture",
             category: "CULTURE",
             title: "Museum morning + park",
-            summary: "Classic culture day.",
+            summary: "Met / MoMA-style culture day.",
             viatorQuery: "Metropolitan Museum",
+          },
+          {
+            id: "nyc3-nature",
+            category: "NATURE",
+            title: "Central Park day",
+            summary: "Green space mid-trip.",
+            viatorQuery: "Central Park",
           },
           {
             id: "nyc3-food",
@@ -843,8 +942,27 @@ export const tripTemplates: TripTemplate[] = [
             summary: "Show night for the group.",
             viatorQuery: "Broadway",
           },
+          {
+            id: "nyc3-relax",
+            category: "RELAX",
+            title: "Easy park pace",
+            summary: "Light walking and cafe time only.",
+          },
+          {
+            id: "nyc3-nightlife",
+            category: "NIGHTLIFE",
+            title: "Midtown evening",
+            summary: "Later start, evening energy.",
+          },
+          {
+            id: "nyc3-private",
+            category: "PRIVATE_GROUP_EVENT",
+            title: "Private group dinner",
+            summary: "Book a table for everyone.",
+            specialProviderRequired: true,
+          },
         ],
-        { viatorCitySlug: "new-york" },
+        { viatorCitySlug: "new-york", category: "CULTURE" },
       ),
       anchor(
         "nyc4",
@@ -883,29 +1001,62 @@ export const tripTemplates: TripTemplate[] = [
         "chi2",
         "Day 2",
         "Chicago flexible",
-        "Museums, food, or lake.",
+        "Museums, food, lake, shopping, or a show.",
         [
           {
             id: "chi2-culture",
             category: "CULTURE",
             title: "Museum campus day",
-            summary: "Art / science pick.",
+            summary: "Art Institute or science campus.",
+            viatorQuery: "Chicago museum",
           },
           {
             id: "chi2-food",
             category: "FOOD",
             title: "Food neighbourhood day",
-            summary: "Deep dish optional.",
+            summary: "Deep dish optional — neighbourhood tasting.",
             viatorQuery: "Chicago food tour",
           },
           {
             id: "chi2-nature",
             category: "NATURE",
             title: "Lakefront + parks",
-            summary: "Outdoor Chicago.",
+            summary: "Outdoor Chicago along the water.",
+          },
+          {
+            id: "chi2-sights",
+            category: "SIGHTS",
+            title: "Skyline & icons",
+            summary: "Observation decks and Loop landmarks.",
+            viatorQuery: "Chicago architecture",
+          },
+          {
+            id: "chi2-shop",
+            category: "SHOPPING",
+            title: "Magnificent Mile shopping",
+            summary: "Retail spine near the lake.",
+            viatorQuery: "shopping",
+          },
+          {
+            id: "chi2-live",
+            category: "LIVE_ENTERTAINMENT",
+            title: "Show or live evening",
+            summary: "Theatre or music night.",
+          },
+          {
+            id: "chi2-relax",
+            category: "RELAX",
+            title: "Easy lake pace",
+            summary: "Low walking, cafe time.",
+          },
+          {
+            id: "chi2-free",
+            category: "FREE_TIME",
+            title: "Free-form day",
+            summary: "Keep the spine; leave slots open.",
           },
         ],
-        { viatorCitySlug: "chicago" },
+        { viatorCitySlug: "chicago", category: "CULTURE" },
       ),
       anchor("chi3", "Day 3", "Neighbourhoods + buffer", "Keep it lighter."),
     ],
@@ -936,13 +1087,14 @@ export const tripTemplates: TripTemplate[] = [
         "dc2",
         "Day 2",
         "D.C. flexible",
-        "Museums, food, or faith sites.",
+        "Museums, food, faith sites, or a quieter Mall day.",
         [
           {
             id: "dc2-culture",
             category: "CULTURE",
             title: "Smithsonian focus",
             summary: "One campus, done well.",
+            viatorQuery: "Smithsonian",
           },
           {
             id: "dc2-faith",
@@ -957,8 +1109,39 @@ export const tripTemplates: TripTemplate[] = [
             summary: "Less Mall, more meals.",
             viatorQuery: "Washington DC food tour",
           },
+          {
+            id: "dc2-sights",
+            category: "SIGHTS",
+            title: "Monuments deep dive",
+            summary: "More of the Mall outdoor classics.",
+            viatorQuery: "DC monuments",
+          },
+          {
+            id: "dc2-nature",
+            category: "NATURE",
+            title: "Tidal Basin / parks",
+            summary: "Outdoor monuments and green space.",
+          },
+          {
+            id: "dc2-family",
+            category: "FAMILY",
+            title: "Family museum day",
+            summary: "Kid-friendly Smithsonian pacing.",
+          },
+          {
+            id: "dc2-relax",
+            category: "RELAX",
+            title: "Easy capital pace",
+            summary: "Light walking only.",
+          },
+          {
+            id: "dc2-free",
+            category: "FREE_TIME",
+            title: "Free-form day",
+            summary: "Keep the spine; leave slots open.",
+          },
         ],
-        { viatorCitySlug: "washington-dc" },
+        { viatorCitySlug: "washington-dc", category: "CULTURE" },
       ),
       anchor("dc3", "Day 3", "Neighbourhoods + buffer", "Georgetown or U Street pace."),
     ],
@@ -987,7 +1170,7 @@ export const tripTemplates: TripTemplate[] = [
         "mia2",
         "Day 2",
         "Miami flexible",
-        "Culture, nature, or nightlife.",
+        "Culture, nature, food, beach energy, or nightlife.",
         [
           {
             id: "mia2-culture",
@@ -1003,13 +1186,46 @@ export const tripTemplates: TripTemplate[] = [
             viatorQuery: "Everglades",
           },
           {
+            id: "mia2-food",
+            category: "FOOD",
+            title: "Miami food day",
+            summary: "Cuban, seafood, or neighbourhood tasting.",
+            viatorQuery: "Miami food tour",
+          },
+          {
+            id: "mia2-sights",
+            category: "SIGHTS",
+            title: "South Beach icons",
+            summary: "Art Deco and beachfront landmarks.",
+            viatorQuery: "South Beach",
+          },
+          {
+            id: "mia2-water",
+            category: "WATER_ACTIVITY",
+            title: "Boat / water day",
+            summary: "Bay cruise or beach water time.",
+            viatorQuery: "Miami boat",
+          },
+          {
             id: "mia2-night",
             category: "NIGHTLIFE",
             title: "Nightlife-focused evening",
             summary: "Late start day.",
           },
+          {
+            id: "mia2-relax",
+            category: "RELAX",
+            title: "Beach rest day",
+            summary: "Pool and sand only.",
+          },
+          {
+            id: "mia2-free",
+            category: "FREE_TIME",
+            title: "Free-form day",
+            summary: "Keep the spine; leave slots open.",
+          },
         ],
-        { viatorCitySlug: "miami" },
+        { viatorCitySlug: "miami", category: "CULTURE" },
       ),
       anchor("mia3", "Day 3", "Easy beach + buffer", "Don’t overpack departure."),
     ],
@@ -1044,7 +1260,7 @@ export const tripTemplates: TripTemplate[] = [
         "orl3",
         "Day 3",
         "Recovery / fun flex",
-        "Waterpark, another park, or rest.",
+        "Waterpark, another park, family fun, or rest.",
         [
           {
             id: "orl3-water",
@@ -1059,15 +1275,42 @@ export const tripTemplates: TripTemplate[] = [
             title: "Third park day",
             summary: "For hardcore park families.",
             tradeOff: "No recovery day.",
+            viatorQuery: "Orlando theme park",
           },
           {
             id: "orl3-relax",
             category: "RELAX",
             title: "Pool / resort day",
-            summary: "Reset.",
+            summary: "Reset at the hotel.",
+          },
+          {
+            id: "orl3-family",
+            category: "FAMILY",
+            title: "Easy family day",
+            summary: "Lower-intensity fun near the resort.",
+          },
+          {
+            id: "orl3-shop",
+            category: "SHOPPING",
+            title: "Outlet / Disney Springs shopping",
+            summary: "Gifts without a full park day.",
+            viatorQuery: "shopping",
+          },
+          {
+            id: "orl3-food",
+            category: "FOOD",
+            title: "Foodie resort day",
+            summary: "Character meals or tasting without park rush.",
+            viatorQuery: "Orlando food",
+          },
+          {
+            id: "orl3-free",
+            category: "FREE_TIME",
+            title: "Free-form day",
+            summary: "Keep the spine; leave slots open.",
           },
         ],
-        { viatorCitySlug: "orlando" },
+        { viatorCitySlug: "orlando", category: "WATER_ACTIVITY" },
       ),
       anchor("orl4", "Day 4", "Light day + buffer", "Shopping or pool before travel."),
     ],
@@ -1096,7 +1339,7 @@ export const tripTemplates: TripTemplate[] = [
         "las2",
         "Day 2",
         "Vegas flexible",
-        "Nature day trip or show focus.",
+        "Nature day trip, show, food, or pool reset.",
         [
           {
             id: "las2-nature",
@@ -1118,8 +1361,41 @@ export const tripTemplates: TripTemplate[] = [
             title: "Pool / spa day",
             summary: "Low walking.",
           },
+          {
+            id: "las2-food",
+            category: "FOOD",
+            title: "Vegas food day",
+            summary: "Strip dining or a tasting focus.",
+            viatorQuery: "Las Vegas food tour",
+          },
+          {
+            id: "las2-sights",
+            category: "SIGHTS",
+            title: "Strip icons deep dive",
+            summary: "Fountains, viewpoints, landmark hops.",
+            viatorQuery: "Las Vegas Strip",
+          },
+          {
+            id: "las2-nightlife",
+            category: "NIGHTLIFE",
+            title: "Nightlife night",
+            summary: "Clubs or late Strip energy.",
+          },
+          {
+            id: "las2-shop",
+            category: "SHOPPING",
+            title: "Strip shopping",
+            summary: "Malls and flagship stores.",
+            viatorQuery: "shopping",
+          },
+          {
+            id: "las2-free",
+            category: "FREE_TIME",
+            title: "Free-form day",
+            summary: "Keep the spine; leave slots open.",
+          },
         ],
-        { viatorCitySlug: "las-vegas" },
+        { viatorCitySlug: "las-vegas", category: "NATURE" },
       ),
       anchor("las3", "Day 3", "Easy Strip + buffer", "Checkout-friendly."),
     ],
@@ -1148,7 +1424,7 @@ export const tripTemplates: TripTemplate[] = [
         "sf2",
         "Day 2",
         "SF flexible",
-        "Nature, food, or culture.",
+        "Nature, food, culture, shopping, or an easy day.",
         [
           {
             id: "sf2-nature",
@@ -1169,9 +1445,36 @@ export const tripTemplates: TripTemplate[] = [
             category: "CULTURE",
             title: "Museums day",
             summary: "Indoor-friendly.",
+            viatorQuery: "San Francisco museum",
+          },
+          {
+            id: "sf2-sights",
+            category: "SIGHTS",
+            title: "Iconic viewpoints",
+            summary: "Bridge, waterfront, cable-car classics.",
+            viatorQuery: "San Francisco sightseeing",
+          },
+          {
+            id: "sf2-shop",
+            category: "SHOPPING",
+            title: "Neighbourhood shopping",
+            summary: "Haight, Union Square, or Ferry Building.",
+            viatorQuery: "shopping",
+          },
+          {
+            id: "sf2-relax",
+            category: "RELAX",
+            title: "Easy bay pace",
+            summary: "Light walking only.",
+          },
+          {
+            id: "sf2-free",
+            category: "FREE_TIME",
+            title: "Free-form day",
+            summary: "Keep the spine; leave slots open.",
           },
         ],
-        { viatorCitySlug: "san-francisco" },
+        { viatorCitySlug: "san-francisco", category: "NATURE" },
       ),
       anchor("sf3", "Day 3", "Neighbourhoods + buffer", "Keep hills reasonable."),
     ],
@@ -1202,7 +1505,7 @@ export const tripTemplates: TripTemplate[] = [
         "nola2",
         "Day 2",
         "NOLA flexible",
-        "Food tour, culture, or music night.",
+        "Food, culture, music, nightlife, or a quieter day.",
         [
           {
             id: "nola2-food",
@@ -1224,8 +1527,39 @@ export const tripTemplates: TripTemplate[] = [
             summary: "Reserve the evening.",
             viatorQuery: "New Orleans jazz",
           },
+          {
+            id: "nola2-nightlife",
+            category: "NIGHTLIFE",
+            title: "French Quarter evening",
+            summary: "Later start, nightlife energy.",
+          },
+          {
+            id: "nola2-sights",
+            category: "SIGHTS",
+            title: "Quarter icons",
+            summary: "Core streets and landmarks.",
+            viatorQuery: "New Orleans sightseeing",
+          },
+          {
+            id: "nola2-religious",
+            category: "RELIGIOUS",
+            title: "Churches & heritage",
+            summary: "Quieter sacred and historic sites.",
+          },
+          {
+            id: "nola2-relax",
+            category: "RELAX",
+            title: "Easy Quarter pace",
+            summary: "Cafe mornings, light walking.",
+          },
+          {
+            id: "nola2-free",
+            category: "FREE_TIME",
+            title: "Free-form day",
+            summary: "Keep the spine; leave slots open.",
+          },
         ],
-        { viatorCitySlug: "new-orleans" },
+        { viatorCitySlug: "new-orleans", category: "FOOD" },
       ),
       anchor("nola3", "Day 3", "Easy morning + buffer", "Beignets, then go."),
     ],
@@ -2078,12 +2412,12 @@ export function personalizeTemplate(
       dayLabel: block.dayLabel,
       want: match.category,
       fromTitle: block.title,
-      toTitle: match.title,
+      toTitle: experienceCategoryLabel[match.category],
       tradeOff: match.tradeOff,
     });
     if (match.tradeOff) tradeOffs.push(match.tradeOff);
     messages.push(
-      `${block.dayLabel}: “${block.title}” → “${match.title}”.`,
+      `${block.dayLabel}: “${block.title}” → “${experienceCategoryLabel[match.category]}”.`,
     );
     if (match.specialProviderRequired) {
       specialEvents.push({
@@ -2094,7 +2428,7 @@ export function personalizeTemplate(
     }
     return {
       ...block,
-      title: match.title,
+      title: experienceCategoryLabel[match.category],
       summary: match.summary,
       category: match.category,
       viatorQuery: match.viatorQuery || block.viatorQuery,

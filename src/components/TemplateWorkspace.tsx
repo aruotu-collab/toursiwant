@@ -87,7 +87,7 @@ function applyOption(
         ? b
         : {
             ...b,
-            title: option.title,
+            title: experienceCategoryLabel[option.category],
             summary: option.summary,
             category: option.category,
             viatorQuery: option.viatorQuery || b.viatorQuery,
