@@ -1248,7 +1248,7 @@ export const tripTemplates: TripTemplate[] = [
     keptOrderPercent: 69,
     hotelAnchor: {
       id: "midtown-generic",
-      name: "Midtown Manhattan hotel",
+      name: "Aliz Hotel Times Square",
       area: "Times Square / Midtown",
       lat: 40.758,
       lng: -73.9855,

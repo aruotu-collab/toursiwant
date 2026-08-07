@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   hereNowHotels,
   moodOptions,
@@ -18,6 +18,49 @@ type StaySuggestion = {
   placeId?: string;
 };
 
+type ResolveBody = {
+  curatedId?: string;
+  nearMePlaceId?: string;
+  placeId?: string;
+  name?: string;
+};
+
+type StoredHereNow = {
+  query: string;
+  selectedLabel: string;
+  timeBucket: string;
+  mood: string;
+  resolve: ResolveBody;
+};
+
+const HERE_NOW_STORAGE_KEY = "tiw_here_now_v1";
+
+function saveHereNowSession(data: StoredHereNow) {
+  try {
+    sessionStorage.setItem(HERE_NOW_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // private mode / quota
+  }
+}
+
+function loadHereNowSession(): StoredHereNow | null {
+  try {
+    const raw = sessionStorage.getItem(HERE_NOW_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as StoredHereNow;
+  } catch {
+    return null;
+  }
+}
+
+function clearHereNowSession() {
+  try {
+    sessionStorage.removeItem(HERE_NOW_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 const scaleLabel: Record<TripTemplate["scale"], string> = {
   multi_city: "Multi-city",
   country: "USA route",
@@ -26,10 +69,18 @@ const scaleLabel: Record<TripTemplate["scale"], string> = {
   here_now: "I'm here now",
 };
 
-function PlanCard({ t }: { t: TripTemplate }) {
+function PlanCard({
+  t,
+  stayName,
+}: {
+  t: TripTemplate;
+  stayName?: string;
+}) {
+  const params = new URLSearchParams({ from: "here" });
+  if (stayName) params.set("stay", stayName);
   return (
     <Link
-      href={`/trips/${t.slug}`}
+      href={`/trips/${t.slug}?${params.toString()}`}
       className="group block border border-white/15 bg-white/[0.04] p-5 transition hover:border-amber/50 hover:bg-white/[0.07]"
     >
       <div className="flex items-start justify-between gap-3">
@@ -64,6 +115,9 @@ export function HereNowPanel() {
   const [mood, setMood] = useState("famous");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const lastResolveRef = useRef<ResolveBody | null>(null);
+  const skipFilterOnceRef = useRef(true);
 
   useEffect(() => {
     fetch("/api/places/status")
@@ -72,7 +126,60 @@ export function HereNowPanel() {
       .catch(() => setPlacesEnabled(false));
   }, []);
 
+  // Restore stay after navigating to a plan and back
   useEffect(() => {
+    const stored = loadHereNowSession();
+    if (!stored?.selectedLabel || !stored.resolve) {
+      setHydrated(true);
+      return;
+    }
+    setQuery(stored.query || stored.selectedLabel);
+    setSelectedLabel(stored.selectedLabel);
+    setTimeBucket(stored.timeBucket || "rest_today");
+    setMood(stored.mood || "famous");
+    lastResolveRef.current = stored.resolve;
+    skipFilterOnceRef.current = true;
+
+    void (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/here-now/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...stored.resolve,
+            timeBucket: stored.timeBucket || "rest_today",
+            mood: stored.mood || "famous",
+          }),
+        });
+        const data = (await res.json()) as {
+          match?: HereNowMatch;
+          error?: string;
+          enabled?: boolean;
+        };
+        if (typeof data.enabled === "boolean") setPlacesEnabled(data.enabled);
+        if (!res.ok || !data.match) {
+          throw new Error(data.error || "Could not restore your stay.");
+        }
+        setMatch(data.match);
+        setSelectedLabel(data.match.stay.name);
+        setQuery(data.match.stay.name);
+        setSuggestions([]);
+      } catch (e) {
+        setMatch(null);
+        setError(
+          e instanceof Error ? e.message : "Could not restore your stay.",
+        );
+      } finally {
+        setLoading(false);
+        setHydrated(true);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     if (selectedLabel) {
       setSuggestions([]);
       return;
@@ -94,14 +201,9 @@ export function HereNowPanel() {
         .catch(() => setSuggestions([]));
     }, 280);
     return () => window.clearTimeout(handle);
-  }, [query, selectedLabel]);
+  }, [query, selectedLabel, hydrated]);
 
-  async function resolveStay(body: {
-    curatedId?: string;
-    nearMePlaceId?: string;
-    placeId?: string;
-    name?: string;
-  }) {
+  async function resolveStay(body: ResolveBody) {
     setLoading(true);
     setError(null);
     try {
@@ -123,10 +225,36 @@ export function HereNowPanel() {
       if (!res.ok || !data.match) {
         throw new Error(data.error || "Could not resolve that stay.");
       }
+      const stay = data.match.stay;
+      const persistResolve: ResolveBody =
+        stay.source === "curated"
+          ? { curatedId: stay.id, name: stay.name }
+          : {
+              placeId: stay.id.replace(/^google:/, ""),
+              name: stay.name,
+            };
+      // Prefer original near-me / google pick when available
+      if (body.nearMePlaceId) {
+        persistResolve.nearMePlaceId = body.nearMePlaceId;
+        persistResolve.name = stay.name;
+        delete persistResolve.curatedId;
+      } else if (body.placeId) {
+        persistResolve.placeId = body.placeId;
+        persistResolve.name = stay.name;
+        delete persistResolve.curatedId;
+      }
+      lastResolveRef.current = persistResolve;
       setMatch(data.match);
-      setSelectedLabel(data.match.stay.name);
-      setQuery(data.match.stay.name);
+      setSelectedLabel(stay.name);
+      setQuery(stay.name);
       setSuggestions([]);
+      saveHereNowSession({
+        query: stay.name,
+        selectedLabel: stay.name,
+        timeBucket,
+        mood,
+        resolve: persistResolve,
+      });
     } catch (e) {
       setMatch(null);
       setError(e instanceof Error ? e.message : "Could not resolve that stay.");
@@ -137,32 +265,46 @@ export function HereNowPanel() {
 
   // Re-filter when time/mood change and we already have a stay
   useEffect(() => {
-    if (!match?.stay) return;
+    if (!hydrated || !match?.stay) return;
+    if (skipFilterOnceRef.current) {
+      skipFilterOnceRef.current = false;
+      return;
+    }
     const stay = match.stay;
+    const resolve =
+      lastResolveRef.current ||
+      (stay.source === "curated"
+        ? { curatedId: stay.id, name: stay.name }
+        : {
+            placeId: stay.id.replace(/^google:/, ""),
+            name: stay.name,
+          });
     void (async () => {
       setLoading(true);
       try {
-        const body =
-          stay.source === "curated"
-            ? { curatedId: stay.id, name: stay.name }
-            : {
-                placeId: stay.id.replace(/^google:/, ""),
-                name: stay.name,
-              };
         const res = await fetch("/api/here-now/resolve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...body, timeBucket, mood }),
+          body: JSON.stringify({ ...resolve, timeBucket, mood }),
         });
         const data = (await res.json()) as { match?: HereNowMatch };
-        if (data.match) setMatch(data.match);
+        if (data.match) {
+          setMatch(data.match);
+          saveHereNowSession({
+            query: data.match.stay.name,
+            selectedLabel: data.match.stay.name,
+            timeBucket,
+            mood,
+            resolve,
+          });
+        }
       } finally {
         setLoading(false);
       }
     })();
     // intentionally only when filters change after a stay is set
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeBucket, mood]);
+  }, [timeBucket, mood, hydrated]);
 
   function clearStay() {
     setSelectedLabel(null);
@@ -170,6 +312,8 @@ export function HereNowPanel() {
     setQuery("");
     setError(null);
     setSuggestions([]);
+    lastResolveRef.current = null;
+    clearHereNowSession();
   }
 
   const plans = useMemo(() => match?.templates || [], [match]);
@@ -188,6 +332,8 @@ export function HereNowPanel() {
               if (selectedLabel) {
                 setSelectedLabel(null);
                 setMatch(null);
+                lastResolveRef.current = null;
+                clearHereNowSession();
               }
             }}
             placeholder="Hotel name or address in the USA"
@@ -212,8 +358,6 @@ export function HereNowPanel() {
                     type="button"
                     onClick={() => {
                       if (item.source === "curated") {
-                        // Suggested stays (e.g. Aliz) come from near-me places —
-                        // resolve them into Midtown / metro plans.
                         void resolveStay({
                           nearMePlaceId: item.id,
                           name: item.name,
@@ -262,7 +406,8 @@ export function HereNowPanel() {
         </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {hereNowHotels.map((h) => {
-            const on = match?.matchedHotelId === h.id && match.stay.source === "curated";
+            const on =
+              match?.matchedHotelId === h.id && match.stay.source === "curated";
             return (
               <button
                 key={h.id}
@@ -350,7 +495,9 @@ export function HereNowPanel() {
             </p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               {plans.length ? (
-                plans.map((t) => <PlanCard key={t.id} t={t} />)
+                plans.map((t) => (
+                  <PlanCard key={t.id} t={t} stayName={match.stay.name} />
+                ))
               ) : (
                 <p className="text-white/55">
                   No plans for this time and mood — try another combination.

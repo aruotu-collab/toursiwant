@@ -138,6 +138,8 @@ export function TemplateWorkspace({
   const [savedTripId, setSavedTripId] = useState<string | null>(null);
   const [savedTripTitle, setSavedTripTitle] = useState("");
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [fromHereNow, setFromHereNow] = useState(false);
+  const [stayFromHere, setStayFromHere] = useState<string | null>(null);
 
   const availability = useMemo(
     () => personalizeAvailability(initial),
@@ -246,6 +248,15 @@ export function TemplateWorkspace({
         setSignedIn(Boolean(d.user));
       })
       .catch(() => setSignedIn(false));
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("from") === "here") {
+      setFromHereNow(true);
+      const stay = params.get("stay");
+      if (stay) setStayFromHere(stay);
+    }
   }, []);
 
   useEffect(() => {
@@ -671,10 +682,10 @@ export function TemplateWorkspace({
             Tours<span className="text-amber">I</span>Want
           </Link>
           <Link
-            href="/?door=explore"
+            href={fromHereNow ? "/?door=here" : "/?door=explore"}
             className="font-mono text-xs uppercase tracking-[0.16em] text-white/50 hover:text-amber"
           >
-            ← USA templates
+            {fromHereNow ? "← Back to I'm here now" : "← USA templates"}
           </Link>
         </div>
 
@@ -683,9 +694,11 @@ export function TemplateWorkspace({
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
               {template.scale.replace("_", " ")} · {template.days} days
               {template.region ? ` · ${template.region}` : ""}
-              {template.hotelAnchor
-                ? ` · from ${template.hotelAnchor.name}`
-                : ""}
+              {stayFromHere
+                ? ` · from ${stayFromHere}`
+                : template.hotelAnchor
+                  ? ` · from ${template.hotelAnchor.name}`
+                  : ""}
             </p>
             <h1 className="mt-3 font-display text-4xl tracking-tight sm:text-5xl">
               {template.title}
