@@ -259,13 +259,15 @@ export function TemplateWorkspace({
   }, [session?.shareCode]);
 
   async function createShare() {
+    const name = voterName.trim() || "Host";
     if (!voterName.trim()) {
-      setStatus("Enter your name before creating a share link.");
-      return;
+      setVoterName("Host");
     }
     setBusy(true);
     setStatus("");
     try {
+      const key = voterKey || ensureVoterKey();
+      setVoterKey(key);
       const selections: Record<string, string> = {};
       for (const swap of personalizeResult?.applied || []) {
         selections[swap.blockId] = swap.optionId;
@@ -280,8 +282,10 @@ export function TemplateWorkspace({
           hotelName: initial.hotelAnchor?.name,
           wants,
           selections,
-          hostName: voterName.trim(),
-          hostKey: voterKey || ensureVoterKey(),
+          hostName: name,
+          hostKey: key,
+          voterName: name,
+          voterKey: key,
         }),
       });
       const data = (await res.json()) as {
@@ -289,15 +293,21 @@ export function TemplateWorkspace({
         winners?: Winners;
         error?: string;
       };
-      if (!res.ok || !data.session) throw new Error(data.error || "Failed");
+      if (!res.ok || !data.session) {
+        throw new Error(data.error || `Could not create share (${res.status})`);
+      }
       setSession(data.session);
       setWinners(data.winners || {});
       setJoined(true);
       const url = `${window.location.origin}/trips/${initial.slug}?share=${data.session.shareCode}`;
       setShareUrl(url);
       window.history.replaceState(null, "", `?share=${data.session.shareCode}`);
-      await navigator.clipboard?.writeText(url).catch(() => undefined);
-      setStatus("Share link created and copied. Send it to your group.");
+      try {
+        await navigator.clipboard.writeText(url);
+        setStatus("Share link created and copied. Send it to your group.");
+      } catch {
+        setStatus("Share link created. Copy it below and send it to your group.");
+      }
       setAsideTab("share");
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Could not create share");
