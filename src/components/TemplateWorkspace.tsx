@@ -26,6 +26,8 @@ type Session = {
   voterNames: string[];
   wants?: ExperienceCategory[];
   selections?: Record<string, string>;
+  openToJoin?: boolean;
+  joinNote?: string;
   specialEventRequests: Array<{
     id: string;
     kind: string;
@@ -130,6 +132,9 @@ export function TemplateWorkspace({
   const [asideTab, setAsideTab] = useState<
     "personalize" | "share" | "city"
   >("personalize");
+  const [openToJoin, setOpenToJoin] = useState(true);
+  const [joinNote, setJoinNote] = useState("");
+  const [pendingJoin, setPendingJoin] = useState(false);
 
   const availability = useMemo(
     () => personalizeAvailability(initial),
@@ -234,6 +239,7 @@ export function TemplateWorkspace({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("share");
+    const wantJoin = params.get("join") === "1";
     if (!code) return;
     (async () => {
       const data = await refreshSession(code);
@@ -242,6 +248,7 @@ export function TemplateWorkspace({
         `${window.location.origin}/trips/${initial.slug}?share=${code}`,
       );
       setAsideTab("share");
+      if (wantJoin) setPendingJoin(true);
       if (data.session.wants?.length) setWants(data.session.wants);
       if (data.session.selections) {
         setTemplate(applySelections(initial, data.session.selections));
@@ -280,6 +287,11 @@ export function TemplateWorkspace({
           templateSlug: initial.slug,
           templateTitle: initial.title,
           hotelName: initial.hotelAnchor?.name,
+          route: initial.route,
+          region: initial.region,
+          cityCodes: initial.cityCodes,
+          openToJoin,
+          joinNote: joinNote.trim() || undefined,
           wants,
           selections,
           hostName: name,
@@ -304,10 +316,14 @@ export function TemplateWorkspace({
       window.history.replaceState(null, "", `?share=${data.session.shareCode}`);
       try {
         await navigator.clipboard.writeText(url);
-        setStatus("Share link created and copied. Send it to your group.");
       } catch {
-        setStatus("Share link created. Copy it below and send it to your group.");
+        // clipboard may be blocked — link still shown
       }
+      setStatus(
+        openToJoin
+          ? "Share link created — listed on Join a group so others can find you."
+          : "Share link created. Send it privately, or list it later so others can join.",
+      );
       setAsideTab("share");
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Could not create share");
@@ -533,6 +549,7 @@ export function TemplateWorkspace({
                 <span className="text-white/75">
                   {(session.voters || []).length} in room · code{" "}
                   <span className="font-mono text-amber">{session.shareCode}</span>
+                  {session.openToJoin ? " · open to joiners" : ""}
                 </span>
                 <button
                   type="button"
@@ -541,6 +558,44 @@ export function TemplateWorkspace({
                 >
                   Apply winning votes
                 </button>
+              </div>
+            ) : null}
+
+            {pendingJoin && session && !joined ? (
+              <div className="mt-5 border border-white/20 bg-white/[0.05] px-4 py-4">
+                <p className="font-display text-xl text-white">
+                  Join this group&apos;s trip
+                </p>
+                <p className="mt-2 text-sm text-white/65">
+                  You&apos;ll keep this template spine. Enter your name, join the
+                  room, then personalize flexible days or vote with the group.
+                </p>
+                {session.joinNote ? (
+                  <p className="mt-2 text-sm text-amber">{session.joinNote}</p>
+                ) : null}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <input
+                    value={voterName}
+                    onChange={(e) => setVoterName(e.target.value)}
+                    placeholder="Your name"
+                    className="min-w-[12rem] flex-1 border border-white/20 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-amber"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={async () => {
+                      await joinShare();
+                      setPendingJoin(false);
+                      setAsideTab("personalize");
+                      setStatus(
+                        "Joined. Personalize flexible days, or vote with the group.",
+                      );
+                    }}
+                    className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep"
+                  >
+                    Join & personalize
+                  </button>
+                </div>
               </div>
             ) : null}
 
@@ -895,14 +950,36 @@ export function TemplateWorkspace({
                 </label>
 
                 {!session ? (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={createShare}
-                    className="mt-4 w-full bg-amber px-4 py-3 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-60"
-                  >
-                    Create share link
-                  </button>
+                  <>
+                    <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-white/75">
+                      <input
+                        type="checkbox"
+                        checked={openToJoin}
+                        onChange={(e) => setOpenToJoin(e.target.checked)}
+                        className="mt-1"
+                      />
+                      <span>
+                        List on <strong className="text-white">Join a group</strong>{" "}
+                        so travellers who like this template can find and join you
+                      </span>
+                    </label>
+                    {openToJoin ? (
+                      <input
+                        value={joinNote}
+                        onChange={(e) => setJoinNote(e.target.value)}
+                        placeholder="Optional note — e.g. Times Square stay, open to 2 more"
+                        className="mt-3 w-full border border-white/20 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-amber"
+                      />
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={createShare}
+                      className="mt-4 w-full bg-amber px-4 py-3 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-60"
+                    >
+                      Create share link
+                    </button>
+                  </>
                 ) : (
                   <div className="mt-4 space-y-3">
                     {!joined ? (
@@ -917,7 +994,7 @@ export function TemplateWorkspace({
                     ) : (
                       <p className="text-sm text-amber">
                         You&apos;re in as {voterName || "Guest"}. Vote on slots
-                        in the itinerary.
+                        in the itinerary, or use Personalize for your swaps.
                       </p>
                     )}
                     <div className="border border-white/10 bg-black/20 p-3">
@@ -935,6 +1012,43 @@ export function TemplateWorkspace({
                         Copy link
                       </button>
                     </div>
+                    <label className="flex cursor-pointer items-start gap-2 text-sm text-white/75">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(session.openToJoin)}
+                        onChange={async (e) => {
+                          const next = e.target.checked;
+                          setBusy(true);
+                          try {
+                            const res = await fetch("/api/trip-sessions", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                action: "list",
+                                shareCode: session.shareCode,
+                                openToJoin: next,
+                                joinNote: joinNote.trim() || session.joinNote,
+                              }),
+                            });
+                            const data = (await res.json()) as {
+                              session?: Session;
+                            };
+                            if (data.session) {
+                              setSession(data.session);
+                              setStatus(
+                                next
+                                  ? "Listed on Join a group."
+                                  : "Removed from public Join a group list.",
+                              );
+                            }
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                        className="mt-1"
+                      />
+                      <span>Show on Join a group board</span>
+                    </label>
                     {(session.voters || []).length ? (
                       <div>
                         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">

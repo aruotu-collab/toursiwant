@@ -4,8 +4,10 @@ import {
   createTripSession,
   getSessionByShareCode,
   joinTripSession,
+  listOpenTripSessions,
   saveSessionVotes,
   saveTravelledRating,
+  setSessionOpenToJoin,
   updateSessionWants,
   winningOptions,
 } from "@/lib/trip-sessions";
@@ -21,9 +23,38 @@ function fail(error: unknown, fallback: string, status = 500) {
 
 export async function GET(request: Request) {
   try {
-    const code = new URL(request.url).searchParams.get("code");
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code");
+    const open = searchParams.get("open") === "1";
+    const city = searchParams.get("city") || undefined;
+
+    if (open) {
+      const sessions = await listOpenTripSessions({ cityCode: city });
+      return NextResponse.json({
+        sessions: sessions.map((s) => ({
+          id: s.id,
+          shareCode: s.shareCode,
+          templateSlug: s.templateSlug,
+          templateTitle: s.templateTitle,
+          route: s.route,
+          region: s.region,
+          cityCodes: s.cityCodes,
+          hotelName: s.hotelName,
+          joinNote: s.joinNote,
+          openToJoin: s.openToJoin,
+          createdAt: s.createdAt,
+          travellerCount: (s.voters || []).length,
+          travellerNames: (s.voters || []).map((v) => v.name),
+          wants: s.wants,
+        })),
+      });
+    }
+
     if (!code) {
-      return NextResponse.json({ error: "code required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "code or open=1 required" },
+        { status: 400 },
+      );
     }
     const session = await getSessionByShareCode(code);
     if (!session) {
@@ -41,10 +72,22 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
-      action?: "create" | "join" | "vote" | "rate" | "special" | "sync";
+      action?:
+        | "create"
+        | "join"
+        | "vote"
+        | "rate"
+        | "special"
+        | "sync"
+        | "list";
       templateSlug?: string;
       templateTitle?: string;
       hotelName?: string;
+      route?: string;
+      region?: string;
+      cityCodes?: string[];
+      openToJoin?: boolean;
+      joinNote?: string;
       selections?: Record<string, string>;
       wants?: ExperienceCategory[];
       shareCode?: string;
@@ -67,19 +110,40 @@ export async function POST(request: Request) {
         );
       }
       const hostKey =
-        body.hostKey ||
-        body.voterKey ||
-        `host_${Date.now().toString(36)}`;
+        body.hostKey || body.voterKey || `host_${Date.now().toString(36)}`;
       const hostName = (body.hostName || body.voterName || "Host").trim();
       const session = await createTripSession({
         templateSlug: body.templateSlug,
         templateTitle: body.templateTitle,
         hotelName: body.hotelName,
+        route: body.route,
+        region: body.region,
+        cityCodes: body.cityCodes,
+        openToJoin: body.openToJoin,
+        joinNote: body.joinNote,
         selections: body.selections,
         wants: body.wants,
         hostName,
         hostKey,
       });
+      return NextResponse.json({ session, winners: winningOptions(session) });
+    }
+
+    if (body.action === "list") {
+      if (!body.shareCode) {
+        return NextResponse.json(
+          { error: "Missing share code" },
+          { status: 400 },
+        );
+      }
+      const session = await setSessionOpenToJoin(
+        body.shareCode,
+        body.openToJoin !== false,
+        body.joinNote,
+      );
+      if (!session) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
       return NextResponse.json({ session, winners: winningOptions(session) });
     }
 

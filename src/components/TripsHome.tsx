@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { HereNowPanel } from "@/components/HereNowPanel";
+import { LiveTripsPanel } from "@/components/LiveTripsPanel";
 import {
   combineUsCities,
   listTemplates,
@@ -12,7 +13,7 @@ import {
   type TripTemplate,
 } from "@/lib/trip-templates";
 
-type Door = "home" | "explore" | "combine" | "here";
+type Door = "home" | "explore" | "combine" | "here" | "live";
 
 const scaleLabel: Record<TripTemplate["scale"], string> = {
   multi_city: "Multi-city",
@@ -68,7 +69,13 @@ function TemplateCard({ t }: { t: TripTemplate }) {
 }
 
 function parseDoor(raw: string | null): Door {
-  if (raw === "explore" || raw === "combine" || raw === "here") return raw;
+  if (
+    raw === "explore" ||
+    raw === "combine" ||
+    raw === "here" ||
+    raw === "live"
+  )
+    return raw;
   return "home";
 }
 
@@ -197,7 +204,7 @@ export function TripsHome() {
               right-now plans from your hotel — not a blank itinerary.
             </p>
             <div
-              className="mt-10 grid gap-3 sm:grid-cols-3"
+              className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
               style={{ animation: "rise-in 0.7s ease-out 0.2s both" }}
             >
               {(
@@ -217,13 +224,18 @@ export function TripsHome() {
                     title: "I'm here now",
                     copy: "Type your hotel → time → mood → ready plans.",
                   },
+                  {
+                    id: "live" as const,
+                    title: "Join a group",
+                    copy: "See live templates people are already on — join and personalize.",
+                  },
                 ] as const
               ).map((d) => (
                 <button
                   key={d.id}
                   type="button"
                   onClick={() => setDoor(d.id)}
-                  className="border border-white/20 bg-white/[0.05] px-5 py-6 text-left transition hover:border-amber hover:bg-amber/10"
+                  className="border border-white/20 bg-white/[0.05] px-5 py-6 text-left transition hover:border-amber hover:bg-amber/10 sm:col-span-1"
                 >
                   <p className="font-display text-xl text-white">{d.title}</p>
                   <p className="mt-2 text-sm text-white/60">{d.copy}</p>
@@ -312,6 +324,7 @@ export function TripsHome() {
                   ["explore", "Explore USA"],
                   ["combine", "Combine cities"],
                   ["here", "I'm here now"],
+                  ["live", "Join a group"],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -445,6 +458,19 @@ export function TripsHome() {
                 tell us how much time you have.
               </p>
               <HereNowPanel />
+            </div>
+          ) : null}
+
+          {door === "live" ? (
+            <div className="mt-8">
+              <h2 className="font-display text-3xl tracking-tight sm:text-4xl">
+                Join a group
+              </h2>
+              <p className="mt-2 max-w-xl text-white/60">
+                See templates people are already travelling with — join their
+                room, then personalize flexible days to suit you.
+              </p>
+              <LiveTripsPanel />
             </div>
           ) : null}
 

@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomBytes } from "crypto";
 import { ensureAppSchema, getSql, hasDatabase } from "@/lib/db";
+import { getTemplateBySlug } from "@/lib/trip-templates";
 import type { ExperienceCategory } from "@/lib/trip-templates";
 
 export type VoteTally = Record<string, Record<string, number>>;
@@ -21,6 +22,13 @@ export type TripSession = {
   templateTitle: string;
   createdAt: string;
   hotelName?: string;
+  route?: string;
+  region?: string;
+  cityCodes?: string[];
+  /** Listed on the Live trips board for strangers to join */
+  openToJoin: boolean;
+  /** Short note shown on the board, e.g. meeting point / vibe */
+  joinNote?: string;
   selections: Record<string, string>;
   wants: ExperienceCategory[];
   votes: VoteTally;
@@ -63,11 +71,13 @@ function normalizeSession(session: TripSession): TripSession {
   const voters = Array.isArray(session.voters) ? session.voters : [];
   return {
     ...session,
+    openToJoin: Boolean(session.openToJoin),
     voters,
     votes: rebuildTallies(voters),
     voterNames: voters.map((v) => v.name),
     selections: session.selections || {},
     wants: session.wants || [],
+    cityCodes: session.cityCodes || [],
     specialEventRequests: session.specialEventRequests || [],
   };
 }
@@ -97,6 +107,11 @@ async function ensureTripSessionsTable() {
 function sessionToPayload(session: TripSession) {
   return {
     hotelName: session.hotelName,
+    route: session.route,
+    region: session.region,
+    cityCodes: session.cityCodes,
+    openToJoin: session.openToJoin,
+    joinNote: session.joinNote,
     selections: session.selections,
     wants: session.wants,
     voters: session.voters,
@@ -131,6 +146,11 @@ function rowToSession(row: {
     templateTitle: row.template_title,
     createdAt,
     hotelName: row.hotel_name || (payload.hotelName as string | undefined),
+    route: payload.route as string | undefined,
+    region: payload.region as string | undefined,
+    cityCodes: (payload.cityCodes as string[]) || [],
+    openToJoin: Boolean(payload.openToJoin),
+    joinNote: payload.joinNote as string | undefined,
     selections: (payload.selections as Record<string, string>) || {},
     wants: (payload.wants as ExperienceCategory[]) || [],
     votes: {},
@@ -177,6 +197,25 @@ async function dbGetByShareCode(shareCode: string) {
   return rows[0] ? rowToSession(rows[0]) : null;
 }
 
+async function dbListRecent(limit = 80) {
+  await ensureTripSessionsTable();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT * FROM trip_sessions
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `) as Array<{
+    id: string;
+    share_code: string;
+    template_slug: string;
+    template_title: string;
+    hotel_name: string | null;
+    payload: unknown;
+    created_at: string | Date;
+  }>;
+  return rows.map(rowToSession);
+}
+
 async function dbUpsertSession(session: TripSession) {
   await ensureTripSessionsTable();
   const sql = getSql();
@@ -221,6 +260,11 @@ export async function createTripSession(input: {
   templateSlug: string;
   templateTitle: string;
   hotelName?: string;
+  route?: string;
+  region?: string;
+  cityCodes?: string[];
+  openToJoin?: boolean;
+  joinNote?: string;
   selections?: Record<string, string>;
   wants?: ExperienceCategory[];
   hostName?: string;
@@ -236,13 +280,19 @@ export async function createTripSession(input: {
     });
   }
 
+  const template = getTemplateBySlug(input.templateSlug);
   const session: TripSession = {
     id: `sess_${Date.now()}_${code()}`,
     shareCode: code(),
     templateSlug: input.templateSlug,
     templateTitle: input.templateTitle,
     createdAt: new Date().toISOString(),
-    hotelName: input.hotelName,
+    hotelName: input.hotelName || template?.hotelAnchor?.name,
+    route: input.route || template?.route,
+    region: input.region || template?.region,
+    cityCodes: input.cityCodes || template?.cityCodes || [],
+    openToJoin: Boolean(input.openToJoin),
+    joinNote: input.joinNote?.slice(0, 160),
     selections: input.selections || {},
     wants: input.wants || [],
     votes: {},
@@ -263,6 +313,104 @@ export async function getSessionByShareCode(shareCode: string) {
     (s) => s.shareCode.toLowerCase() === shareCode.toLowerCase(),
   );
   return session ? normalizeSession(session) : null;
+}
+
+export async function listOpenTripSessions(filters?: {
+  cityCode?: string;
+}) {
+  let sessions: TripSession[] = [];
+  if (hasDatabase()) {
+    sessions = await dbListRecent(100);
+  } else {
+    const store = await readFileStore();
+    sessions = store.sessions.map(normalizeSession);
+  }
+
+  let open = sessions.filter((s) => s.openToJoin);
+  if (open.length === 0) {
+    open = await ensureDemoOpenTrips();
+  }
+  if (filters?.cityCode) {
+    const code = filters.cityCode.toUpperCase();
+    open = open.filter((s) => (s.cityCodes || []).includes(code));
+  }
+
+  open.sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
+  return open.slice(0, 40);
+}
+
+async function ensureDemoOpenTrips(): Promise<TripSession[]> {
+  const demos = [
+    {
+      slug: "new-york-4-days",
+      host: "Maya",
+      note: "Times Square stay · open to 2–4 more travellers",
+      voters: ["Maya", "Jordan"],
+    },
+    {
+      slug: "midtown-hotel-3-days",
+      host: "Sam",
+      note: "Midtown hotel base · flexible Broadway night",
+      voters: ["Sam", "Priya", "Chris"],
+    },
+    {
+      slug: "east-coast-classics",
+      host: "Alex",
+      note: "NYC → Philly → D.C. · looking for 1–2 more",
+      voters: ["Alex"],
+    },
+  ];
+
+  const created: TripSession[] = [];
+  for (const demo of demos) {
+    const template = getTemplateBySlug(demo.slug);
+    if (!template) continue;
+    const voters: TripVoter[] = demo.voters.map((name, i) => ({
+      key: `demo_${demo.slug}_${i}`,
+      name,
+      votes: {},
+      joinedAt: new Date(Date.now() - (i + 1) * 3600_000).toISOString(),
+    }));
+    const session: TripSession = {
+      id: `demo_${demo.slug}_${code()}`,
+      shareCode: `demo${code().slice(0, 4)}`,
+      templateSlug: template.slug,
+      templateTitle: template.title,
+      createdAt: new Date(Date.now() - 7200_000).toISOString(),
+      hotelName: template.hotelAnchor?.name,
+      route: template.route,
+      region: template.region,
+      cityCodes: template.cityCodes,
+      openToJoin: true,
+      joinNote: demo.note,
+      selections: {},
+      wants: [],
+      votes: {},
+      voters,
+      voterNames: voters.map((v) => v.name),
+      specialEventRequests: [],
+    };
+    created.push(await saveSession(session));
+  }
+  return created;
+}
+
+export async function setSessionOpenToJoin(
+  shareCode: string,
+  openToJoin: boolean,
+  joinNote?: string,
+) {
+  const session = await getSessionByShareCode(shareCode);
+  if (!session) return null;
+  session.openToJoin = openToJoin;
+  if (typeof joinNote === "string") {
+    session.joinNote = joinNote.slice(0, 160);
+  }
+  return saveSession(session);
 }
 
 export async function joinTripSession(

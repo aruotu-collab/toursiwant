@@ -20,6 +20,9 @@ export function SiteFooter() {
           <Link href="/?door=combine" className="hover:text-white">
             Combine cities
           </Link>
+          <Link href="/?door=live" className="hover:text-white">
+            Join a group
+          </Link>
           <Link href="/?door=here" className="hover:text-white">
             I&apos;m here now
           </Link>
