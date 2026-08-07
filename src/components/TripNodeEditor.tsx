@@ -69,8 +69,7 @@ function countAllStops(nodes: RouteNode[]) {
 }
 
 /**
- * Combined editor: days first, add stops under a day, tours, then
- * personalize / save (via children).
+ * Combined editor: vertical day map, tours, then personalize / save.
  */
 export function TripNodeEditor({
   nodes,
@@ -88,11 +87,13 @@ export function TripNodeEditor({
   children?: ReactNode;
 }) {
   const days = useMemo(() => nodes.filter((n) => n.kind === "day"), [nodes]);
-  const [custom, setCustom] = useState("");
   const [selectedDayId, setSelectedDayId] = useState<string | null>(
     () => days[0]?.id ?? null,
   );
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
+  const [expandedDayId, setExpandedDayId] = useState<string | null>(
+    () => days[0]?.id ?? null,
+  );
   const [tours, setTours] = useState<TourHit[]>([]);
   const [loadingTours, setLoadingTours] = useState(false);
   const [tourError, setTourError] = useState<string | null>(null);
@@ -108,22 +109,13 @@ export function TripNodeEditor({
       : null;
 
   const totalStops = countAllStops(nodes);
-  const dayStopCount = selectedDay?.stops?.length || 0;
-  const atLimit =
-    totalStops >= MAX_DAY_STOPS ||
-    dayStopCount >= MAX_STOPS_PER_DAY ||
-    !selectedDay ||
-    selectedDay.kind !== "day";
-
-  const chips = Array.from(
-    new Set(suggestions.map((s) => s.trim()).filter(Boolean)),
-  );
 
   useEffect(() => {
     if (!selectedDayId) return;
     if (!nodes.some((n) => n.id === selectedDayId)) {
       setSelectedDayId(days[0]?.id ?? null);
       setSelectedStopId(null);
+      setExpandedDayId(days[0]?.id ?? null);
       setTours([]);
     } else if (
       selectedStopId &&
@@ -200,24 +192,26 @@ export function TripNodeEditor({
     };
   }, [selectedDay, selectedStop, template]);
 
-  function add(label: string) {
-    const clean = label.trim();
-    if (!clean || atLimit || !selectedDay || selectedDay.kind !== "day") return;
-    onAddStop(selectedDay.id, clean);
-    setCustom("");
-  }
-
   function selectNode(node: RouteNode) {
-    setSelectedDayId((prev) => {
-      if (prev === node.id && !selectedStopId) return prev;
-      return node.id;
-    });
+    setSelectedDayId(node.id);
     setSelectedStopId(null);
+    if (node.kind === "day") {
+      setExpandedDayId(node.id);
+    }
   }
 
   function selectStop(day: RouteNode, stop: DayStop) {
     setSelectedDayId(day.id);
+    setExpandedDayId(day.id);
     setSelectedStopId((prev) => (prev === stop.id ? null : stop.id));
+  }
+
+  function handleExpandedChange(id: string | null) {
+    setExpandedDayId(id);
+    if (id) {
+      setSelectedDayId(id);
+      setSelectedStopId(null);
+    }
   }
 
   const tourHeading = selectedStop
@@ -233,8 +227,8 @@ export function TripNodeEditor({
           <div>
             <h2 className="font-display text-xl">Make it yours</h2>
             <p className="mt-1 text-sm text-white/55">
-              Numbers are days. Add stops under a day, personalize the vibe,
-              then save.
+              Numbers are days. Open a day with +, add stops inside, then
+              personalize and save.
             </p>
           </div>
           <p className="font-mono text-[11px] text-white/40">
@@ -248,61 +242,19 @@ export function TripNodeEditor({
         interactive
         selectedNodeId={selectedDayId}
         selectedStopId={selectedStopId}
+        expandedDayId={expandedDayId}
+        onExpandedDayIdChange={handleExpandedChange}
         onSelectNode={selectNode}
         onSelectStop={selectStop}
         onRemoveStop={onRemoveStop}
-        className="w-full border-0 border-b border-white/10"
+        onAddStop={onAddStop}
+        addSuggestions={suggestions}
+        canAddStop={(day) =>
+          totalStops < MAX_DAY_STOPS &&
+          (day.stops?.length || 0) < MAX_STOPS_PER_DAY
+        }
+        className="h-80 w-full border-0 border-b border-white/10 sm:h-[22rem]"
       />
-
-      <div className="space-y-3 border-b border-white/10 px-4 py-4 sm:px-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-amber">
-          Add a stop
-          {selectedDay?.kind === "day" ? (
-            <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-white/50">
-              → {selectedDay.dayLabel || "Day"}
-            </span>
-          ) : (
-            <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-white/45">
-              · tap a day first
-            </span>
-          )}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {chips.map((label) => (
-            <button
-              key={label}
-              type="button"
-              disabled={atLimit}
-              onClick={() => add(label)}
-              className="border border-white/20 px-2.5 py-1.5 text-xs text-white/80 transition hover:border-amber hover:bg-amber/10 hover:text-amber disabled:opacity-40 sm:text-sm"
-            >
-              + {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            value={custom}
-            onChange={(e) => setCustom(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                add(custom);
-              }
-            }}
-            placeholder="Custom — e.g. Chinatown"
-            className="min-w-[10rem] flex-1 border border-white/20 bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber"
-          />
-          <button
-            type="button"
-            disabled={!custom.trim() || atLimit}
-            onClick={() => add(custom)}
-            className="bg-amber px-3 py-2 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
-          >
-            Add
-          </button>
-        </div>
-      </div>
 
       {selectedDay ? (
         <div className="border-b border-amber/25 bg-amber/5 px-4 py-4 sm:px-5">
@@ -322,7 +274,9 @@ export function TripNodeEditor({
               type="button"
               onClick={() => {
                 setSelectedStopId(null);
-                if (selectedDay.kind === "hotel") setSelectedDayId(days[0]?.id ?? null);
+                if (selectedDay.kind === "hotel") {
+                  setSelectedDayId(days[0]?.id ?? null);
+                }
               }}
               className="text-xs text-white/50 hover:text-amber"
             >

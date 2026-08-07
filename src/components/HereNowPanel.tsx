@@ -84,7 +84,7 @@ function PlanCard({
       href={`/trips/${t.slug}?${params.toString()}`}
       className="group block overflow-hidden border border-white/15 bg-white/[0.04] transition hover:border-amber/50 hover:bg-white/[0.07]"
     >
-      <TemplateRouteLoop template={t} className="min-h-[7.5rem] w-full" />
+      <TemplateRouteLoop template={t} className="h-52 w-full" />
       <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber">
