@@ -1033,18 +1033,15 @@ export function TemplateWorkspace({
                               ) : null}
                               <div className="relative flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                  <p className="text-sm text-white">
-                                    {opt.title}
-                                    <span className="ml-2 text-white/40">
-                                      {experienceCategoryLabel[opt.category]}
-                                    </span>
+                                  <p className="text-sm font-semibold text-white">
+                                    {experienceCategoryLabel[opt.category]}
                                     {isWinner ? (
-                                      <span className="ml-2 font-mono text-[10px] text-amber">
+                                      <span className="ml-2 font-mono text-[10px] font-normal text-amber">
                                         LEADING
                                       </span>
                                     ) : null}
                                     {isMine ? (
-                                      <span className="ml-2 font-mono text-[10px] text-white/50">
+                                      <span className="ml-2 font-mono text-[10px] font-normal text-white/50">
                                         YOUR VOTE
                                       </span>
                                     ) : null}
