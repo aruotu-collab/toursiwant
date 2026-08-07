@@ -6,6 +6,7 @@ import {
   type ResolvedStay,
 } from "@/lib/here-now";
 import { hasGooglePlacesKey, metroLabel } from "@/lib/places-usa";
+import type { ExperienceCategory } from "@/lib/trip-templates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ type Body = {
   name?: string;
   timeBucket?: string;
   mood?: string;
+  topics?: ExperienceCategory[];
 };
 
 async function googleDetails(placeId: string, key: string) {
@@ -45,7 +47,11 @@ async function googleDetails(placeId: string, key: string) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Body;
-    const filters = { timeBucket: body.timeBucket, mood: body.mood };
+    const filters = {
+      timeBucket: body.timeBucket,
+      mood: body.mood,
+      topics: body.topics,
+    };
 
     if (body.nearMePlaceId) {
       const stay = curatedStayFromNearMePlace(body.nearMePlaceId);

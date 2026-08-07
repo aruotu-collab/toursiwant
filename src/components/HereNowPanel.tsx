@@ -6,7 +6,9 @@ import { TemplateRouteLoop } from "@/components/TemplateRouteLoop";
 import {
   hereNowHotels,
   moodOptions,
+  personalizeOptions,
   timeBucketOptions,
+  type ExperienceCategory,
   type TripTemplate,
 } from "@/lib/trip-templates";
 import type { HereNowMatch } from "@/lib/here-now";
@@ -31,6 +33,8 @@ type StoredHereNow = {
   selectedLabel: string;
   timeBucket: string;
   mood: string;
+  topics: ExperienceCategory[];
+  showPlans: boolean;
   resolve: ResolveBody;
 };
 
@@ -117,6 +121,8 @@ export function HereNowPanel() {
   const [match, setMatch] = useState<HereNowMatch | null>(null);
   const [timeBucket, setTimeBucket] = useState("rest_today");
   const [mood, setMood] = useState("famous");
+  const [topics, setTopics] = useState<ExperienceCategory[]>([]);
+  const [showPlans, setShowPlans] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -141,6 +147,8 @@ export function HereNowPanel() {
     setSelectedLabel(stored.selectedLabel);
     setTimeBucket(stored.timeBucket || "rest_today");
     setMood(stored.mood || "famous");
+    setTopics(stored.topics || []);
+    setShowPlans(Boolean(stored.showPlans && (stored.topics?.length || stored.showPlans)));
     lastResolveRef.current = stored.resolve;
     skipFilterOnceRef.current = true;
 
@@ -155,6 +163,7 @@ export function HereNowPanel() {
             ...stored.resolve,
             timeBucket: stored.timeBucket || "rest_today",
             mood: stored.mood || "famous",
+            topics: stored.showPlans ? stored.topics || [] : [],
           }),
         });
         const data = (await res.json()) as {
@@ -207,7 +216,7 @@ export function HereNowPanel() {
     return () => window.clearTimeout(handle);
   }, [query, selectedLabel, hydrated]);
 
-  async function resolveStay(body: ResolveBody) {
+  async function resolveStay(body: ResolveBody, withTopics = false) {
     setLoading(true);
     setError(null);
     try {
@@ -218,6 +227,7 @@ export function HereNowPanel() {
           ...body,
           timeBucket,
           mood,
+          topics: withTopics ? topics : [],
         }),
       });
       const data = (await res.json()) as {
@@ -237,7 +247,6 @@ export function HereNowPanel() {
               placeId: stay.id.replace(/^google:/, ""),
               name: stay.name,
             };
-      // Prefer original near-me / google pick when available
       if (body.nearMePlaceId) {
         persistResolve.nearMePlaceId = body.nearMePlaceId;
         persistResolve.name = stay.name;
@@ -252,11 +261,17 @@ export function HereNowPanel() {
       setSelectedLabel(stay.name);
       setQuery(stay.name);
       setSuggestions([]);
+      if (!withTopics) {
+        setShowPlans(false);
+        setTopics([]);
+      }
       saveHereNowSession({
         query: stay.name,
         selectedLabel: stay.name,
         timeBucket,
         mood,
+        topics: withTopics ? topics : [],
+        showPlans: withTopics,
         resolve: persistResolve,
       });
     } catch (e) {
@@ -267,9 +282,46 @@ export function HereNowPanel() {
     }
   }
 
-  // Re-filter when time/mood change and we already have a stay
+  async function findPlansByTopics() {
+    const resolve = lastResolveRef.current;
+    if (!resolve) return;
+    if (!topics.length) {
+      setError("Pick at least one day topic, then find plans.");
+      return;
+    }
+    setError(null);
+    setShowPlans(true);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/here-now/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...resolve, timeBucket, mood, topics }),
+      });
+      const data = (await res.json()) as { match?: HereNowMatch; error?: string };
+      if (!res.ok || !data.match) {
+        throw new Error(data.error || "Could not find plans.");
+      }
+      setMatch(data.match);
+      saveHereNowSession({
+        query: data.match.stay.name,
+        selectedLabel: data.match.stay.name,
+        timeBucket,
+        mood,
+        topics,
+        showPlans: true,
+        resolve,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not find plans.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Re-filter when time/mood/topics change after a search was run
   useEffect(() => {
-    if (!hydrated || !match?.stay) return;
+    if (!hydrated || !match?.stay || !showPlans) return;
     if (skipFilterOnceRef.current) {
       skipFilterOnceRef.current = false;
       return;
@@ -289,7 +341,7 @@ export function HereNowPanel() {
         const res = await fetch("/api/here-now/resolve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...resolve, timeBucket, mood }),
+          body: JSON.stringify({ ...resolve, timeBucket, mood, topics }),
         });
         const data = (await res.json()) as { match?: HereNowMatch };
         if (data.match) {
@@ -299,6 +351,8 @@ export function HereNowPanel() {
             selectedLabel: data.match.stay.name,
             timeBucket,
             mood,
+            topics,
+            showPlans: true,
             resolve,
           });
         }
@@ -306,9 +360,8 @@ export function HereNowPanel() {
         setLoading(false);
       }
     })();
-    // intentionally only when filters change after a stay is set
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeBucket, mood, hydrated]);
+  }, [timeBucket, mood, topics, hydrated, showPlans]);
 
   function clearStay() {
     setSelectedLabel(null);
@@ -316,11 +369,22 @@ export function HereNowPanel() {
     setQuery("");
     setError(null);
     setSuggestions([]);
+    setTopics([]);
+    setShowPlans(false);
     lastResolveRef.current = null;
     clearHereNowSession();
   }
 
-  const plans = useMemo(() => match?.templates || [], [match]);
+  function toggleTopic(id: ExperienceCategory) {
+    setTopics((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  const plans = useMemo(
+    () => (showPlans ? match?.templates || [] : []),
+    [match, showPlans],
+  );
 
   return (
     <div className="mt-8 space-y-8">
@@ -399,8 +463,8 @@ export function HereNowPanel() {
               : "Checking hotel search…"}
         </p>
         {error ? <p className="mt-2 text-sm text-amber">{error}</p> : null}
-        {loading ? (
-          <p className="mt-2 text-sm text-white/50">Finding plans near you…</p>
+        {loading && !match ? (
+          <p className="mt-2 text-sm text-white/50">Matching your stay…</p>
         ) : null}
       </div>
 
@@ -490,30 +554,78 @@ export function HereNowPanel() {
 
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">
-              4 · Ready plans for you
+              4 · Day topics
             </p>
-            <p className="mt-2 text-sm text-white/50">
-              {plans.length} plan{plans.length === 1 ? "" : "s"} near{" "}
-              {match.stay.name}
-              {match.stay.metro ? ` · ${match.stay.metro}` : ""}
+            <p className="mt-2 text-sm text-white/55">
+              What do you want today? Pick one or more — then we search plans
+              that fit.
             </p>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {plans.length ? (
-                plans.map((t) => (
-                  <PlanCard key={t.id} t={t} stayName={match.stay.name} />
-                ))
-              ) : (
-                <p className="text-white/55">
-                  No plans for this time and mood — try another combination.
-                </p>
-              )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {personalizeOptions.map((opt) => {
+                const on = topics.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => toggleTopic(opt.id)}
+                    className={`border px-3 py-2 text-sm transition ${
+                      on
+                        ? "border-amber bg-amber text-ink"
+                        : "border-white/20 text-white/70 hover:border-white/40"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
+            <button
+              type="button"
+              disabled={loading || topics.length === 0}
+              onClick={() => void findPlansByTopics()}
+              className="mt-4 bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
+            >
+              {loading ? "Searching…" : "Find plans"}
+            </button>
+            {topics.length === 0 ? (
+              <p className="mt-2 text-xs text-white/45">
+                Select at least one topic to search.
+              </p>
+            ) : null}
           </div>
+
+          {showPlans ? (
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-amber">
+                5 · Ready plans for you
+              </p>
+              <p className="mt-2 text-sm text-white/50">
+                {plans.length} plan{plans.length === 1 ? "" : "s"} near{" "}
+                {match.stay.name}
+                {match.stay.metro ? ` · ${match.stay.metro}` : ""}
+                {topics.length
+                  ? ` · ${topics.length} topic${topics.length === 1 ? "" : "s"}`
+                  : ""}
+              </p>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {plans.length ? (
+                  plans.map((t) => (
+                    <PlanCard key={t.id} t={t} stayName={match.stay.name} />
+                  ))
+                ) : (
+                  <p className="text-white/55">
+                    No plans for this mix — try different day topics, time, or
+                    mood.
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : null}
         </>
       ) : (
         <p className="border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-white/55">
-          Search your hotel or tap a featured stay — then we&apos;ll ask how much
-          time you have and what mood you&apos;re in.
+          Search your hotel or tap a featured stay — then pick time, mood, and
+          day topics before we show plans.
         </p>
       )}
     </div>

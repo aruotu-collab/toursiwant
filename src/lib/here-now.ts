@@ -3,6 +3,7 @@ import { getNearMePlace } from "@/lib/near-me";
 import {
   hereNowHotels,
   listTemplates,
+  type ExperienceCategory,
   type TripTemplate,
 } from "@/lib/trip-templates";
 
@@ -96,12 +97,76 @@ function refineMetro(lat: number, lng: number, name: string, address: string) {
   return metroLabel(lat, lng);
 }
 
+/** How well a template’s days/options match the traveler’s day topics. */
+export function templateTopicScore(
+  t: TripTemplate,
+  topics: ExperienceCategory[],
+): number {
+  if (!topics.length) return 0;
+  const want = new Set(topics);
+  let score = 0;
+  for (const b of t.blocks) {
+    if (b.category && want.has(b.category)) score += 3;
+    for (const a of b.alternatives || []) {
+      if (want.has(a.category)) score += 1;
+    }
+  }
+  return score;
+}
+
+function applyTopicFilter(
+  plans: TripTemplate[],
+  topics?: ExperienceCategory[],
+  cityCodes: string[] = [],
+): TripTemplate[] {
+  if (!topics?.length) return plans;
+
+  const scored = plans
+    .map((t) => ({ t, score: templateTopicScore(t, topics) }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  let next = scored.map((x) => x.t);
+
+  // Also pull city / hotel-area templates that cover these day topics
+  if (cityCodes.length) {
+    const extras = [
+      ...listTemplates({ scale: "hotel_area" }),
+      ...listTemplates({ scale: "city" }),
+    ]
+      .filter(
+        (t) =>
+          t.cityCodes.some((c) => cityCodes.includes(c)) &&
+          templateTopicScore(t, topics) > 0 &&
+          !next.some((p) => p.id === t.id),
+      )
+      .map((t) => ({ t, score: templateTopicScore(t, topics) }))
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.t);
+    next = [...next, ...extras];
+  }
+
+  if (next.length) {
+    return next
+      .map((t) => ({ t, score: templateTopicScore(t, topics) }))
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.t)
+      .slice(0, 12);
+  }
+
+  // No hard matches — keep location plans so the traveler isn’t stuck
+  return plans.slice(0, 6);
+}
+
 function filterPlans(
   hotelId: string | null,
   cityCodes: string[],
   timeBucket?: string,
   mood?: string,
+  topics?: ExperienceCategory[],
 ) {
+  let plans: TripTemplate[] = [];
+
   if (hotelId) {
     const exact = listTemplates({
       scale: "here_now",
@@ -109,14 +174,18 @@ function filterPlans(
       timeBucket,
       mood,
     });
-    if (exact.length) return exact;
-    const hotelOnly = listTemplates({ scale: "here_now", hotelId });
-    if (hotelOnly.length) return hotelOnly;
-    const area = listTemplates({ scale: "hotel_area", hotelId });
-    if (area.length) return area;
+    if (exact.length) plans = exact;
+    else {
+      const hotelOnly = listTemplates({ scale: "here_now", hotelId });
+      if (hotelOnly.length) plans = hotelOnly;
+      else {
+        const area = listTemplates({ scale: "hotel_area", hotelId });
+        if (area.length) plans = area;
+      }
+    }
   }
 
-  if (cityCodes.length) {
+  if (!plans.length && cityCodes.length) {
     const byCity = listTemplates({ scale: "here_now" }).filter((t) =>
       t.cityCodes.some((c) => cityCodes.includes(c)),
     );
@@ -130,19 +199,30 @@ function filterPlans(
       if (mood && t.moods && !t.moods.includes(mood)) return false;
       return true;
     });
-    if (filtered.length) return filtered;
-    if (byCity.length) return byCity;
+    plans = filtered.length ? filtered : byCity;
   }
 
-  return listTemplates({ scale: "here_now" }).slice(0, 6);
+  if (!plans.length) {
+    plans = listTemplates({ scale: "here_now" }).slice(0, 6);
+  }
+
+  return applyTopicFilter(plans, topics, cityCodes);
 }
+
+export type HereNowFilters = {
+  timeBucket?: string;
+  mood?: string;
+  topics?: ExperienceCategory[];
+};
 
 export function matchHereNowFromStay(
   stay: ResolvedStay,
-  filters?: { timeBucket?: string; mood?: string },
+  filters?: HereNowFilters,
 ): HereNowMatch {
   const metro = refineMetro(stay.lat, stay.lng, stay.name, stay.address);
   const stayWithMetro = { ...stay, metro };
+  const cityCodes = metroToCityCodes[metro] || [];
+  const topics = filters?.topics;
 
   const anchors = hotelAnchors();
   let nearest: (typeof anchors)[number] | null = null;
@@ -162,9 +242,10 @@ export function matchHereNowFromStay(
   if (stay.source === "curated" && hereNowHotels.some((h) => h.id === stay.id)) {
     const templates = filterPlans(
       stay.id,
-      metroToCityCodes[metro] || [],
+      cityCodes,
       filters?.timeBucket,
       filters?.mood,
+      topics,
     );
     const hotel = hereNowHotels.find((h) => h.id === stay.id);
     return {
@@ -181,9 +262,10 @@ export function matchHereNowFromStay(
   if (nearest && nearestMeters <= MATCH_METERS) {
     const templates = filterPlans(
       nearest.id,
-      metroToCityCodes[metro] || [],
+      cityCodes,
       filters?.timeBucket,
       filters?.mood,
+      topics,
     );
     const miles = (nearestMeters / 1609.34).toFixed(1);
     return {
@@ -200,13 +282,13 @@ export function matchHereNowFromStay(
     };
   }
 
-  const cityCodes = metroToCityCodes[metro] || [];
   if (cityCodes.length) {
     const templates = filterPlans(
       null,
       cityCodes,
       filters?.timeBucket,
       filters?.mood,
+      topics,
     );
     return {
       stay: stayWithMetro,
@@ -224,6 +306,7 @@ export function matchHereNowFromStay(
     [],
     filters?.timeBucket,
     filters?.mood,
+    topics,
   );
   return {
     stay: stayWithMetro,
@@ -231,7 +314,7 @@ export function matchHereNowFromStay(
     matchedHotelName: null,
     distanceMeters: nearest ? Math.round(nearestMeters) : null,
     matchKind: "fallback",
-    message: `We don't have ${metro}-specific right-now plans yet — here are starter plans. Pick time and mood, or try a featured hotel below.`,
+    message: `We don't have ${metro}-specific right-now plans yet — here are starter plans. Pick time, mood, and day topics, or try a featured hotel below.`,
     templates,
   };
 }

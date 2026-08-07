@@ -226,7 +226,7 @@ export function TripsHome() {
                   {
                     id: "here" as const,
                     title: "I'm here now",
-                    copy: "Type your hotel → time → mood → ready plans.",
+                    copy: "Hotel → time → mood → day topics → plans.",
                   },
                   {
                     id: "live" as const,
