@@ -224,8 +224,8 @@ export function TripNodeEditor({
           <div>
             <h2 className="font-display text-xl">Make it yours</h2>
             <p className="mt-1 text-sm text-white/55">
-              Numbers are days. Expand any day with +, add stops inside, then
-              personalize and save.
+              Numbers are days on the diagram. Follow the arrows, expand a day
+              to add stops, then personalize and save.
             </p>
           </div>
           <p className="font-mono text-[11px] text-white/40">

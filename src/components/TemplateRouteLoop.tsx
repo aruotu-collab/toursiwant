@@ -185,9 +185,8 @@ const DEFAULT_SUGGESTIONS = [
 ];
 
 /**
- * Vertical day map: H + Day 1/2/3 with +/− expand for stops.
- * Fixed panel height; list scrolls inside so the border stays stable.
- * Days expand independently — expand/collapse any combination.
+ * Vertical journey diagram: Hotel → Day 1 → Day 2 → Day 3 with arrows.
+ * Fixed panel height; diagram scrolls inside. Days expand independently.
  */
 export function TemplateRouteLoop({
   template,
@@ -265,9 +264,7 @@ export function TemplateRouteLoop({
     setExpandedIds([]);
   }
 
-  function selectDayRow(day: RouteNode) {
-    onSelectNode?.(day);
-  }
+  const hotelSelected = selectedNodeId === hotel?.id && !selectedStopId;
 
   return (
     <div
@@ -276,9 +273,9 @@ export function TemplateRouteLoop({
       <div className="shrink-0 border-b border-white/10 px-4 py-3 sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
-            Your days
+            Trip diagram
             <span className="ml-2 font-sans text-[11px] normal-case tracking-normal text-white/45">
-              · + / − each day
+              · follow the arrows · + opens stops
             </span>
           </p>
           <div className="flex gap-2">
@@ -300,239 +297,301 @@ export function TemplateRouteLoop({
         </div>
       </div>
 
-      {/* Sticky hotel */}
-      {hotel ? (
-        <div className="shrink-0 border-b border-white/10 bg-black/25 px-3 py-2.5 sm:px-4">
-          <button
-            type="button"
-            disabled={!onSelectNode}
-            onClick={() => onSelectNode?.(hotel)}
-            className={`flex w-full items-center gap-3 text-left ${
-              onSelectNode ? "cursor-pointer" : "cursor-default"
-            }`}
-          >
-            <span
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-semibold ${
-                selectedNodeId === hotel.id && !selectedStopId
-                  ? "border-amber bg-amber text-ink"
-                  : "border-paper bg-amber text-ink"
-              }`}
-            >
-              H
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="font-mono text-[9px] uppercase tracking-wider text-amber/80">
-                Stay
-              </p>
-              <p className="truncate text-sm font-semibold text-amber">
-                {hotel.label}
-              </p>
-            </div>
-          </button>
-        </div>
-      ) : null}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5">
+        <ol className="relative mx-auto max-w-lg">
+          {/* Hotel node */}
+          {hotel ? (
+            <li className="relative">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="relative z-10 flex w-12 shrink-0 flex-col items-center sm:w-14">
+                  <button
+                    type="button"
+                    disabled={!onSelectNode}
+                    onClick={() => onSelectNode?.(hotel)}
+                    className={`flex h-12 w-12 items-center justify-center rounded-full border-2 text-sm font-semibold transition sm:h-14 sm:w-14 ${
+                      hotelSelected
+                        ? "scale-105 border-amber bg-amber text-ink shadow-[0_0_0_3px_rgba(212,160,23,0.35)]"
+                        : "border-paper bg-amber text-ink"
+                    } ${onSelectNode ? "cursor-pointer hover:scale-105" : "cursor-default"}`}
+                    aria-label={`Hotel ${hotel.label}`}
+                  >
+                    H
+                  </button>
+                </div>
+                <div className="min-w-0 flex-1 pt-1.5 sm:pt-2.5">
+                  <p className="font-mono text-[9px] uppercase tracking-wider text-amber/80">
+                    Stay
+                  </p>
+                  <p className="truncate font-display text-base text-amber sm:text-lg">
+                    {hotel.label}
+                  </p>
+                </div>
+              </div>
+              {days.length > 0 ? <FlowArrow /> : null}
+            </li>
+          ) : null}
 
-      {/* Scrollable day list — fixed panel height */}
-      <ol className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-2 py-2 sm:px-3">
-        {days.map((day, i) => {
-          const num = day.dayIndex ?? i + 1;
-          const stopCount = day.stops?.length || 0;
-          const expanded = isExpanded(day.id);
-          const daySelected =
-            selectedNodeId === day.id && !selectedStopId;
-          const allowAdd =
-            interactive &&
-            onAddStop &&
-            (canAddStop ? canAddStop(day) : true);
-          const custom = customByDay[day.id] || "";
+          {days.map((day, i) => {
+            const num = day.dayIndex ?? i + 1;
+            const stopCount = day.stops?.length || 0;
+            const expanded = isExpanded(day.id);
+            const daySelected =
+              selectedNodeId === day.id && !selectedStopId;
+            const allowAdd =
+              interactive &&
+              onAddStop &&
+              (canAddStop ? canAddStop(day) : true);
+            const custom = customByDay[day.id] || "";
+            const isLast = i === days.length - 1;
 
-          return (
-            <li
-              key={day.id}
-              className={`rounded-sm border transition ${
-                expanded || daySelected
-                  ? "border-amber/40 bg-amber/10"
-                  : "border-transparent hover:border-white/10 hover:bg-white/[0.03]"
-              }`}
-            >
-              <div className="flex items-center gap-2 px-2 py-2 sm:gap-3 sm:px-2.5">
-                <button
-                  type="button"
-                  onClick={() => selectDayRow(day)}
-                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                  aria-pressed={daySelected}
-                >
-                  <span
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 text-[12px] font-semibold transition sm:h-11 sm:w-11 ${
-                      daySelected || expanded
-                        ? "border-amber bg-amber text-ink"
-                        : "border-amber bg-paper text-ink"
+            return (
+              <li key={day.id} className="relative">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  {/* Spine node */}
+                  <div className="relative z-10 flex w-12 shrink-0 flex-col items-center sm:w-14">
+                    <button
+                      type="button"
+                      onClick={() => onSelectNode?.(day)}
+                      className={`flex h-12 w-12 items-center justify-center rounded-full border-2 text-sm font-semibold transition sm:h-14 sm:w-14 ${
+                        daySelected || expanded
+                          ? "scale-105 border-amber bg-amber text-ink shadow-[0_0_0_3px_rgba(212,160,23,0.35)]"
+                          : "border-amber bg-paper text-ink hover:scale-105"
+                      }`}
+                      aria-pressed={daySelected}
+                      aria-label={`${day.dayLabel || `Day ${num}`}: ${day.label}`}
+                    >
+                      {num}
+                    </button>
+                  </div>
+
+                  {/* Label + expand */}
+                  <div
+                    className={`min-w-0 flex-1 border transition ${
+                      expanded || daySelected
+                        ? "border-amber/35 bg-amber/10"
+                        : "border-white/10 bg-white/[0.03]"
                     }`}
                   >
-                    {num}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-mono text-[9px] uppercase tracking-wider text-amber/80">
-                      {day.dayLabel || `Day ${num}`}
-                    </p>
-                    <p
-                      className={`truncate text-sm ${
-                        daySelected || expanded
-                          ? "font-semibold text-amber"
-                          : "text-white/90"
-                      }`}
-                    >
-                      {day.label}
-                    </p>
-                    {!expanded ? (
-                      <p className="mt-0.5 text-[11px] text-white/40">
-                        {stopCount === 0
-                          ? "No stops yet"
-                          : `${stopCount} stop${stopCount === 1 ? "" : "s"}`}
-                      </p>
+                    <div className="flex items-start gap-2 px-3 py-2.5">
+                      <button
+                        type="button"
+                        onClick={() => onSelectNode?.(day)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <p className="font-mono text-[9px] uppercase tracking-wider text-amber/80">
+                          {day.dayLabel || `Day ${num}`}
+                        </p>
+                        <p
+                          className={`truncate text-sm sm:text-base ${
+                            daySelected || expanded
+                              ? "font-semibold text-amber"
+                              : "text-white/90"
+                          }`}
+                        >
+                          {day.label}
+                        </p>
+                        {!expanded ? (
+                          <p className="mt-0.5 text-[11px] text-white/40">
+                            {stopCount === 0
+                              ? "No stops yet"
+                              : `${stopCount} stop${stopCount === 1 ? "" : "s"}`}
+                          </p>
+                        ) : null}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center border text-lg leading-none transition ${
+                          expanded
+                            ? "border-amber bg-amber text-ink"
+                            : "border-white/25 text-white/70 hover:border-amber hover:text-amber"
+                        }`}
+                        aria-expanded={expanded}
+                        aria-label={
+                          expanded
+                            ? `Hide stops for ${day.dayLabel || `Day ${num}`}`
+                            : `Show stops for ${day.dayLabel || `Day ${num}`}`
+                        }
+                      >
+                        {expanded ? "−" : "+"}
+                      </button>
+                    </div>
+
+                    {expanded ? (
+                      <div className="border-t border-white/10 px-3 pb-3 pt-2">
+                        {stopCount === 0 ? (
+                          <p className="mb-2 text-sm text-white/45">
+                            No stops yet
+                            {interactive ? " · add one below" : ""}
+                          </p>
+                        ) : (
+                          <ul className="mb-2 space-y-1.5">
+                            {day.stops!.map((stop) => {
+                              const stopSelected =
+                                selectedNodeId === day.id &&
+                                selectedStopId === stop.id;
+                              return (
+                                <li
+                                  key={stop.id}
+                                  className="flex items-center gap-2"
+                                >
+                                  <span
+                                    className="text-amber/60"
+                                    aria-hidden
+                                  >
+                                    →
+                                  </span>
+                                  {onSelectStop ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => onSelectStop(day, stop)}
+                                      className={`min-w-0 flex-1 truncate border px-2.5 py-1.5 text-left text-sm transition ${
+                                        stopSelected
+                                          ? "border-amber bg-amber/20 text-amber"
+                                          : "border-white/15 text-white/80 hover:border-amber/50"
+                                      }`}
+                                    >
+                                      {stop.label}
+                                    </button>
+                                  ) : (
+                                    <span className="min-w-0 flex-1 truncate border border-white/10 px-2.5 py-1.5 text-sm text-white/70">
+                                      {stop.label}
+                                    </span>
+                                  )}
+                                  {interactive && onRemoveStop ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        onRemoveStop(day.id, stop.id)
+                                      }
+                                      className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/20 text-white/50 hover:border-amber hover:text-amber"
+                                      aria-label={`Remove ${stop.label}`}
+                                    >
+                                      ×
+                                    </button>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+
+                        {interactive && onAddStop ? (
+                          <div className="space-y-2 border-t border-white/10 pt-2">
+                            <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/40">
+                              Add a stop to {day.dayLabel || `Day ${num}`}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {chips.slice(0, 8).map((label) => (
+                                <button
+                                  key={label}
+                                  type="button"
+                                  disabled={!allowAdd}
+                                  onClick={() => onAddStop(day.id, label)}
+                                  className="border border-white/20 px-2 py-1 text-[11px] text-white/75 hover:border-amber hover:text-amber disabled:opacity-40"
+                                >
+                                  + {label}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex gap-2">
+                              <input
+                                value={custom}
+                                onChange={(e) =>
+                                  setCustomByDay((prev) => ({
+                                    ...prev,
+                                    [day.id]: e.target.value,
+                                  }))
+                                }
+                                onFocus={() => onSelectNode?.(day)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    const v = custom.trim();
+                                    if (!v || !allowAdd) return;
+                                    onAddStop(day.id, v);
+                                    setCustomByDay((prev) => ({
+                                      ...prev,
+                                      [day.id]: "",
+                                    }));
+                                  }
+                                }}
+                                placeholder="Custom stop"
+                                disabled={!allowAdd}
+                                className="min-w-0 flex-1 border border-white/20 bg-black/30 px-2 py-1.5 text-sm outline-none focus:border-amber disabled:opacity-40"
+                              />
+                              <button
+                                type="button"
+                                disabled={!custom.trim() || !allowAdd}
+                                onClick={() => {
+                                  const v = custom.trim();
+                                  if (!v || !allowAdd) return;
+                                  onAddStop(day.id, v);
+                                  setCustomByDay((prev) => ({
+                                    ...prev,
+                                    [day.id]: "",
+                                  }));
+                                }}
+                                className="bg-amber px-2.5 py-1.5 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => toggleDay(day)}
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center border text-lg leading-none transition ${
-                    expanded
-                      ? "border-amber bg-amber text-ink"
-                      : "border-white/25 text-white/70 hover:border-amber hover:text-amber"
-                  }`}
-                  aria-expanded={expanded}
-                  aria-label={
-                    expanded
-                      ? `Hide stops for ${day.dayLabel || `Day ${num}`}`
-                      : `Show stops for ${day.dayLabel || `Day ${num}`}`
-                  }
-                >
-                  {expanded ? "−" : "+"}
-                </button>
-              </div>
-
-              {expanded ? (
-                <div className="border-t border-white/10 px-3 pb-3 pt-2 sm:px-4">
-                  {stopCount === 0 ? (
-                    <p className="mb-2 text-sm text-white/45">
-                      No stops yet
-                      {interactive ? " · add one below" : ""}
-                    </p>
-                  ) : (
-                    <ul className="mb-2 space-y-1.5">
-                      {day.stops!.map((stop) => {
-                        const stopSelected =
-                          selectedNodeId === day.id &&
-                          selectedStopId === stop.id;
-                        return (
-                          <li
-                            key={stop.id}
-                            className="flex items-center gap-2"
-                          >
-                            {onSelectStop ? (
-                              <button
-                                type="button"
-                                onClick={() => onSelectStop(day, stop)}
-                                className={`min-w-0 flex-1 truncate border px-2.5 py-1.5 text-left text-sm transition ${
-                                  stopSelected
-                                    ? "border-amber bg-amber/20 text-amber"
-                                    : "border-white/15 text-white/80 hover:border-amber/50"
-                                }`}
-                              >
-                                {stop.label}
-                              </button>
-                            ) : (
-                              <span className="min-w-0 flex-1 truncate border border-white/10 px-2.5 py-1.5 text-sm text-white/70">
-                                {stop.label}
-                              </span>
-                            )}
-                            {interactive && onRemoveStop ? (
-                              <button
-                                type="button"
-                                onClick={() => onRemoveStop(day.id, stop.id)}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/20 text-white/50 hover:border-amber hover:text-amber"
-                                aria-label={`Remove ${stop.label}`}
-                              >
-                                ×
-                              </button>
-                            ) : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-
-                  {interactive && onAddStop ? (
-                    <div className="space-y-2 border-t border-white/10 pt-2">
-                      <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/40">
-                        Add a stop to {day.dayLabel || `Day ${num}`}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {chips.slice(0, 8).map((label) => (
-                          <button
-                            key={label}
-                            type="button"
-                            disabled={!allowAdd}
-                            onClick={() => onAddStop(day.id, label)}
-                            className="border border-white/20 px-2 py-1 text-[11px] text-white/75 hover:border-amber hover:text-amber disabled:opacity-40"
-                          >
-                            + {label}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="flex gap-2">
-                        <input
-                          value={custom}
-                          onChange={(e) =>
-                            setCustomByDay((prev) => ({
-                              ...prev,
-                              [day.id]: e.target.value,
-                            }))
-                          }
-                          onFocus={() => onSelectNode?.(day)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              const v = custom.trim();
-                              if (!v || !allowAdd) return;
-                              onAddStop(day.id, v);
-                              setCustomByDay((prev) => ({
-                                ...prev,
-                                [day.id]: "",
-                              }));
-                            }
-                          }}
-                          placeholder="Custom stop"
-                          disabled={!allowAdd}
-                          className="min-w-0 flex-1 border border-white/20 bg-black/30 px-2 py-1.5 text-sm outline-none focus:border-amber disabled:opacity-40"
-                        />
-                        <button
-                          type="button"
-                          disabled={!custom.trim() || !allowAdd}
-                          onClick={() => {
-                            const v = custom.trim();
-                            if (!v || !allowAdd) return;
-                            onAddStop(day.id, v);
-                            setCustomByDay((prev) => ({
-                              ...prev,
-                              [day.id]: "",
-                            }));
-                          }}
-                          className="bg-amber px-2.5 py-1.5 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-50"
-                        >
-                          Add
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
-              ) : null}
+
+                {!isLast ? <FlowArrow /> : null}
+              </li>
+            );
+          })}
+
+          {/* Return to hotel */}
+          {days.length > 0 ? (
+            <li className="relative">
+              <FlowArrow dashed />
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="relative z-10 flex w-12 shrink-0 flex-col items-center sm:w-14">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-amber/50 text-sm text-amber sm:h-11 sm:w-11">
+                    ↩
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1 pt-2">
+                  <p className="text-sm text-white/50">Back to hotel</p>
+                </div>
+              </div>
             </li>
-          );
-        })}
-      </ol>
+          ) : null}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+/** Vertical connector with a down arrow — the diagram “flow”. */
+function FlowArrow({ dashed = false }: { dashed?: boolean }) {
+  return (
+    <div
+      className="flex w-12 flex-col items-center py-1 sm:w-14"
+      aria-hidden
+    >
+      <span
+        className={`h-5 w-0.5 sm:h-6 ${
+          dashed
+            ? "border-l-2 border-dashed border-amber/45 bg-transparent"
+            : "bg-amber/70"
+        }`}
+      />
+      <span
+        className={`text-[11px] leading-none ${
+          dashed ? "text-amber/50" : "text-amber"
+        }`}
+      >
+        ▼
+      </span>
     </div>
   );
 }
