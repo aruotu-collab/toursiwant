@@ -135,6 +135,9 @@ export function TemplateWorkspace({
   const [openToJoin, setOpenToJoin] = useState(true);
   const [joinNote, setJoinNote] = useState("");
   const [pendingJoin, setPendingJoin] = useState(false);
+  const [savedTripId, setSavedTripId] = useState<string | null>(null);
+  const [savedTripTitle, setSavedTripTitle] = useState("");
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
   const availability = useMemo(
     () => personalizeAvailability(initial),
@@ -237,9 +240,47 @@ export function TemplateWorkspace({
   }
 
   useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d: { user?: { id: string } | null }) => {
+        setSignedIn(Boolean(d.user));
+      })
+      .catch(() => setSignedIn(false));
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("share");
     const wantJoin = params.get("join") === "1";
+    const savedId = params.get("saved");
+    if (savedId) {
+      setSavedTripId(savedId);
+      (async () => {
+        const res = await fetch(
+          `/api/saved-trips?id=${encodeURIComponent(savedId)}`,
+        );
+        if (!res.ok) {
+          setStatus("Could not load your saved trip — sign in and try again.");
+          return;
+        }
+        const data = (await res.json()) as {
+          trip?: {
+            id: string;
+            title: string;
+            selections?: Record<string, string>;
+            wants?: ExperienceCategory[];
+          };
+        };
+        if (!data.trip) return;
+        setSavedTripTitle(data.trip.title);
+        if (data.trip.wants?.length) setWants(data.trip.wants);
+        if (data.trip.selections) {
+          setTemplate(applySelections(initial, data.trip.selections));
+        }
+        setStatus(`Opened your saved trip: ${data.trip.title}`);
+        setAsideTab("personalize");
+      })();
+    }
     if (!code) return;
     (async () => {
       const data = await refreshSession(code);
@@ -487,6 +528,119 @@ export function TemplateWorkspace({
         setSession(data.session);
         setStatus("Travelled rating saved.");
       }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveAsMyTrip() {
+    if (signedIn === false) {
+      const next = encodeURIComponent(
+        `${window.location.pathname}${window.location.search}`,
+      );
+      window.location.href = `/join?next=${next}`;
+      return;
+    }
+    setBusy(true);
+    setStatus("");
+    try {
+      const selections: Record<string, string> = {
+        ...(session?.selections || {}),
+      };
+      for (const swap of personalizeResult?.applied || []) {
+        selections[swap.blockId] = swap.optionId;
+      }
+      // Prefer current block titles if user used "Use" without personalize apply
+      for (const block of template.blocks) {
+        const original = initial.blocks.find((b) => b.id === block.id);
+        if (
+          original?.alternatives &&
+          block.title !== original.title
+        ) {
+          const match = original.alternatives.find((a) => a.title === block.title);
+          if (match) selections[block.id] = match.id;
+        }
+      }
+
+      const res = await fetch("/api/saved-trips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          templateSlug: initial.slug,
+          templateTitle: initial.title,
+          title: savedTripTitle.trim() || `${initial.title} — ours`,
+          route: initial.route,
+          region: initial.region,
+          cityCodes: initial.cityCodes,
+          hotelName: initial.hotelAnchor?.name,
+          selections,
+          wants,
+          sourceShareCode: session?.shareCode,
+        }),
+      });
+      const data = (await res.json()) as {
+        trip?: { id: string; title: string };
+        error?: string;
+      };
+      if (!res.ok || !data.trip) {
+        if (res.status === 401) {
+          const next = encodeURIComponent(
+            `${window.location.pathname}${window.location.search}`,
+          );
+          window.location.href = `/join?next=${next}`;
+          return;
+        }
+        throw new Error(data.error || "Could not save trip");
+      }
+      setSavedTripId(data.trip.id);
+      setSavedTripTitle(data.trip.title);
+      window.history.replaceState(
+        null,
+        "",
+        `?saved=${data.trip.id}${session?.shareCode ? `&share=${session.shareCode}` : ""}`,
+      );
+      setStatus(
+        `Saved as your trip. Find it anytime under Account → My trips.`,
+      );
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Could not save trip");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function updateMySavedTrip() {
+    if (!savedTripId) return;
+    setBusy(true);
+    try {
+      const selections: Record<string, string> = {};
+      for (const swap of personalizeResult?.applied || []) {
+        selections[swap.blockId] = swap.optionId;
+      }
+      for (const block of template.blocks) {
+        const original = initial.blocks.find((b) => b.id === block.id);
+        if (original?.alternatives && block.title !== original.title) {
+          const match = original.alternatives.find((a) => a.title === block.title);
+          if (match) selections[block.id] = match.id;
+        }
+      }
+      const res = await fetch("/api/saved-trips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          id: savedTripId,
+          title: savedTripTitle.trim() || undefined,
+          selections,
+          wants,
+        }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "Could not update");
+      setStatus("Your saved trip was updated.");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Could not update trip");
     } finally {
       setBusy(false);
     }
@@ -926,6 +1080,51 @@ export function TemplateWorkspace({
                     </div>
                   </>
                 )}
+
+                <div className="mt-5 border border-amber/30 bg-amber/10 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber">
+                    Save as my trip
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-white/75">
+                    Like this template? Fork it as your own — separate from
+                    joining someone else&apos;s group room.
+                  </p>
+                  <input
+                    value={savedTripTitle}
+                    onChange={(e) => setSavedTripTitle(e.target.value)}
+                    placeholder={`${initial.title} — ours`}
+                    className="mt-3 w-full border border-amber/30 bg-black/20 px-3 py-2.5 text-sm outline-none focus:border-amber"
+                  />
+                  {savedTripId ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs text-amber">
+                        Saved ·{" "}
+                        <Link href="/account" className="underline">
+                          My trips
+                        </Link>
+                      </p>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={updateMySavedTrip}
+                        className="w-full border border-amber/50 bg-amber/15 px-4 py-3 text-sm text-amber hover:bg-amber/25 disabled:opacity-60"
+                      >
+                        Update my saved trip
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={saveAsMyTrip}
+                      className="mt-3 w-full bg-amber px-4 py-3 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-60"
+                    >
+                      {signedIn === false
+                        ? "Sign in to save as my trip"
+                        : "Save as my trip"}
+                    </button>
+                  )}
+                </div>
               </div>
             ) : null}
 

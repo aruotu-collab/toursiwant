@@ -45,4 +45,5 @@ next-env.d.ts
 /data/captured-requests.json
 /data/trip-sessions.json
 /data/revenue-events.json
+/data/saved-trips.json
 !/data/.gitkeep

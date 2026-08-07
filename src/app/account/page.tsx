@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AccountLogoutButton } from "@/components/AccountLogoutButton";
+import { DeleteSavedTripButton } from "@/components/DeleteSavedTripButton";
 import { getCurrentUser } from "@/lib/auth";
+import { listSavedTripsForUser } from "@/lib/saved-trips";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   }
 
   const firstName = user.name?.split(" ")[0] || user.email.split("@")[0];
+  const savedTrips = await listSavedTripsForUser(user.id).catch(() => []);
 
   return (
     <main className="flex-1 bg-[linear-gradient(180deg,var(--mist)_0%,var(--paper)_40%)]">
@@ -42,8 +45,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <p className="mt-3 max-w-xl text-ink-soft">
               Signed in as{" "}
               <span className="font-medium text-ink">{user.email}</span>
-              {user.role === "admin" ? " · Admin" : ""}. Browse proven USA trip
-              templates and share plans with your group.
+              {user.role === "admin" ? " · Admin" : ""}. Save templates as your
+              own trips, then personalize and share with your group.
             </p>
           </div>
           <AccountLogoutButton />
@@ -63,6 +66,87 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           </div>
         ) : null}
 
+        <section className="mt-12">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="font-display text-2xl text-ink">My trips</h2>
+              <p className="mt-2 text-sm text-ink-soft">
+                Templates you saved as your own — not someone else&apos;s group
+                room.
+              </p>
+            </div>
+            <Link
+              href="/?door=explore"
+              className="text-sm font-semibold text-skyline underline-offset-2 hover:underline"
+            >
+              Find another template →
+            </Link>
+          </div>
+
+          {savedTrips.length === 0 ? (
+            <div className="mt-6 border border-ink/10 bg-white/70 p-8">
+              <p className="text-ink-soft">
+                No saved trips yet. Open a USA template you like and tap{" "}
+                <span className="font-semibold text-ink">Save as my trip</span>.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href="/?door=explore"
+                  className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep"
+                >
+                  Explore trips
+                </Link>
+                <Link
+                  href="/?door=live"
+                  className="border border-ink/20 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-white"
+                >
+                  Browse groups joining
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <ul className="mt-6 grid gap-4 md:grid-cols-2">
+              {savedTrips.map((trip) => (
+                <li
+                  key={trip.id}
+                  className="border border-ink/10 bg-white/70 p-5"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wider text-stone">
+                    {trip.region || "USA"}
+                    {trip.cityCodes?.length
+                      ? ` · ${trip.cityCodes.join(" · ")}`
+                      : ""}
+                  </p>
+                  <h3 className="mt-2 font-display text-2xl text-ink">
+                    {trip.title}
+                  </h3>
+                  {trip.route ? (
+                    <p className="mt-2 text-sm text-ink-soft">{trip.route}</p>
+                  ) : null}
+                  <p className="mt-2 text-xs text-stone">
+                    Based on {trip.templateTitle}
+                    {trip.sourceShareCode
+                      ? " · forked from a group room"
+                      : ""}
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] text-stone">
+                    Updated {new Date(trip.updatedAt).toLocaleString()}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link
+                      href={`/trips/${trip.templateSlug}?saved=${trip.id}`}
+                      className="bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft"
+                    >
+                      Open my trip
+                    </Link>
+                    <DeleteSavedTripButton tripId={trip.id} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <div className="mt-10 grid gap-4 sm:grid-cols-3">
           <Link
             href="/?door=explore"
@@ -74,15 +158,13 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <p className="mt-2 font-display text-xl text-ink">Explore trips →</p>
           </Link>
           <Link
-            href="/?door=combine"
+            href="/?door=live"
             className="border border-ink/10 bg-white/70 px-5 py-5 transition hover:border-skyline/40"
           >
             <p className="text-xs font-semibold uppercase tracking-wider text-stone">
-              Multi-country
+              Groups
             </p>
-            <p className="mt-2 font-display text-xl text-ink">
-              Combine countries →
-            </p>
+            <p className="mt-2 font-display text-xl text-ink">Join a group →</p>
           </Link>
           <Link
             href="/?door=here"
@@ -96,32 +178,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </p>
           </Link>
         </div>
-
-        <section className="mt-12 border border-ink/10 bg-white/70 p-8">
-          <h2 className="font-display text-2xl text-ink">How to use ToursIWant</h2>
-          <ol className="mt-4 space-y-3 text-sm leading-relaxed text-ink-soft">
-            <li>
-              <span className="font-semibold text-ink">1.</span> Pick a proven
-              template — country, multi-country, or from your hotel.
-            </li>
-            <li>
-              <span className="font-semibold text-ink">2.</span> Personalize
-              flexible days (faith, food, fun, free time) without rewriting the
-              trip spine.
-            </li>
-            <li>
-              <span className="font-semibold text-ink">3.</span> Share a link so
-              your group can vote on slots, then book optional paid experiences
-              when they fit.
-            </li>
-          </ol>
-          <Link
-            href="/"
-            className="mt-6 inline-flex bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep"
-          >
-            Start with a trip
-          </Link>
-        </section>
       </div>
     </main>
   );
