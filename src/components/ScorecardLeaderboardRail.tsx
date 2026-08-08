@@ -38,22 +38,18 @@ export function ScorecardLeaderboardRail() {
         }
       }}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-ink/10 px-3 py-1.5 sm:px-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="live-dot shrink-0" aria-hidden />
-          <p className="truncate font-mono text-[10px] uppercase tracking-[0.16em] text-amber-deep">
-            Leaderboards
+      <div className="flex items-start justify-between gap-3 border-b border-ink/10 px-3 py-1.5 sm:items-center sm:px-4">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          <span className="live-dot mt-1 shrink-0 sm:mt-0.5" aria-hidden />
+          <p className="min-w-0 font-mono text-[10px] uppercase leading-snug tracking-[0.14em] text-amber-deep">
+            <span className="text-amber-deep">Leaderboards</span>
             <span className="text-ink/25"> · </span>
             <span className="text-stone">
-              {active.city}
-              <span className="hidden sm:inline">
-                {" "}
-                · {active.title}
-              </span>
+              {active.city} · {active.title}
             </span>
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3 pt-0.5 sm:pt-0">
           {active.href ? (
             <Link
               href={active.href}
