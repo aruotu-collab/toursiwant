@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   costBandSortValue,
   placeMatchesCategory,
@@ -281,16 +281,16 @@ export function NycScoreboard({
         </div>
       ) : null}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div>
-          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-amber-deep">
+          <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-amber-deep">
             Personalize categories
           </p>
-          <div className="flex flex-wrap gap-2">
+          <ChipScrollRow>
             <button
               type="button"
               onClick={() => setCategoryFilter("")}
-              className={`border px-3 py-1.5 text-sm transition ${
+              className={`shrink-0 border px-3 py-1.5 text-sm transition ${
                 !categoryFilter
                   ? "border-amber bg-amber text-ink"
                   : "border-ink/15 bg-white text-ink-soft hover:border-amber"
@@ -309,7 +309,7 @@ export function NycScoreboard({
                     setSortKey("score");
                     setSortDir("desc");
                   }}
-                  className={`border px-3 py-1.5 text-sm transition ${
+                  className={`shrink-0 border px-3 py-1.5 text-sm transition ${
                     on
                       ? "border-amber bg-amber text-ink"
                       : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
@@ -319,14 +319,14 @@ export function NycScoreboard({
                 </button>
               );
             })}
-          </div>
+          </ChipScrollRow>
         </div>
 
         <div>
-          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-stone">
+          <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-stone">
             Sort by interest
           </p>
-          <div className="flex flex-wrap gap-2">
+          <ChipScrollRow>
             {interestLenses.map((id) => {
               const l = lensMeta(id);
               if (!l) return null;
@@ -339,7 +339,7 @@ export function NycScoreboard({
                     setLens(id);
                     setCategoryFilter("");
                   }}
-                  className={`border px-3 py-1.5 text-sm transition ${
+                  className={`shrink-0 border px-3 py-1.5 text-sm transition ${
                     on
                       ? "border-ink bg-ink text-white"
                       : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
@@ -349,14 +349,14 @@ export function NycScoreboard({
                 </button>
               );
             })}
-          </div>
+          </ChipScrollRow>
         </div>
 
         <div>
-          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-stone">
+          <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-stone">
             Or sort by who / practical
           </p>
-          <div className="flex flex-wrap gap-2">
+          <ChipScrollRow>
             {practicalLenses.map((id) => {
               const l = lensMeta(id);
               if (!l) return null;
@@ -369,7 +369,7 @@ export function NycScoreboard({
                     setLens(id);
                     setCategoryFilter("");
                   }}
-                  className={`border px-3 py-1.5 text-sm transition ${
+                  className={`shrink-0 border px-3 py-1.5 text-sm transition ${
                     on
                       ? "border-ink bg-ink text-white"
                       : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
@@ -379,7 +379,7 @@ export function NycScoreboard({
                 </button>
               );
             })}
-          </div>
+          </ChipScrollRow>
         </div>
       </div>
 
@@ -629,6 +629,14 @@ export function NycScoreboard({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ChipScrollRow({ children }: { children: ReactNode }) {
+  return (
+    <div className="-mx-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
+      <div className="flex w-max gap-2 px-1">{children}</div>
     </div>
   );
 }
