@@ -113,7 +113,7 @@ export function ScorecardHub() {
           </label>
         </div>
 
-        <label className="mt-4 block text-sm">
+        <label className="mt-4 flex w-full flex-col gap-1.5 text-sm">
           <span className="font-mono text-[10px] uppercase tracking-wider text-stone">
             Or search
           </span>
@@ -121,7 +121,7 @@ export function ScorecardHub() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="New York, California, Miami…"
-            className="mt-1.5 w-full border border-ink/15 bg-paper px-3 py-2.5 outline-none focus:border-amber sm:max-w-md"
+            className="w-full border border-ink/15 bg-paper px-3 py-2.5 outline-none focus:border-amber"
           />
         </label>
       </section>
