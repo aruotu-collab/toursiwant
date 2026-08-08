@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AccountLogoutButton } from "@/components/AccountLogoutButton";
 import { DeleteSavedTripButton } from "@/components/DeleteSavedTripButton";
 import { getCurrentUser } from "@/lib/auth";
+import { isNycPlanTrip, openSavedTripHref } from "@/lib/saved-trip-kinds";
 import { listSavedTripsForUser } from "@/lib/saved-trips";
 
 export const dynamic = "force-dynamic";
@@ -45,8 +46,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <p className="mt-3 max-w-xl text-ink-soft">
               Signed in as{" "}
               <span className="font-medium text-ink">{user.email}</span>
-              {user.role === "admin" ? " · Admin" : ""}. Save templates as your
-              own trips, then personalize and share with your group.
+              {user.role === "admin" ? " · Admin" : ""}. Save scoreboard plans
+              and USA templates here, then reopen them anytime from My trips.
             </p>
           </div>
           <AccountLogoutButton />
@@ -66,83 +67,102 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           </div>
         ) : null}
 
-        <section className="mt-12">
+        <section id="my-trips" className="mt-12 scroll-mt-28">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="font-display text-2xl text-ink">My trips</h2>
               <p className="mt-2 text-sm text-ink-soft">
-                Templates you saved as your own — not someone else&apos;s group
-                room.
+                Built New York plans and USA templates you saved to your
+                account.
               </p>
             </div>
-            <Link
-              href="/?door=explore"
-              className="text-sm font-semibold text-skyline underline-offset-2 hover:underline"
-            >
-              Find another template →
-            </Link>
+            <div className="flex flex-wrap gap-3 text-sm font-semibold">
+              <Link
+                href="/new-york"
+                className="text-skyline underline-offset-2 hover:underline"
+              >
+                NY Scoreboard →
+              </Link>
+              <Link
+                href="/?door=explore"
+                className="text-skyline underline-offset-2 hover:underline"
+              >
+                Explore templates →
+              </Link>
+            </div>
           </div>
 
           {savedTrips.length === 0 ? (
             <div className="mt-6 border border-ink/10 bg-white/70 p-8">
               <p className="text-ink-soft">
-                No saved trips yet. Open a USA template you like and tap{" "}
-                <span className="font-semibold text-ink">Save as my trip</span>.
+                No saved trips yet. Build a New York plan and tap{" "}
+                <span className="font-semibold text-ink">Save as my trip</span>,
+                or open a USA template and save it.
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
-                  href="/?door=explore"
+                  href="/new-york"
                   className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep"
                 >
-                  Explore trips
+                  New York Scoreboard
                 </Link>
                 <Link
-                  href="/?door=live"
+                  href="/?door=explore"
                   className="border border-ink/20 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-white"
                 >
-                  Browse groups joining
+                  Explore trips
                 </Link>
               </div>
             </div>
           ) : (
             <ul className="mt-6 grid gap-4 md:grid-cols-2">
-              {savedTrips.map((trip) => (
-                <li
-                  key={trip.id}
-                  className="border border-ink/10 bg-white/70 p-5"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wider text-stone">
-                    {trip.region || "USA"}
-                    {trip.cityCodes?.length
-                      ? ` · ${trip.cityCodes.join(" · ")}`
-                      : ""}
-                  </p>
-                  <h3 className="mt-2 font-display text-2xl text-ink">
-                    {trip.title}
-                  </h3>
-                  {trip.route ? (
-                    <p className="mt-2 text-sm text-ink-soft">{trip.route}</p>
-                  ) : null}
-                  <p className="mt-2 text-xs text-stone">
-                    Based on {trip.templateTitle}
-                    {trip.sourceShareCode
-                      ? " · forked from a group room"
-                      : ""}
-                  </p>
-                  <p className="mt-1 font-mono text-[11px] text-stone">
-                    Updated {new Date(trip.updatedAt).toLocaleString()}
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Link
-                      href={`/trips/${trip.templateSlug}?saved=${trip.id}`}
-                      className="bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft"
-                    >
-                      Open my trip
-                    </Link>
-                    <DeleteSavedTripButton tripId={trip.id} />
-                  </div>
-                </li>
-              ))}
+              {savedTrips.map((trip) => {
+                const nyc = isNycPlanTrip(trip);
+                return (
+                  <li
+                    key={trip.id}
+                    className="border border-ink/10 bg-white/70 p-5"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wider text-stone">
+                      {nyc
+                        ? "New York plan"
+                        : trip.region || "USA"}
+                      {trip.cityCodes?.length
+                        ? ` · ${trip.cityCodes.join(" · ")}`
+                        : ""}
+                      {nyc && trip.planDays
+                        ? ` · ${trip.planDays} day${trip.planDays === 1 ? "" : "s"}`
+                        : ""}
+                    </p>
+                    <h3 className="mt-2 font-display text-2xl text-ink">
+                      {trip.title}
+                    </h3>
+                    {trip.route ? (
+                      <p className="mt-2 text-sm text-ink-soft">{trip.route}</p>
+                    ) : null}
+                    <p className="mt-2 text-xs text-stone">
+                      {nyc
+                        ? `${trip.placeSlugs?.length || 0} places from the scoreboard`
+                        : `Based on ${trip.templateTitle}`}
+                      {trip.sourceShareCode
+                        ? " · forked from a group room"
+                        : ""}
+                    </p>
+                    <p className="mt-1 font-mono text-[11px] text-stone">
+                      Updated {new Date(trip.updatedAt).toLocaleString()}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Link
+                        href={openSavedTripHref(trip)}
+                        className="bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft"
+                      >
+                        Open my trip
+                      </Link>
+                      <DeleteSavedTripButton tripId={trip.id} />
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

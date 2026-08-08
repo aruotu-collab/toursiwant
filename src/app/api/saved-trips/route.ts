@@ -58,6 +58,8 @@ export async function POST(request: Request) {
         dayIndex?: number;
         stops?: Array<{ id: string; label: string }>;
       }>;
+      placeSlugs?: string[];
+      planDays?: number;
       sourceShareCode?: string;
     };
 
@@ -79,6 +81,8 @@ export async function POST(request: Request) {
         selections: body.selections,
         wants: body.wants,
         routeNodes: body.routeNodes,
+        placeSlugs: body.placeSlugs,
+        planDays: body.planDays,
       });
       if (!trip) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -107,6 +111,8 @@ export async function POST(request: Request) {
       selections: body.selections,
       wants: body.wants,
       routeNodes: body.routeNodes,
+      placeSlugs: body.placeSlugs,
+      planDays: body.planDays,
       sourceShareCode: body.sourceShareCode,
     });
 

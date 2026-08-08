@@ -4,6 +4,12 @@ import { randomBytes } from "crypto";
 import { ensureAppSchema, getSql, hasDatabase } from "@/lib/db";
 import type { ExperienceCategory } from "@/lib/trip-templates";
 
+export {
+  NYC_PLAN_TEMPLATE_SLUG,
+  isNycPlanTrip,
+  openSavedTripHref,
+} from "@/lib/saved-trip-kinds";
+
 /** Serializable nested stop under a day */
 export type SavedDayStop = {
   id: string;
@@ -36,6 +42,10 @@ export type SavedTrip = {
   wants: ExperienceCategory[];
   /** Editable trip path (node map) */
   routeNodes?: SavedRouteNode[];
+  /** NYC scoreboard plan: place slugs from “Want” */
+  placeSlugs?: string[];
+  /** NYC scoreboard plan: trip length in days */
+  planDays?: number;
   /** If forked from a live group room */
   sourceShareCode?: string;
   createdAt: string;
@@ -85,6 +95,8 @@ function toPayload(trip: SavedTrip) {
     selections: trip.selections,
     wants: trip.wants,
     routeNodes: trip.routeNodes || [],
+    placeSlugs: trip.placeSlugs || [],
+    planDays: trip.planDays,
     sourceShareCode: trip.sourceShareCode,
   };
 }
@@ -127,6 +139,13 @@ function fromRow(row: {
     selections: (payload.selections as Record<string, string>) || {},
     wants: (payload.wants as ExperienceCategory[]) || [],
     routeNodes: (payload.routeNodes as SavedRouteNode[]) || [],
+    placeSlugs: Array.isArray(payload.placeSlugs)
+      ? (payload.placeSlugs as string[]).filter((s) => typeof s === "string")
+      : [],
+    planDays:
+      typeof payload.planDays === "number" && Number.isFinite(payload.planDays)
+        ? payload.planDays
+        : undefined,
     sourceShareCode: payload.sourceShareCode as string | undefined,
     createdAt,
     updatedAt,
@@ -160,6 +179,8 @@ export async function createSavedTrip(input: {
   selections?: Record<string, string>;
   wants?: ExperienceCategory[];
   routeNodes?: SavedRouteNode[];
+  placeSlugs?: string[];
+  planDays?: number;
   sourceShareCode?: string;
 }): Promise<SavedTrip> {
   const now = new Date().toISOString();
@@ -177,6 +198,8 @@ export async function createSavedTrip(input: {
     selections: input.selections || {},
     wants: input.wants || [],
     routeNodes: input.routeNodes || [],
+    placeSlugs: input.placeSlugs || [],
+    planDays: input.planDays,
     sourceShareCode: input.sourceShareCode,
     createdAt: now,
     updatedAt: now,
@@ -281,6 +304,8 @@ export async function updateSavedTrip(
     selections?: Record<string, string>;
     wants?: ExperienceCategory[];
     routeNodes?: SavedRouteNode[];
+    placeSlugs?: string[];
+    planDays?: number;
   },
 ) {
   const trip = await getSavedTrip(id, userId);
@@ -290,6 +315,8 @@ export async function updateSavedTrip(
   if (patch.selections) trip.selections = patch.selections;
   if (patch.wants) trip.wants = patch.wants;
   if (patch.routeNodes) trip.routeNodes = patch.routeNodes;
+  if (patch.placeSlugs) trip.placeSlugs = patch.placeSlugs;
+  if (patch.planDays !== undefined) trip.planDays = patch.planDays;
   trip.updatedAt = new Date().toISOString();
 
   if (hasDatabase()) {

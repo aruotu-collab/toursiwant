@@ -122,6 +122,10 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
 
   return (
     <>
+      <Link href="/account#my-trips" className={linkClass}>
+        <span className="sm:hidden">Trips</span>
+        <span className="hidden sm:inline">My trips</span>
+      </Link>
       <Link href="/account" className={accountClass}>
         <span className="sm:hidden">Account</span>
         <span className="hidden sm:inline">My account</span>

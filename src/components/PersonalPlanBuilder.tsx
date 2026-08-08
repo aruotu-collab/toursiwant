@@ -2,21 +2,38 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getPlaceBySlug } from "@/lib/nyc-places";
 import {
   buildPlanFromSelections,
   MAX_TRIP_DAYS,
   suggestedDaysForSelections,
 } from "@/lib/scoreboard-plan";
+import { NYC_PLAN_TEMPLATE_SLUG } from "@/lib/saved-trip-kinds";
 import { useNycWants } from "@/lib/use-nyc-wants";
 
 export function PersonalPlanBuilder() {
   const router = useRouter();
-  const { wants, days, ready, toggle, clear, removeMany, setDays } =
-    useNycWants();
+  const searchParams = useSearchParams();
+  const savedIdParam = searchParams.get("saved");
+  const {
+    wants,
+    days,
+    ready,
+    toggle,
+    clear,
+    removeMany,
+    setDays,
+    setWants,
+  } = useNycWants();
   /** Dropdown override — ignored again once wants change. */
   const [manualOverride, setManualOverride] = useState(false);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [savedTripId, setSavedTripId] = useState<string | null>(null);
+  const [tripTitle, setTripTitle] = useState("My New York trip");
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const [loadingSaved, setLoadingSaved] = useState(Boolean(savedIdParam));
   const wantsKey = wants.join("|");
 
   const neededDays = useMemo(
@@ -25,19 +42,106 @@ export function PersonalPlanBuilder() {
   );
 
   useEffect(() => {
-    setManualOverride(false);
-  }, [wantsKey]);
-
-  // Match scoreboard projection: days = packed plan length.
-  useEffect(() => {
-    if (!ready || !wants.length || manualOverride) return;
-    if (neededDays !== days) setDays(neededDays);
-  }, [ready, wants.length, wantsKey, neededDays, days, setDays, manualOverride]);
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data: { user?: { id: string } | null }) => {
+        if (!cancelled) setSignedIn(Boolean(data.user));
+      })
+      .catch(() => {
+        if (!cancelled) setSignedIn(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!ready) return;
-    router.replace(`/new-york/plan?days=${days}`, { scroll: false });
-  }, [ready, days, router]);
+    if (!savedIdParam) {
+      setLoadingSaved(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingSaved(true);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/saved-trips?id=${encodeURIComponent(savedIdParam)}`,
+        );
+        if (!res.ok) {
+          if (!cancelled) {
+            setStatus(
+              res.status === 401
+                ? "Sign in to open this saved trip."
+                : "Could not load that saved trip.",
+            );
+          }
+          return;
+        }
+        const data = (await res.json()) as {
+          trip?: {
+            id: string;
+            title: string;
+            placeSlugs?: string[];
+            planDays?: number;
+            templateSlug?: string;
+          };
+        };
+        if (cancelled || !data.trip) return;
+        if (data.trip.templateSlug !== NYC_PLAN_TEMPLATE_SLUG) {
+          setStatus("That saved trip is a template — open it from My trips.");
+          return;
+        }
+        const slugs = (data.trip.placeSlugs || []).filter(Boolean);
+        setWants(slugs);
+        if (data.trip.planDays) {
+          setManualOverride(true);
+          setDays(data.trip.planDays);
+        }
+        setSavedTripId(data.trip.id);
+        setTripTitle(data.trip.title || "My New York trip");
+        setStatus(`Loaded “${data.trip.title}”.`);
+      } catch {
+        if (!cancelled) setStatus("Could not load that saved trip.");
+      } finally {
+        if (!cancelled) setLoadingSaved(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, savedIdParam, setWants, setDays]);
+
+  useEffect(() => {
+    if (loadingSaved) return;
+    setManualOverride(false);
+  }, [wantsKey, loadingSaved]);
+
+  // Match scoreboard projection: days = packed plan length.
+  useEffect(() => {
+    if (!ready || loadingSaved || !wants.length || manualOverride) return;
+    if (neededDays !== days) setDays(neededDays);
+  }, [
+    ready,
+    loadingSaved,
+    wants.length,
+    wantsKey,
+    neededDays,
+    days,
+    setDays,
+    manualOverride,
+  ]);
+
+  useEffect(() => {
+    if (!ready || loadingSaved) return;
+    const params = new URLSearchParams();
+    params.set("days", String(days));
+    if (savedTripId) params.set("saved", savedTripId);
+    router.replace(`/new-york/plan?${params.toString()}`, { scroll: false });
+  }, [ready, loadingSaved, days, savedTripId, router]);
 
   const plan = useMemo(
     () => buildPlanFromSelections(wants, days),
@@ -49,8 +153,90 @@ export function PersonalPlanBuilder() {
     [plan.days],
   );
 
-  if (!ready) {
-    return <p className="text-ink-soft">Loading your selections…</p>;
+  async function saveTrip(asNew = false) {
+    if (signedIn === false) {
+      const next = encodeURIComponent(
+        `/new-york/plan?days=${days}${savedTripId ? `&saved=${savedTripId}` : ""}`,
+      );
+      window.location.href = `/join?next=${next}`;
+      return;
+    }
+
+    setBusy(true);
+    setStatus("");
+    try {
+      const routeNodes = plan.days
+        .filter((d) => d.stops.length > 0)
+        .map((d) => ({
+          id: `day-${d.dayIndex}`,
+          label: d.title,
+          kind: "day" as const,
+          dayIndex: d.dayIndex,
+          dayLabel: d.title,
+          stops: d.stops.map((s) => ({ id: s.slug, label: s.name })),
+        }));
+
+      const title =
+        tripTitle.trim() ||
+        `New York · ${filledDays || days} day${(filledDays || days) === 1 ? "" : "s"}`;
+
+      const updating = Boolean(savedTripId) && !asNew;
+      const res = await fetch("/api/saved-trips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          updating
+            ? {
+                action: "update",
+                id: savedTripId,
+                title,
+                route: `${filledDays || days} days · ${wants.length} places`,
+                placeSlugs: wants,
+                planDays: days,
+                routeNodes,
+              }
+            : {
+                action: "create",
+                templateSlug: NYC_PLAN_TEMPLATE_SLUG,
+                templateTitle: "New York scoreboard plan",
+                title,
+                route: `${filledDays || days} days · ${wants.length} places`,
+                region: "New York",
+                cityCodes: ["NYC"],
+                placeSlugs: wants,
+                planDays: days,
+                routeNodes,
+              },
+        ),
+      });
+      const data = (await res.json()) as {
+        trip?: { id: string; title: string };
+        error?: string;
+      };
+      if (!res.ok || !data.trip) {
+        if (res.status === 401) {
+          const next = encodeURIComponent(`/new-york/plan?days=${days}`);
+          window.location.href = `/join?next=${next}`;
+          return;
+        }
+        throw new Error(data.error || "Could not save trip");
+      }
+      setSavedTripId(data.trip.id);
+      setTripTitle(data.trip.title);
+      setStatus(
+        updating
+          ? "Trip updated — find it under My trips."
+          : "Saved — find it under My trips in the menu.",
+      );
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Could not save trip");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!ready || loadingSaved) {
+    return <p className="text-ink-soft">Loading your plan…</p>;
   }
 
   if (!wants.length) {
@@ -60,12 +246,23 @@ export function PersonalPlanBuilder() {
         <p className="mt-2 text-ink-soft">
           Go back to the scoreboard and tap Want to go on places you like.
         </p>
-        <Link
-          href="/new-york#board"
-          className="mt-6 inline-block bg-ink px-5 py-3 text-sm font-semibold text-white hover:bg-ink-soft"
-        >
-          Open New York Scoreboard
-        </Link>
+        {status ? (
+          <p className="mt-3 text-sm text-amber-deep">{status}</p>
+        ) : null}
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Link
+            href="/new-york#board"
+            className="inline-block bg-ink px-5 py-3 text-sm font-semibold text-white hover:bg-ink-soft"
+          >
+            Open New York Scoreboard
+          </Link>
+          <Link
+            href="/account#my-trips"
+            className="inline-block border border-ink/20 px-5 py-3 text-sm font-semibold text-ink hover:border-amber"
+          >
+            My saved trips
+          </Link>
+        </div>
       </div>
     );
   }
@@ -108,6 +305,62 @@ export function PersonalPlanBuilder() {
         </label>
       </div>
 
+      <section className="border border-ink/10 bg-ink px-5 py-6 text-white sm:px-6">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
+          Save this trip
+        </p>
+        <p className="mt-2 max-w-2xl text-sm text-white/70">
+          Keep this built plan in My trips so you can come back later — separate
+          from the live “wants” tray on the scoreboard.
+        </p>
+        <label className="mt-4 block max-w-md">
+          <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+            Trip name
+          </span>
+          <input
+            value={tripTitle}
+            onChange={(e) => setTripTitle(e.target.value)}
+            placeholder="My New York trip"
+            className="w-full border border-white/25 bg-white/5 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-amber"
+          />
+        </label>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => saveTrip(false)}
+            className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-60"
+          >
+            {busy
+              ? "Saving…"
+              : signedIn === false
+                ? "Sign in to save"
+                : savedTripId
+                  ? "Update saved trip"
+                  : "Save as my trip"}
+          </button>
+          {savedTripId ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => saveTrip(true)}
+              className="border border-white/25 px-4 py-2.5 text-sm hover:border-amber hover:text-amber disabled:opacity-60"
+            >
+              Save as new trip
+            </button>
+          ) : null}
+          <Link
+            href="/account#my-trips"
+            className="border border-white/25 px-4 py-2.5 text-sm hover:border-amber hover:text-amber"
+          >
+            View My trips
+          </Link>
+        </div>
+        {status ? (
+          <p className="mt-3 text-sm text-amber">{status}</p>
+        ) : null}
+      </section>
+
       {manualOverride && filledDays >= 1 && filledDays < days ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border border-amber/40 bg-amber/[0.1] px-4 py-3">
           <p className="text-sm text-ink">
@@ -148,53 +401,38 @@ export function PersonalPlanBuilder() {
                 <p className="font-mono text-xs text-stone">
                   ~{day.hours}h · grouped to reduce travel
                 </p>
-                {day.stops.length > 0 ? (
+                {day.stops.length === 0 ? (
                   <button
                     type="button"
                     onClick={() => {
-                      const slugs = day.stops.map((s) => s.slug);
-                      removeMany(slugs);
-                      // Clearing a later day should also shorten the trip.
-                      if (day.dayIndex === days && days > 1) {
-                        setDays(days - 1);
-                      }
+                      setManualOverride(true);
+                      setDays(Math.max(1, day.dayIndex - 1));
                     }}
-                    className="text-xs font-semibold text-ink-soft underline decoration-ink/20 hover:text-ink"
+                    className="text-xs font-semibold text-amber-deep hover:underline"
                   >
-                    Clear this day
+                    Drop empty days from here
                   </button>
                 ) : null}
               </div>
             </div>
             {day.stops.length === 0 ? (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm text-ink-soft">
-                  Empty day — clear it from the trip length, or add wants.
-                </p>
-                {day.dayIndex > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => setDays(day.dayIndex - 1)}
-                    className="text-sm font-semibold text-amber-deep hover:underline"
-                  >
-                    Drop to {day.dayIndex - 1} days
-                  </button>
-                ) : null}
-              </div>
+              <p className="mt-4 text-sm text-ink-soft">
+                Empty day — clear it from the trip length, or add wants.
+              </p>
             ) : (
-              <ol className="mt-4 space-y-2">
+              <ol className="mt-4 space-y-3">
                 {day.stops.map((s, i) => (
                   <li
                     key={s.slug}
-                    className="flex flex-wrap items-center justify-between gap-2 border-b border-ink/8 py-2 last:border-0"
+                    className="flex flex-wrap items-start justify-between gap-3 border-t border-ink/10 pt-3 first:border-0 first:pt-0"
                   >
                     <div>
-                      <span className="font-mono text-xs text-amber-deep">
-                        {i + 1}.
-                      </span>{" "}
+                      <p className="font-mono text-[11px] text-stone">
+                        Stop {i + 1}
+                      </p>
                       <Link
                         href={`/new-york/${s.slug}`}
-                        className="font-display text-lg text-ink hover:text-amber-deep"
+                        className="font-display text-xl text-ink hover:text-amber-deep"
                       >
                         {s.name}
                       </Link>
