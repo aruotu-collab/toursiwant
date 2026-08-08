@@ -34,28 +34,28 @@ const searchConsoleVerification =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "ToursIWant — Proven USA trips, then make them yours",
+    default: "ToursIWant — The scorecard for things to do",
     template: "%s · ToursIWant",
   },
   description:
-    "Proven trip templates for American cities, multi-city routes, and right-now plans from your hotel. Make them yours — then book optional experiences.",
+    "Rank what’s worth doing in a city with the ToursIWant Scorecard. Shortlist places, build a trip, and save it to My trips.",
   alternates: {
-    canonical: "/",
+    canonical: "/scorecard",
   },
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: siteUrl,
+    url: `${siteUrl}/scorecard`,
     siteName: "ToursIWant",
-    title: "ToursIWant — Proven USA trips, then make them yours",
+    title: "ToursIWant — The scorecard for things to do",
     description:
-      "Proven trip templates for American cities, multi-city routes, and right-now plans from your hotel. Make them yours — then book optional experiences.",
+      "Rank what’s worth doing in a city with the ToursIWant Scorecard. Shortlist places, build a trip, and save it to My trips.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ToursIWant — Proven USA trips, then make them yours",
+    title: "ToursIWant — The scorecard for things to do",
     description:
-      "Proven trip templates for American cities, multi-city routes, and right-now plans from your hotel. Make them yours — then book optional experiences.",
+      "Rank what’s worth doing in a city with the ToursIWant Scorecard. Shortlist places, build a trip, and save it to My trips.",
   },
   verification: searchConsoleVerification
     ? { google: searchConsoleVerification }

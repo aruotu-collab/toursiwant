@@ -71,15 +71,15 @@ function JoinContent() {
           {isOperator ? "Staff sign-in" : "Continue with email"}
         </h1>
         <p className="mt-4 max-w-md text-ink-soft">
-          Browse trip templates freely. Sign in when you want to save shared
-          plans with your group.
+          Use the Scorecard freely. Sign in when you want to save trips to My
+          trips.
         </p>
         <div className="mt-8">
           <Link
-            href="/"
+            href="/scorecard"
             className="text-sm text-skyline underline-offset-2 hover:underline"
           >
-            ← Back to trips
+            ← Back to Scorecard
           </Link>
         </div>
       </div>

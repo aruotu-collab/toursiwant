@@ -15,7 +15,6 @@ type AuthUser = {
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const onHome = pathname === "/";
   const onTrip = pathname?.startsWith("/trips");
   const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -39,13 +38,13 @@ export function SiteHeader() {
     setBusy(true);
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
-    router.push("/");
+    router.push("/scorecard");
     router.refresh();
     setBusy(false);
   }
 
-  // Homepage and trip templates have their own chrome.
-  if (onHome || onTrip) return null;
+  // Legacy trip-template pages keep their own chrome if opened via old links.
+  if (onTrip) return null;
 
   const onScorecard =
     pathname?.startsWith("/scorecard") || pathname?.startsWith("/new-york");
@@ -56,13 +55,10 @@ export function SiteHeader() {
     href: string;
     label: string;
     active: boolean;
-    /** Shown in the slide strip on phones only (desktop has right-side auth) */
     mobileOnly?: boolean;
   }> = [
     { href: "/scorecard", label: "Scorecard", active: Boolean(onScorecard) },
     { href: "/account#my-trips", label: "My trips", active: onAccount },
-    { href: "/?door=explore", label: "Explore", active: false },
-    { href: "/?door=here", label: "I'm here now", active: false },
   ];
 
   if (user) {
@@ -95,7 +91,7 @@ export function SiteHeader() {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <Link
-              href="/"
+              href="/scorecard"
               className="font-display text-xl tracking-tight text-ink sm:text-2xl"
             >
               Tours<span className="text-amber">I</span>Want
@@ -103,7 +99,6 @@ export function SiteHeader() {
             <AuthGreeting />
           </div>
 
-          {/* Desktop account actions stay on the right */}
           <div className="hidden items-center gap-3 md:flex">
             {user === undefined ? (
               <span className="h-8 w-24 animate-pulse bg-ink/10" aria-hidden />
@@ -142,7 +137,6 @@ export function SiteHeader() {
             )}
           </div>
 
-          {/* Mobile: compact auth only */}
           <div className="flex shrink-0 items-center gap-2 md:hidden">
             {user === undefined ? (
               <span className="h-8 w-14 animate-pulse bg-ink/10" aria-hidden />
@@ -166,7 +160,6 @@ export function SiteHeader() {
           </div>
         </div>
 
-        {/* Horizontal slide menu — primary nav on all sizes */}
         <nav
           className="mt-3 max-w-full overflow-x-auto overscroll-x-contain touch-pan-x pb-3 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
           aria-label="Main"
@@ -180,13 +173,9 @@ export function SiteHeader() {
                 <Link
                   href={item.href}
                   className={`block shrink-0 whitespace-nowrap border px-3 py-2 text-xs font-semibold transition sm:text-sm ${
-                    item.label === "I'm here now"
-                      ? item.active
-                        ? "border-ink bg-ink text-white"
-                        : "border-ink bg-ink text-white hover:bg-ink-soft"
-                      : item.active
-                        ? "border-amber bg-amber text-ink"
-                        : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
+                    item.active
+                      ? "border-amber bg-amber text-ink"
+                      : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
                   }`}
                 >
                   {item.label}

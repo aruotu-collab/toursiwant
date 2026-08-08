@@ -83,7 +83,7 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
     setBusy(true);
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
-    router.push("/");
+    router.push("/scorecard");
     router.refresh();
     setBusy(false);
   }

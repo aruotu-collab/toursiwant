@@ -32,10 +32,10 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Link
-              href="/"
+              href="/scorecard"
               className="mb-4 inline-flex text-sm font-semibold text-skyline underline-offset-2 hover:underline"
             >
-              ← Back to trips
+              ← Back to Scorecard
             </Link>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-skyline">
               Member area
@@ -46,8 +46,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <p className="mt-3 max-w-xl text-ink-soft">
               Signed in as{" "}
               <span className="font-medium text-ink">{user.email}</span>
-              {user.role === "admin" ? " · Admin" : ""}. Save scoreboard plans
-              and USA templates here, then reopen them anytime from My trips.
+              {user.role === "admin" ? " · Admin" : ""}. Save scorecard trips
+              here, then reopen them anytime from My trips.
             </p>
           </div>
           <AccountLogoutButton />
@@ -72,8 +72,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <div>
               <h2 className="font-display text-2xl text-ink">My trips</h2>
               <p className="mt-2 text-sm text-ink-soft">
-                Built New York plans and USA templates you saved to your
-                account.
+                Scorecard plans you saved to your account.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 text-sm font-semibold">
@@ -83,21 +82,14 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               >
                 Scorecard →
               </Link>
-              <Link
-                href="/?door=explore"
-                className="text-skyline underline-offset-2 hover:underline"
-              >
-                Explore templates →
-              </Link>
             </div>
           </div>
 
           {savedTrips.length === 0 ? (
             <div className="mt-6 border border-ink/10 bg-white/70 p-8">
               <p className="text-ink-soft">
-                No saved trips yet. Build a New York plan and tap{" "}
-                <span className="font-semibold text-ink">Save as my trip</span>,
-                or open a USA template and save it.
+                No saved trips yet. Open the Scorecard, build a plan, and tap{" "}
+                <span className="font-semibold text-ink">Save as my trip</span>.
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
@@ -105,12 +97,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                   className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep"
                 >
                   Open Scorecard
-                </Link>
-                <Link
-                  href="/?door=explore"
-                  className="border border-ink/20 px-4 py-2.5 text-sm font-semibold text-ink hover:bg-white"
-                >
-                  Explore trips
                 </Link>
               </div>
             </div>
@@ -167,34 +153,25 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
           )}
         </section>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
           <Link
-            href="/?door=explore"
+            href="/scorecard"
             className="border border-ink/10 bg-white/70 px-5 py-5 transition hover:border-skyline/40"
           >
             <p className="text-xs font-semibold uppercase tracking-wider text-stone">
-              Browse
+              Destinations
             </p>
-            <p className="mt-2 font-display text-xl text-ink">Explore trips →</p>
+            <p className="mt-2 font-display text-xl text-ink">Open Scorecard →</p>
           </Link>
           <Link
-            href="/?door=live"
+            href="/new-york"
             className="border border-ink/10 bg-white/70 px-5 py-5 transition hover:border-skyline/40"
           >
             <p className="text-xs font-semibold uppercase tracking-wider text-stone">
-              Groups
-            </p>
-            <p className="mt-2 font-display text-xl text-ink">Join a group →</p>
-          </Link>
-          <Link
-            href="/?door=here"
-            className="border border-ink/10 bg-white/70 px-5 py-5 transition hover:border-skyline/40"
-          >
-            <p className="text-xs font-semibold uppercase tracking-wider text-stone">
-              Right now
+              Live board
             </p>
             <p className="mt-2 font-display text-xl text-ink">
-              I&apos;m here now →
+              New York Top Places →
             </p>
           </Link>
         </div>
