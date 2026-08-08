@@ -10,6 +10,7 @@ import {
 } from "@/lib/nyc-places";
 import { suggestedDaysForSelections } from "@/lib/scoreboard-plan";
 import { saveNycPlanTrip } from "@/lib/save-nyc-plan";
+import { formatLikeCount, sampleLikeBase } from "@/lib/sample-likes";
 import {
   interestLenses,
   practicalLenses,
@@ -27,7 +28,14 @@ function lensMeta(id: ScoreboardLens) {
   return scoreboardLenses.find((l) => l.id === id);
 }
 
-type SortKey = "rank" | "score" | "bestFor" | "cost" | "category" | "name";
+type SortKey =
+  | "rank"
+  | "score"
+  | "likes"
+  | "bestFor"
+  | "cost"
+  | "category"
+  | "name";
 type SortDir = "asc" | "desc";
 
 export function NycScoreboard({
@@ -103,6 +111,11 @@ export function NycScoreboard({
           break;
         case "score":
           cmp = a.tiwScore - b.tiwScore;
+          break;
+        case "likes":
+          cmp =
+            sampleLikeBase(a.slug, a.tiwScore) -
+            sampleLikeBase(b.slug, b.tiwScore);
           break;
         case "bestFor":
           cmp = a.audience.localeCompare(b.audience);
@@ -371,8 +384,8 @@ export function NycScoreboard({
       </div>
 
       <div className="overflow-x-auto border border-ink/10 bg-white">
-        <div className="min-w-[58rem]">
-          <div className="grid grid-cols-[5.5rem_4rem_minmax(12rem,1.3fr)_5.5rem_5.5rem_7.5rem_8.5rem] gap-3 border-b border-ink/10 bg-paper-deep/60 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-stone sm:px-5">
+        <div className="min-w-[66rem]">
+          <div className="grid grid-cols-[5.5rem_4rem_minmax(12rem,1.3fr)_5.5rem_7rem_5.5rem_7.5rem_8.5rem] gap-3 border-b border-ink/10 bg-paper-deep/60 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-stone sm:px-5">
             <span className="self-center">Select</span>
             <SortHeading
               label="Rank"
@@ -392,6 +405,13 @@ export function NycScoreboard({
               active={sortKey === "score"}
               dir={sortDir}
               onClick={() => toggleSort("score")}
+              align="right"
+            />
+            <SortHeading
+              label="Liked by"
+              active={sortKey === "likes"}
+              dir={sortDir}
+              onClick={() => toggleSort("likes")}
               align="right"
             />
             <SortHeading
@@ -657,7 +677,7 @@ function ScoreRow({
 }) {
   return (
     <li
-      className={`grid grid-cols-[5.5rem_4rem_minmax(12rem,1.3fr)_5.5rem_5.5rem_7.5rem_8.5rem] items-center gap-3 border-b border-ink/8 px-4 py-3 sm:px-5 sm:py-4 ${
+      className={`grid grid-cols-[5.5rem_4rem_minmax(12rem,1.3fr)_5.5rem_7rem_5.5rem_7.5rem_8.5rem] items-center gap-3 border-b border-ink/8 px-4 py-3 sm:px-5 sm:py-4 ${
         stripe ? "bg-paper/40" : "bg-white"
       }`}
     >
@@ -701,6 +721,8 @@ function ScoreRow({
           /100
         </span>
       </Link>
+
+      <LikedByCounter slug={place.slug} tiwScore={place.tiwScore} />
 
       <span
         className={`truncate text-right text-sm font-semibold ${
@@ -749,4 +771,38 @@ function shortCategory(label: string) {
     .replace("Nature / parks day", "Nature")
     .replace("Food tour", "Food")
     .replace("Shopping day", "Shopping");
+}
+
+/** Sample social-proof counter — ticks up slowly while the board is open. */
+function LikedByCounter({
+  slug,
+  tiwScore,
+}: {
+  slug: string;
+  tiwScore: number;
+}) {
+  const base = sampleLikeBase(slug, tiwScore);
+  const [count, setCount] = useState(base);
+
+  useEffect(() => {
+    setCount(base);
+    const id = window.setInterval(() => {
+      setCount((n) => n + (Math.random() < 0.55 ? 1 : 2));
+    }, 3500 + (base % 2500));
+    return () => window.clearInterval(id);
+  }, [base, slug]);
+
+  return (
+    <div
+      className="text-right tabular-nums"
+      title="Sample interest counter — for demo atmosphere"
+    >
+      <span className="block font-display text-lg text-ink sm:text-xl">
+        {formatLikeCount(count)}
+      </span>
+      <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wider text-stone">
+        liked by
+      </span>
+    </div>
+  );
 }
