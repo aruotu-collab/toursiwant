@@ -1,4 +1,7 @@
-import { rankNycPlaces } from "@/lib/nyc-places";
+import {
+  cityCatalogs,
+  rankCityPlaces,
+} from "@/lib/places/registry";
 import {
   formatCompactCount,
   sampleExplorerBase,
@@ -21,26 +24,25 @@ export type ScorecardDestination = {
   href: string | null;
   placeCount?: number;
   blurb: string;
-  /** Social proof + board teaser for live destinations */
   stats?: ScorecardDestinationStats;
   cta?: string;
 };
 
-function nycLiveCard() {
-  const ranked = rankNycPlaces("overall");
-  const likes = ranked.reduce(
+function liveCard(opts: {
+  id: string;
+  places: { slug: string; tiwScore: number }[];
+}) {
+  const likes = opts.places.reduce(
     (sum, p) => sum + sampleLikeBase(p.slug, p.tiwScore),
     0,
   );
-  const top = ranked[0]?.tiwScore;
+  const top = opts.places[0]?.tiwScore;
   return {
-    placeCount: ranked.length,
-    blurb:
-      "Icons, neighborhoods, and hidden gems — ranked so you know what's worth your days.",
+    placeCount: opts.places.length,
     stats: {
-      placesLabel: `${ranked.length} places ranked`,
+      placesLabel: `${opts.places.length} places ranked`,
       likesLabel: `${formatCompactCount(likes)} likes`,
-      explorersLabel: `${formatCompactCount(sampleExplorerBase("new-york-ny"))} explorers`,
+      explorersLabel: `${formatCompactCount(sampleExplorerBase(opts.id))} explorers`,
       topScoreLabel:
         typeof top === "number" ? `Top score ${Math.round(top)}` : undefined,
     } satisfies ScorecardDestinationStats,
@@ -48,54 +50,27 @@ function nycLiveCard() {
   };
 }
 
-const nyc = nycLiveCard();
-
 /** Destinations people can open from the Scorecard hub. */
-export const scorecardDestinations: ScorecardDestination[] = [
-  {
-    id: "new-york-ny",
-    country: "United States",
-    state: "New York",
-    city: "New York City",
-    href: "/new-york",
-    placeCount: nyc.placeCount,
-    blurb: nyc.blurb,
-    stats: nyc.stats,
-    cta: nyc.cta,
+export const scorecardDestinations: ScorecardDestination[] = cityCatalogs.map(
+  (c) => {
+    const ranked = rankCityPlaces(c.places, "overall");
+    const card = liveCard({
+      id: `${c.slug}-live`,
+      places: ranked.map((p) => ({ slug: p.slug, tiwScore: p.tiwScore })),
+    });
+    return {
+      id: `${c.slug}-${c.state.toLowerCase().replace(/\s+/g, "-")}`,
+      country: c.country,
+      state: c.state,
+      city: c.name,
+      href: c.href,
+      placeCount: card.placeCount,
+      blurb: c.blurb,
+      stats: card.stats,
+      cta: card.cta,
+    };
   },
-  {
-    id: "los-angeles-ca",
-    country: "United States",
-    state: "California",
-    city: "Los Angeles",
-    href: null,
-    blurb: "Coming soon — Hollywood, beaches, and food neighborhoods.",
-  },
-  {
-    id: "chicago-il",
-    country: "United States",
-    state: "Illinois",
-    city: "Chicago",
-    href: null,
-    blurb: "Coming soon — architecture, museums, and lakefront.",
-  },
-  {
-    id: "miami-fl",
-    country: "United States",
-    state: "Florida",
-    city: "Miami",
-    href: null,
-    blurb: "Coming soon — beaches, Art Deco, and nightlife.",
-  },
-  {
-    id: "las-vegas-nv",
-    country: "United States",
-    state: "Nevada",
-    city: "Las Vegas",
-    href: null,
-    blurb: "Coming soon — Strip icons and desert day trips.",
-  },
-];
+);
 
 export function uniqueSorted(values: string[]) {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));

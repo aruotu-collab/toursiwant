@@ -8,6 +8,8 @@ import {
   experienceCategoryLabel,
   type ExperienceCategory,
 } from "@/lib/trip-templates";
+import { nycExtraPlaces } from "@/lib/places/data/nyc-extra";
+import type { CityPlace } from "@/lib/places/types";
 
 export type PlaceTag =
   | "first-time"
@@ -23,23 +25,10 @@ export type PlaceTag =
   | "evening"
   | "rainy-day"
   | "nightlife"
-  | "shopping";
+  | "shopping"
+  | "music";
 
-export type NycPlace = {
-  id: string;
-  slug: string;
-  name: string;
-  summary: string;
-  neighborhood: string;
-  cost: "free" | "under_50" | "paid";
-  typicalCostLabel: string;
-  durationLabel: string;
-  bestFor: string[];
-  tags: PlaceTag[];
-  factors: ScoreFactors;
-  viatorQuery: string;
-  whyHigh?: string;
-};
+export type NycPlace = CityPlace;
 
 function place(
   partial: Omit<NycPlace, "id"> & { id?: string },
@@ -48,8 +37,8 @@ function place(
   return { ...partial, id };
 }
 
-/** Curated New York places for the TIW Scoreboard MVP. */
-export const nycPlaces: NycPlace[] = [
+/** Curated New York places for the TIW Scoreboard. */
+const nycCorePlaces: NycPlace[] = [
   place({
     slug: "statue-of-liberty-ellis-island",
     name: "Statue of Liberty & Ellis Island",
@@ -1134,6 +1123,11 @@ export const nycPlaces: NycPlace[] = [
   }),
 ];
 
+export const nycPlaces: NycPlace[] = [
+  ...nycCorePlaces,
+  ...(nycExtraPlaces as NycPlace[]),
+];
+
 // Fix invalid tags - I used some cast hacks. Clean the data.
 function normalizeTags(tags: PlaceTag[]): PlaceTag[] {
   const allowed = new Set<string>([
@@ -1151,8 +1145,9 @@ function normalizeTags(tags: PlaceTag[]): PlaceTag[] {
     "rainy-day",
     "nightlife",
     "shopping",
+    "music",
   ]);
-  return tags.filter((t) => allowed.has(t));
+  return tags.filter((t) => allowed.has(t)) as PlaceTag[];
 }
 
 for (const p of nycPlaces) {

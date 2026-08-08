@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { nycPlaces } from "@/lib/nyc-places";
+import { cityCatalogs } from "@/lib/places/registry";
 import { tripTemplates } from "@/lib/trip-templates";
 
 const siteUrl =
@@ -15,20 +16,40 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/new-york/plan",
     "/account",
     "/join",
+    ...cityCatalogs
+      .filter((c) => c.slug !== "new-york")
+      .map((c) => `/city/${c.slug}`),
   ].map((path) => ({
     url: `${siteUrl}${path}`,
     lastModified: now,
     changeFrequency:
-      path === "/scorecard" || path === "/new-york" ? "daily" : "monthly",
-    priority: path === "/scorecard" || path === "/new-york" ? 1 : 0.5,
+      path === "/scorecard" || path.startsWith("/new-york") || path.startsWith("/city/")
+        ? "daily"
+        : "monthly",
+    priority:
+      path === "/scorecard" || path === "/new-york" || path.startsWith("/city/")
+        ? 1
+        : 0.5,
   }));
 
-  const scoreboardRoutes: MetadataRoute.Sitemap = nycPlaces.map((p) => ({
-    url: `${siteUrl}/new-york/${p.slug}`,
-    lastModified: now,
-    changeFrequency: "weekly" as const,
-    priority: 0.85,
-  }));
+  const scoreboardRoutes: MetadataRoute.Sitemap = [
+    ...nycPlaces.map((p) => ({
+      url: `${siteUrl}/new-york/${p.slug}`,
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: 0.85,
+    })),
+    ...cityCatalogs
+      .filter((c) => c.slug !== "new-york")
+      .flatMap((c) =>
+        c.places.map((p) => ({
+          url: `${siteUrl}/city/${c.slug}/${p.slug}`,
+          lastModified: now,
+          changeFrequency: "weekly" as const,
+          priority: 0.8,
+        })),
+      ),
+  ];
 
   const tripRoutes: MetadataRoute.Sitemap = tripTemplates.map((t) => ({
     url: `${siteUrl}/trips/${t.slug}`,

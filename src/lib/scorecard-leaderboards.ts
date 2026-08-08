@@ -1,4 +1,4 @@
-import { rankNycPlaces } from "@/lib/nyc-places";
+import { getCityCatalog, rankCityPlaces } from "@/lib/places/registry";
 import {
   formatCompactCount,
   sampleLikeBase,
@@ -10,10 +10,8 @@ export type LeaderboardRow = {
   name: string;
   meta: string;
   href: string | null;
-  /** Short code for terminal-style boards */
   symbol?: string;
   score?: number;
-  /** Day change in TIW points (sample) */
   change?: number;
   volumeLabel?: string;
 };
@@ -41,7 +39,7 @@ function hashUnit(key: string): number {
 function sampleChange(key: string): number {
   const u = hashUnit(key);
   const mag = 0.2 + u * 2.4;
-  return (u > 0.42 ? 1 : -1) * Math.round(mag * 10) / 10;
+  return ((u > 0.42 ? 1 : -1) * Math.round(mag * 10)) / 10;
 }
 
 function makeSymbol(name: string): string {
@@ -58,8 +56,19 @@ function makeSymbol(name: string): string {
     .toUpperCase();
 }
 
-function nycTopByLikes(limit = 5): LeaderboardRow[] {
-  return [...rankNycPlaces("overall")]
+function placeHref(citySlug: string, placeSlug: string, lens?: ScoreboardLens) {
+  if (citySlug === "new-york") {
+    return lens
+      ? `/new-york/${placeSlug}?lens=${lens}`
+      : `/new-york/${placeSlug}`;
+  }
+  return `/city/${citySlug}/${placeSlug}`;
+}
+
+function cityTopByLikes(citySlug: string, limit = 5): LeaderboardRow[] {
+  const catalog = getCityCatalog(citySlug);
+  if (!catalog) return [];
+  return [...rankCityPlaces(catalog.places, "overall")]
     .map((p) => ({
       place: p,
       likes: sampleLikeBase(p.slug, p.tiwScore),
@@ -70,16 +79,22 @@ function nycTopByLikes(limit = 5): LeaderboardRow[] {
       rank: i + 1,
       name: row.place.name,
       meta: `${formatCompactCount(row.likes)} likes`,
-      href: `/new-york/${row.place.slug}`,
+      href: placeHref(citySlug, row.place.slug),
       symbol: makeSymbol(row.place.name),
       score: Math.round(row.place.tiwScore * 10) / 10,
-      change: sampleChange(`likes:${row.place.slug}`),
+      change: sampleChange(`likes:${citySlug}:${row.place.slug}`),
       volumeLabel: formatCompactCount(row.likes),
     }));
 }
 
-function nycTopByLens(lens: ScoreboardLens, limit = 5): LeaderboardRow[] {
-  return rankNycPlaces(lens)
+function cityTopByLens(
+  citySlug: string,
+  lens: ScoreboardLens,
+  limit = 5,
+): LeaderboardRow[] {
+  const catalog = getCityCatalog(citySlug);
+  if (!catalog) return [];
+  return rankCityPlaces(catalog.places, lens)
     .slice(0, limit)
     .map((p, i) => {
       const likes = sampleLikeBase(p.slug, p.tiwScore);
@@ -87,32 +102,13 @@ function nycTopByLens(lens: ScoreboardLens, limit = 5): LeaderboardRow[] {
         rank: i + 1,
         name: p.name,
         meta: `TIW ${Math.round(p.tiwScore)}`,
-        href: `/new-york/${p.slug}?lens=${lens}`,
+        href: placeHref(citySlug, p.slug, lens),
         symbol: makeSymbol(p.name),
         score: Math.round(p.tiwScore * 10) / 10,
-        change: sampleChange(`${lens}:${p.slug}`),
+        change: sampleChange(`${citySlug}:${lens}:${p.slug}`),
         volumeLabel: formatCompactCount(likes),
       };
     });
-}
-
-/** Preview ranks for cities that are not live yet. */
-function previewBoard(seed: string, names: string[]): LeaderboardRow[] {
-  return names.map((name, i) => {
-    const u = hashUnit(`${seed}:${name}`);
-    const metric = 8_400 + Math.floor(u * 14_200);
-    const score = Math.round((78 + u * 18) * 10) / 10;
-    return {
-      rank: i + 1,
-      name,
-      meta: `${formatCompactCount(metric)} explorers`,
-      href: null,
-      symbol: makeSymbol(name),
-      score,
-      change: sampleChange(`${seed}:${name}:chg`),
-      volumeLabel: formatCompactCount(metric),
-    };
-  });
 }
 
 /** Rotating mini-leaderboards for the Scorecard home rail. */
@@ -126,23 +122,17 @@ export function buildScorecardLeaderboards(): ScorecardLeaderboard[] {
       blurb: "What travelers are shortlisting on the live board.",
       live: true,
       href: "/new-york",
-      rows: nycTopByLikes(5),
+      rows: cityTopByLikes("new-york", 5),
     },
     {
-      id: "la-preview",
+      id: "la-most-liked",
       city: "Los Angeles",
       region: "California",
-      title: "Preview · most explored",
-      blurb: "Coming soon — a taste of the LA scorecard.",
-      live: false,
-      href: null,
-      rows: previewBoard("los-angeles-ca", [
-        "Griffith Observatory",
-        "Santa Monica Pier",
-        "The Getty Center",
-        "Hollywood Walk of Fame",
-        "Venice Beach Boardwalk",
-      ]),
+      title: "Most liked right now",
+      blurb: "Hollywood, beaches, and museums climbing the board.",
+      live: true,
+      href: "/city/los-angeles",
+      rows: cityTopByLikes("los-angeles", 5),
     },
     {
       id: "nyc-families",
@@ -152,23 +142,17 @@ export function buildScorecardLeaderboards(): ScorecardLeaderboard[] {
       blurb: "Top picks when the board is sorted for families.",
       live: true,
       href: "/new-york?lens=families",
-      rows: nycTopByLens("families", 5),
+      rows: cityTopByLens("new-york", "families", 5),
     },
     {
-      id: "miami-preview",
-      city: "Miami",
-      region: "Florida",
-      title: "Preview · most explored",
-      blurb: "Coming soon — beaches, Art Deco, and nightlife ranked.",
-      live: false,
-      href: null,
-      rows: previewBoard("miami-fl", [
-        "South Beach",
-        "Wynwood Walls",
-        "Vizcaya Museum",
-        "Little Havana",
-        "Everglades day trip",
-      ]),
+      id: "chicago-most-liked",
+      city: "Chicago",
+      region: "Illinois",
+      title: "Most liked right now",
+      blurb: "Lakefront icons and architecture crowd-pleasers.",
+      live: true,
+      href: "/city/chicago",
+      rows: cityTopByLikes("chicago", 5),
     },
     {
       id: "nyc-first-visit",
@@ -178,7 +162,17 @@ export function buildScorecardLeaderboards(): ScorecardLeaderboard[] {
       blurb: "Highest first-visit value on the TIW scorecard.",
       live: true,
       href: "/new-york?lens=first_visit",
-      rows: nycTopByLens("first_visit", 5),
+      rows: cityTopByLens("new-york", "first_visit", 5),
+    },
+    {
+      id: "miami-most-liked",
+      city: "Miami",
+      region: "Florida",
+      title: "Most liked right now",
+      blurb: "Beaches, Wynwood, and Little Havana favorites.",
+      live: true,
+      href: "/city/miami",
+      rows: cityTopByLikes("miami", 5),
     },
   ];
 }
