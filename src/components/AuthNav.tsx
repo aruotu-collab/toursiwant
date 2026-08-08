@@ -127,7 +127,7 @@ export function AuthNav({ variant = "light" }: { variant?: Variant }) {
         <span className="hidden sm:inline">My account</span>
       </Link>
       {user.role === "admin" ? (
-        <Link href="/admin" className={`hidden sm:inline ${linkClass}`}>
+        <Link href="/admin" className={linkClass}>
           Admin
         </Link>
       ) : null}
