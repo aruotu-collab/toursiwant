@@ -1,144 +1,201 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AuthGreeting, AuthNav } from "@/components/AuthNav";
+import { AuthGreeting } from "@/components/AuthNav";
+
+type AuthUser = {
+  id: string;
+  email: string;
+  name?: string;
+  role: string;
+};
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const onHome = pathname === "/";
   const onTrip = pathname?.startsWith("/trips");
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setMenuOpen(false);
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data: { user?: AuthUser | null }) => {
+        if (!cancelled) setUser(data.user ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [menuOpen]);
+  async function logout() {
+    setBusy(true);
+    await fetch("/api/auth/logout", { method: "POST" });
+    setUser(null);
+    router.push("/");
+    router.refresh();
+    setBusy(false);
+  }
 
   // Homepage and trip templates have their own chrome.
   if (onHome || onTrip) return null;
 
   const onScorecard =
     pathname?.startsWith("/scorecard") || pathname?.startsWith("/new-york");
+  const onAccount = pathname === "/account";
+  const onAdmin = pathname?.startsWith("/admin");
 
-  const links = [
-    { href: "/scorecard", label: "Scorecard", active: onScorecard },
-    {
-      href: "/account#my-trips",
-      label: "My trips",
-      active: pathname === "/account",
-    },
+  const navItems: Array<{
+    href: string;
+    label: string;
+    active: boolean;
+    /** Shown in the slide strip on phones only (desktop has right-side auth) */
+    mobileOnly?: boolean;
+  }> = [
+    { href: "/scorecard", label: "Scorecard", active: Boolean(onScorecard) },
+    { href: "/account#my-trips", label: "My trips", active: onAccount },
     { href: "/?door=explore", label: "Explore", active: false },
     { href: "/?door=here", label: "I'm here now", active: false },
   ];
 
+  if (user) {
+    navItems.push({
+      href: "/account",
+      label: "Account",
+      active: onAccount,
+      mobileOnly: true,
+    });
+    if (user.role === "admin") {
+      navItems.push({
+        href: "/admin",
+        label: "Admin",
+        active: Boolean(onAdmin),
+        mobileOnly: true,
+      });
+    }
+  } else if (user === null) {
+    navItems.push({
+      href: "/join",
+      label: "Sign in",
+      active: false,
+      mobileOnly: true,
+    });
+  }
+
   return (
     <header className="absolute inset-x-0 top-0 z-40 border-b border-ink/10 bg-paper/95 backdrop-blur-md">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-8 sm:py-5">
-        <div className="min-w-0">
-          <Link
-            href="/"
-            className="font-display text-xl tracking-tight text-ink sm:text-2xl"
-          >
-            Tours<span className="text-amber">I</span>Want
-          </Link>
-          <AuthGreeting />
-        </div>
-
-        {/* Desktop nav */}
-        <nav className="hidden items-center gap-4 text-sm text-ink-soft md:flex">
-          {links.map((l) => (
+      <div className="mx-auto w-full max-w-6xl px-4 pt-3 sm:px-8 sm:pt-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <Link
-              key={l.href}
-              href={l.href}
-              className={`transition hover:text-ink ${
-                l.active ? "font-semibold text-ink" : ""
-              } ${
-                l.label === "I'm here now"
-                  ? "bg-ink px-3 py-2 font-semibold text-white hover:bg-ink-soft"
-                  : ""
-              }`}
+              href="/"
+              className="font-display text-xl tracking-tight text-ink sm:text-2xl"
             >
-              {l.label}
+              Tours<span className="text-amber">I</span>Want
             </Link>
-          ))}
-          <AuthNav />
-        </nav>
+            <AuthGreeting />
+          </div>
 
-        {/* Mobile: compact actions + menu */}
-        <div className="flex shrink-0 items-center gap-2 md:hidden">
-          <Link
-            href="/scorecard"
-            className={`px-2 py-1.5 text-xs font-semibold ${
-              onScorecard ? "text-ink" : "text-ink-soft"
-            }`}
-          >
-            Scorecard
-          </Link>
-          <button
-            type="button"
-            onClick={() => setMenuOpen(true)}
-            className="border border-ink/20 bg-white px-3 py-2 text-xs font-semibold text-ink"
-            aria-expanded={menuOpen}
-            aria-controls="mobile-site-menu"
-          >
-            Menu
-          </button>
-        </div>
-      </div>
+          {/* Desktop account actions stay on the right */}
+          <div className="hidden items-center gap-3 md:flex">
+            {user === undefined ? (
+              <span className="h-8 w-24 animate-pulse bg-ink/10" aria-hidden />
+            ) : user ? (
+              <>
+                <Link
+                  href="/account"
+                  className="bg-ink px-3 py-2 text-sm text-white transition hover:bg-ink-soft"
+                >
+                  My account
+                </Link>
+                {user.role === "admin" ? (
+                  <Link
+                    href="/admin"
+                    className="text-sm text-ink-soft transition hover:text-ink"
+                  >
+                    Admin
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={logout}
+                  disabled={busy}
+                  className="border border-ink/20 px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-white"
+                >
+                  {busy ? "…" : "Log out"}
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/join"
+                className="bg-ink px-3 py-2 text-sm text-white transition hover:bg-ink-soft"
+              >
+                Sign in
+              </Link>
+            )}
+          </div>
 
-      {menuOpen ? (
-        <div className="fixed inset-0 z-50 md:hidden" id="mobile-site-menu">
-          <button
-            type="button"
-            className="absolute inset-0 bg-ink/45"
-            aria-label="Close menu"
-            onClick={() => setMenuOpen(false)}
-          />
-          <div className="absolute inset-y-0 right-0 flex w-[min(19rem,88vw)] flex-col border-l border-ink/10 bg-paper shadow-xl">
-            <div className="flex items-center justify-between border-b border-ink/10 px-4 py-3">
-              <p className="font-display text-lg text-ink">Menu</p>
+          {/* Mobile: compact auth only */}
+          <div className="flex shrink-0 items-center gap-2 md:hidden">
+            {user === undefined ? (
+              <span className="h-8 w-14 animate-pulse bg-ink/10" aria-hidden />
+            ) : user ? (
               <button
                 type="button"
-                onClick={() => setMenuOpen(false)}
-                className="px-2 py-1 text-sm text-ink-soft"
+                onClick={logout}
+                disabled={busy}
+                className="border border-ink/20 px-2.5 py-1.5 text-xs font-semibold text-ink"
               >
-                Close
+                {busy ? "…" : "Log out"}
               </button>
-            </div>
-            <nav className="flex flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-3">
-              {links.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  onClick={() => setMenuOpen(false)}
-                  className={`px-3 py-3 text-base ${
-                    l.active
-                      ? "bg-ink text-white"
-                      : "bg-white text-ink hover:bg-paper-deep"
-                  }`}
-                >
-                  {l.label}
-                </Link>
-              ))}
-              <div className="mt-4 border-t border-ink/10 pt-4">
-                <div className="flex flex-col gap-2 [&_a]:w-full [&_a]:text-center [&_button]:w-full">
-                  <AuthNav />
-                </div>
-              </div>
-            </nav>
+            ) : (
+              <Link
+                href="/join"
+                className="bg-ink px-2.5 py-1.5 text-xs font-semibold text-white"
+              >
+                Sign in
+              </Link>
+            )}
           </div>
         </div>
-      ) : null}
+
+        {/* Horizontal slide menu — primary nav on all sizes */}
+        <nav
+          className="mt-3 max-w-full overflow-x-auto overscroll-x-contain touch-pan-x pb-3 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
+          aria-label="Main"
+        >
+          <ul className="flex w-max items-center gap-2">
+            {navItems.map((item) => (
+              <li
+                key={`${item.href}-${item.label}`}
+                className={item.mobileOnly ? "md:hidden" : undefined}
+              >
+                <Link
+                  href={item.href}
+                  className={`block shrink-0 whitespace-nowrap border px-3 py-2 text-xs font-semibold transition sm:text-sm ${
+                    item.label === "I'm here now"
+                      ? item.active
+                        ? "border-ink bg-ink text-white"
+                        : "border-ink bg-ink text-white hover:bg-ink-soft"
+                      : item.active
+                        ? "border-amber bg-amber text-ink"
+                        : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
     </header>
   );
 }

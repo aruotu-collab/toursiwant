@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function NewYorkPlanPage() {
   return (
-    <main className="flex-1 bg-paper pt-24">
+    <main className="max-w-[100vw] flex-1 overflow-x-clip bg-paper pt-[7.5rem] sm:pt-32">
       <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8 sm:py-14">
         <p className="text-sm text-ink-soft">
           <Link href="/new-york" className="hover:text-amber-deep">

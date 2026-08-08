@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function ScorecardPage() {
   return (
-    <main className="max-w-[100vw] flex-1 overflow-x-clip bg-paper pt-24">
+    <main className="max-w-[100vw] flex-1 overflow-x-clip bg-paper pt-[7.5rem] sm:pt-32">
       <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8 sm:py-14">
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-amber-deep">
           ToursIWant Scorecard

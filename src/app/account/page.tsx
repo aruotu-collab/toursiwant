@@ -28,7 +28,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   return (
     <main className="flex-1 bg-[linear-gradient(180deg,var(--mist)_0%,var(--paper)_40%)]">
-      <div className="mx-auto w-full max-w-6xl px-5 py-24 sm:px-8 lg:py-28">
+      <div className="mx-auto w-full max-w-6xl px-5 py-[7.5rem] sm:px-8 sm:py-32 lg:py-28">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <Link
