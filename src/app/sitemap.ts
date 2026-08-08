@@ -11,6 +11,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticRoutes: MetadataRoute.Sitemap = [
     "",
+    "/scorecard",
     "/new-york",
     "/new-york/plan",
     "/account",
@@ -18,8 +19,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ].map((path) => ({
     url: `${siteUrl}${path}`,
     lastModified: now,
-    changeFrequency: path === "" || path === "/new-york" ? "daily" : "monthly",
-    priority: path === "" || path === "/new-york" ? 1 : 0.5,
+    changeFrequency:
+      path === "" || path === "/scorecard" || path === "/new-york"
+        ? "daily"
+        : "monthly",
+    priority:
+      path === "" || path === "/scorecard" || path === "/new-york" ? 1 : 0.5,
   }));
 
   const scoreboardRoutes: MetadataRoute.Sitemap = nycPlaces.map((p) => ({

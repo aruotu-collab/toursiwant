@@ -26,14 +26,15 @@ export function SiteHeader() {
         </div>
         <nav className="flex shrink-0 items-center gap-2 text-sm text-ink-soft sm:gap-4">
           <Link
-            href="/new-york"
+            href="/scorecard"
             className={`transition hover:text-ink ${
+              pathname?.startsWith("/scorecard") ||
               pathname?.startsWith("/new-york")
                 ? "font-semibold text-ink"
                 : "hidden sm:inline"
             }`}
           >
-            NY Scoreboard
+            Scorecard
           </Link>
           <Link
             href="/account#my-trips"

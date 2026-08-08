@@ -78,10 +78,10 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </div>
             <div className="flex flex-wrap gap-3 text-sm font-semibold">
               <Link
-                href="/new-york"
+                href="/scorecard"
                 className="text-skyline underline-offset-2 hover:underline"
               >
-                NY Scoreboard →
+                Scorecard →
               </Link>
               <Link
                 href="/?door=explore"
@@ -101,10 +101,10 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
-                  href="/new-york"
+                  href="/scorecard"
                   className="bg-amber px-4 py-2.5 text-sm font-semibold text-ink hover:bg-amber-deep"
                 >
-                  New York Scoreboard
+                  Open Scorecard
                 </Link>
                 <Link
                   href="/?door=explore"

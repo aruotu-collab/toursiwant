@@ -178,10 +178,10 @@ export function TripsHome() {
         </button>
         <nav className="flex items-center gap-3 text-sm text-white/70">
           <Link
-            href="/new-york"
+            href="/scorecard"
             className="hidden font-semibold text-amber hover:text-white sm:inline"
           >
-            NY Scoreboard
+            Scorecard
           </Link>
           <button
             type="button"
@@ -230,10 +230,10 @@ export function TripsHome() {
               style={{ animation: "rise-in 0.7s ease-out 0.18s both" }}
             >
               <Link
-                href="/new-york"
+                href="/scorecard"
                 className="bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
               >
-                New York Scoreboard
+                Open Scorecard
               </Link>
               <button
                 type="button"
