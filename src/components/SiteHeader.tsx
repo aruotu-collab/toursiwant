@@ -36,12 +36,6 @@ export function SiteHeader() {
             NY Scoreboard
           </Link>
           <Link
-            href="/account#my-trips"
-            className="hidden transition hover:text-ink sm:inline"
-          >
-            My trips
-          </Link>
-          <Link
             href="/?door=explore"
             className="hidden transition hover:text-ink sm:inline"
           >
