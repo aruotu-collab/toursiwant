@@ -10,6 +10,12 @@ export type LeaderboardRow = {
   name: string;
   meta: string;
   href: string | null;
+  /** Short code for terminal-style boards */
+  symbol?: string;
+  score?: number;
+  /** Day change in TIW points (sample) */
+  change?: number;
+  volumeLabel?: string;
 };
 
 export type ScorecardLeaderboard = {
@@ -22,6 +28,35 @@ export type ScorecardLeaderboard = {
   href: string | null;
   rows: LeaderboardRow[];
 };
+
+function hashUnit(key: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
+}
+
+function sampleChange(key: string): number {
+  const u = hashUnit(key);
+  const mag = 0.2 + u * 2.4;
+  return (u > 0.42 ? 1 : -1) * Math.round(mag * 10) / 10;
+}
+
+function makeSymbol(name: string): string {
+  const words = name
+    .replace(/[^a-zA-Z0-9\s]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 1) return words[0]!.slice(0, 4).toUpperCase();
+  return words
+    .slice(0, 3)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
 
 function nycTopByLikes(limit = 5): LeaderboardRow[] {
   return [...rankNycPlaces("overall")]
@@ -36,38 +71,46 @@ function nycTopByLikes(limit = 5): LeaderboardRow[] {
       name: row.place.name,
       meta: `${formatCompactCount(row.likes)} likes`,
       href: `/new-york/${row.place.slug}`,
+      symbol: makeSymbol(row.place.name),
+      score: Math.round(row.place.tiwScore * 10) / 10,
+      change: sampleChange(`likes:${row.place.slug}`),
+      volumeLabel: formatCompactCount(row.likes),
     }));
 }
 
 function nycTopByLens(lens: ScoreboardLens, limit = 5): LeaderboardRow[] {
   return rankNycPlaces(lens)
     .slice(0, limit)
-    .map((p, i) => ({
-      rank: i + 1,
-      name: p.name,
-      meta: `TIW ${Math.round(p.tiwScore)}`,
-      href: `/new-york/${p.slug}?lens=${lens}`,
-    }));
+    .map((p, i) => {
+      const likes = sampleLikeBase(p.slug, p.tiwScore);
+      return {
+        rank: i + 1,
+        name: p.name,
+        meta: `TIW ${Math.round(p.tiwScore)}`,
+        href: `/new-york/${p.slug}?lens=${lens}`,
+        symbol: makeSymbol(p.name),
+        score: Math.round(p.tiwScore * 10) / 10,
+        change: sampleChange(`${lens}:${p.slug}`),
+        volumeLabel: formatCompactCount(likes),
+      };
+    });
 }
 
 /** Preview ranks for cities that are not live yet. */
-function previewBoard(
-  seed: string,
-  names: string[],
-): LeaderboardRow[] {
+function previewBoard(seed: string, names: string[]): LeaderboardRow[] {
   return names.map((name, i) => {
-    let h = 2166136261;
-    const key = `${seed}:${name}`;
-    for (let j = 0; j < key.length; j++) {
-      h ^= key.charCodeAt(j);
-      h = Math.imul(h, 16777619);
-    }
-    const metric = 8_400 + ((h >>> 0) % 14_200);
+    const u = hashUnit(`${seed}:${name}`);
+    const metric = 8_400 + Math.floor(u * 14_200);
+    const score = Math.round((78 + u * 18) * 10) / 10;
     return {
       rank: i + 1,
       name,
       meta: `${formatCompactCount(metric)} explorers`,
       href: null,
+      symbol: makeSymbol(name),
+      score,
+      change: sampleChange(`${seed}:${name}:chg`),
+      volumeLabel: formatCompactCount(metric),
     };
   });
 }
@@ -138,4 +181,19 @@ export function buildScorecardLeaderboards(): ScorecardLeaderboard[] {
       rows: nycTopByLens("first_visit", 5),
     },
   ];
+}
+
+export function leaderboardTickerLines(
+  boards: ScorecardLeaderboard[],
+): string[] {
+  return boards.flatMap((b) =>
+    b.rows.slice(0, 3).map((r) => {
+      const chg =
+        typeof r.change === "number"
+          ? `${r.change >= 0 ? "+" : ""}${r.change.toFixed(1)}`
+          : "";
+      const score = typeof r.score === "number" ? r.score.toFixed(1) : "";
+      return `${b.city.toUpperCase()} ${b.title.toUpperCase()}  ${r.symbol || `#${r.rank}`}  ${score}  ${chg}  ${r.volumeLabel || ""}`.trim();
+    }),
+  );
 }

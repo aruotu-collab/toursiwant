@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ScorecardHub } from "@/components/ScorecardHub";
-import { ScorecardLeaderboardRail } from "@/components/ScorecardLeaderboardRail";
+import { ScorecardLeaderboardCompare } from "@/components/ScorecardLeaderboardCompare";
 
 export const metadata: Metadata = {
   title: "Scorecard — pick a destination",
@@ -18,7 +18,7 @@ export default function ScorecardPage() {
         </p>
 
         <div className="mt-5 animate-rise">
-          <ScorecardLeaderboardRail />
+          <ScorecardLeaderboardCompare />
         </div>
 
         <h1 className="mt-10 max-w-3xl font-display text-[clamp(2.2rem,5vw,3.6rem)] leading-[0.98] tracking-tight text-ink">
