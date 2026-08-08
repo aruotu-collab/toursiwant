@@ -36,6 +36,16 @@ export function SiteHeader() {
             NY Scoreboard
           </Link>
           <Link
+            href="/account#my-trips"
+            className={`transition hover:text-ink ${
+              pathname === "/account"
+                ? "font-semibold text-ink"
+                : "hidden sm:inline"
+            }`}
+          >
+            My trips
+          </Link>
+          <Link
             href="/?door=explore"
             className="hidden transition hover:text-ink sm:inline"
           >
