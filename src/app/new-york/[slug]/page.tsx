@@ -80,7 +80,7 @@ export default async function NewYorkPlacePage({ params, searchParams }: Props) 
           <span className="text-ink">{place.name}</span>
         </p>
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="mt-6 grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber-deep">
               {place.neighborhood}
@@ -133,65 +133,69 @@ export default async function NewYorkPlacePage({ params, searchParams }: Props) 
             </dl>
           </div>
 
-          <div className="flex flex-col gap-4">
-            <aside className="border border-ink/10 bg-ink px-6 py-7 text-white">
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
-                TIW Score
-              </p>
-              <p className="mt-2 font-display text-6xl leading-none tracking-tight">
-                {score}
-                <span className="text-3xl text-white/50">/100</span>
-              </p>
-              <p className="mt-4 text-sm leading-relaxed text-white/70">
-                {explanation}
-              </p>
-              <Link
-                href={`/new-york?lens=${lens}#board`}
-                className="mt-6 inline-block border border-white/25 px-4 py-2 text-sm hover:border-amber hover:text-amber"
-              >
-                Back to scoreboard
-              </Link>
-            </aside>
-            <PlaceVideoPanel placeName={place.name} slug={place.slug} />
-          </div>
+          <aside className="border border-ink/10 bg-ink px-6 py-7 text-white lg:sticky lg:top-28">
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
+              TIW Score
+            </p>
+            <p className="mt-2 font-display text-6xl leading-none tracking-tight">
+              {score}
+              <span className="text-3xl text-white/50">/100</span>
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-white/70">
+              {explanation}
+            </p>
+            <Link
+              href={`/new-york?lens=${lens}#board`}
+              className="mt-6 inline-block border border-white/25 px-4 py-2 text-sm hover:border-amber hover:text-amber"
+            >
+              Back to scoreboard
+            </Link>
+          </aside>
         </div>
 
-        <section className="mt-12 border border-ink/10 bg-white p-5 sm:p-8">
-          <h2 className="font-display text-2xl text-ink">How we scored this</h2>
-          <p className="mt-2 max-w-2xl text-sm text-ink-soft">
-            Component scores are visible on purpose. Category boards change
-            weights — they do not invent new numbers from nowhere.
-          </p>
-          <ul className="mt-6 space-y-3">
-            {factorOrder.map((key) => {
-              const value = place.factors[key];
-              return (
-                <li key={key}>
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-ink-soft">
-                      {scoreFactorLabel[key]}
-                    </span>
-                    <span className="font-mono font-semibold text-ink">
-                      {value}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-2 overflow-hidden bg-paper-deep">
-                    <div
-                      className="h-full bg-amber"
-                      style={{ width: `${value}%` }}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="mt-6 text-xs leading-relaxed text-stone">
-            Overall TIW Score weights: 30% traveller satisfaction · 20%
-            popularity · 15% value · 15% uniqueness · 10% convenience · 10%
-            first-time visitor value. Family, free, views, and other lenses
-            re-weight these same factors.
-          </p>
-        </section>
+        <div className="mt-10 grid gap-6 lg:grid-cols-2 lg:items-stretch">
+          <PlaceVideoPanel
+            placeName={place.name}
+            slug={place.slug}
+            className="h-full"
+          />
+          <section className="border border-ink/10 bg-white p-5 sm:p-8">
+            <h2 className="font-display text-2xl text-ink">How we scored this</h2>
+            <p className="mt-2 text-sm text-ink-soft">
+              Component scores are visible on purpose. Category boards change
+              weights — they do not invent new numbers from nowhere.
+            </p>
+            <ul className="mt-6 space-y-3">
+              {factorOrder.map((key) => {
+                const value = place.factors[key];
+                return (
+                  <li key={key}>
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="text-ink-soft">
+                        {scoreFactorLabel[key]}
+                      </span>
+                      <span className="font-mono font-semibold text-ink">
+                        {value}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-2 overflow-hidden bg-paper-deep">
+                      <div
+                        className="h-full bg-amber"
+                        style={{ width: `${value}%` }}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-6 text-xs leading-relaxed text-stone">
+              Overall TIW Score weights: 30% traveller satisfaction · 20%
+              popularity · 15% value · 15% uniqueness · 10% convenience · 10%
+              first-time visitor value. Family, free, views, and other lenses
+              re-weight these same factors.
+            </p>
+          </section>
+        </div>
 
         <div className="mt-8">
           <PlaceViatorExperiences

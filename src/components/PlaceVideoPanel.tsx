@@ -7,13 +7,16 @@ import {
 type Props = {
   placeName: string;
   slug: string;
+  className?: string;
 };
 
-export function PlaceVideoPanel({ placeName, slug }: Props) {
+export function PlaceVideoPanel({ placeName, slug, className = "" }: Props) {
   const video = getPlaceVideo(slug);
 
   return (
-    <aside className="border border-ink/10 bg-ink px-5 py-6 text-white sm:px-6">
+    <aside
+      className={`border border-ink/10 bg-ink px-5 py-6 text-white sm:px-6 ${className}`}
+    >
       <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
         See this place
       </p>
