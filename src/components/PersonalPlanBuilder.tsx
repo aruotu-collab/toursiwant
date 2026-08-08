@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getPlaceBySlug } from "@/lib/nyc-places";
+import {
+  categoriesForPlace,
+  getPlaceBySlug,
+} from "@/lib/nyc-places";
 import {
   buildPlanFromSelections,
   MAX_TRIP_DAYS,
@@ -12,7 +15,22 @@ import {
   type BuiltPlan,
 } from "@/lib/scoreboard-plan";
 import { NYC_PLAN_TEMPLATE_SLUG } from "@/lib/saved-trip-kinds";
+import {
+  experienceCategoryLabel,
+  personalizeOptions,
+  type ExperienceCategory,
+} from "@/lib/trip-templates";
 import { useNycWants } from "@/lib/use-nyc-wants";
+
+function primaryPersonalizeCategory(slug: string): ExperienceCategory {
+  const place = getPlaceBySlug(slug);
+  if (!place) return "SIGHTS";
+  const cats = new Set(categoriesForPlace(place));
+  for (const opt of personalizeOptions) {
+    if (cats.has(opt.id)) return opt.id;
+  }
+  return "SIGHTS";
+}
 
 export function PersonalPlanBuilder() {
   const router = useRouter();
@@ -593,52 +611,7 @@ export function PersonalPlanBuilder() {
         </section>
       ) : null}
 
-      <section className="border border-ink/10 bg-white p-5">
-        <h2 className="font-display text-xl text-ink">All your wants</h2>
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {wants.map((slug) => {
-            const p = getPlaceBySlug(slug);
-            const name = p?.name || slug;
-            return (
-              <li
-                key={slug}
-                className="inline-flex items-center gap-1 border border-amber bg-amber/15 text-sm text-ink"
-              >
-                <Link
-                  href={`/new-york/${slug}`}
-                  className="px-3 py-1.5 hover:text-amber-deep"
-                >
-                  {name}
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => toggle(slug)}
-                  className="border-l border-amber/50 px-2 py-1.5 text-stone hover:bg-amber/25 hover:text-ink"
-                  aria-label={`Remove ${name}`}
-                  title="Remove"
-                >
-                  ×
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/new-york#board"
-            className="border border-ink/20 px-4 py-2 text-sm font-semibold hover:border-amber"
-          >
-            Add more from scoreboard
-          </Link>
-          <button
-            type="button"
-            onClick={clear}
-            className="text-sm text-stone hover:text-ink"
-          >
-            Clear all wants
-          </button>
-        </div>
-      </section>
+      <WantsByCategory wants={wants} onRemove={toggle} onClear={clear} />
     </div>
   );
 }
@@ -651,5 +624,109 @@ function Stat({ label, value }: { label: string; value: string }) {
       </p>
       <p className="mt-1 font-display text-2xl text-ink">{value}</p>
     </div>
+  );
+}
+
+function WantsByCategory({
+  wants,
+  onRemove,
+  onClear,
+}: {
+  wants: string[];
+  onRemove: (slug: string) => void;
+  onClear: () => void;
+}) {
+  const groups = useMemo(() => {
+    const byCat = new Map<ExperienceCategory, string[]>();
+    for (const slug of wants) {
+      const cat = primaryPersonalizeCategory(slug);
+      const list = byCat.get(cat) || [];
+      list.push(slug);
+      byCat.set(cat, list);
+    }
+    for (const list of byCat.values()) {
+      list.sort((a, b) => {
+        const na = getPlaceBySlug(a)?.name || a;
+        const nb = getPlaceBySlug(b)?.name || b;
+        return na.localeCompare(nb);
+      });
+    }
+    return personalizeOptions
+      .filter((opt) => byCat.has(opt.id))
+      .map((opt) => ({
+        id: opt.id,
+        label: experienceCategoryLabel[opt.id],
+        slugs: byCat.get(opt.id) || [],
+      }));
+  }, [wants]);
+
+  return (
+    <section className="border border-ink/10 bg-white p-5">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 className="font-display text-xl text-ink">All your wants</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Grouped by personalize category · A–Z within each group
+          </p>
+        </div>
+        <p className="font-mono text-xs text-stone">{wants.length} places</p>
+      </div>
+
+      <div className="mt-5 space-y-5">
+        {groups.map((group) => (
+          <div key={group.id}>
+            <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-amber-deep">
+              {group.label}
+              <span className="ml-2 text-stone normal-case tracking-normal">
+                {group.slugs.length}
+              </span>
+            </p>
+            <ul className="mt-2 flex flex-wrap gap-2">
+              {group.slugs.map((slug) => {
+                const name = getPlaceBySlug(slug)?.name || slug;
+                return (
+                  <li
+                    key={slug}
+                    className="inline-flex items-center gap-1 border border-amber bg-amber/15 text-sm text-ink"
+                  >
+                    <Link
+                      href={`/new-york/${slug}`}
+                      className="px-3 py-1.5 hover:text-amber-deep"
+                    >
+                      {name}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => onRemove(slug)}
+                      className="border-l border-amber/50 px-2 py-1.5 text-stone hover:bg-amber/25 hover:text-ink"
+                      aria-label={`Remove ${name}`}
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link
+          href="/new-york#board"
+          className="border border-ink/20 px-4 py-2 text-sm font-semibold hover:border-amber"
+        >
+          Add more from scoreboard
+        </Link>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-sm text-stone hover:text-ink"
+        >
+          Clear all wants
+        </button>
+      </div>
+    </section>
   );
 }
