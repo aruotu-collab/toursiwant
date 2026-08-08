@@ -106,7 +106,23 @@ export function estimateHours(place: NycPlace): number {
   return 2;
 }
 
-const HOURS_PER_DAY = 8;
+export const HOURS_PER_DAY = 8;
+
+/** How many days the current wants need (1–7), from hours + place count. */
+export function suggestedDaysForSelections(slugs: string[]): number {
+  let hours = 0;
+  let count = 0;
+  for (const slug of slugs) {
+    const place = getPlaceBySlug(slug);
+    if (!place) continue;
+    hours += estimateHours(place);
+    count += 1;
+  }
+  if (!count) return 1;
+  const byHours = Math.ceil(hours / HOURS_PER_DAY - 1e-9) || 1;
+  const byCount = Math.ceil(count / 4); // ~4 stops per day before adding a day
+  return Math.min(7, Math.max(1, byHours, byCount));
+}
 
 /**
  * Turn selected place slugs into a practical day-by-day plan.

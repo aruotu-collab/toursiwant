@@ -1,16 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getPlaceBySlug } from "@/lib/nyc-places";
-import { buildPlanFromSelections } from "@/lib/scoreboard-plan";
+import {
+  buildPlanFromSelections,
+  suggestedDaysForSelections,
+} from "@/lib/scoreboard-plan";
 import { useNycWants } from "@/lib/use-nyc-wants";
 
 export function PersonalPlanBuilder() {
   const router = useRouter();
   const { wants, days, ready, toggle, clear, removeMany, setDays } =
     useNycWants();
+  /** When true, dropdown override wins until wants change again. */
+  const manualDaysLock = useRef(false);
+  const wantsKey = wants.join("|");
+
+  const neededDays = useMemo(
+    () => suggestedDaysForSelections(wants),
+    [wants],
+  );
+
+  // New scoreboard picks (or removals) unlock auto day-fit.
+  useEffect(() => {
+    manualDaysLock.current = false;
+  }, [wantsKey]);
+
+  // Auto-grow / auto-shrink days so added places appear without using the dropdown.
+  useEffect(() => {
+    if (!ready || !wants.length || manualDaysLock.current) return;
+    if (neededDays !== days) setDays(neededDays);
+  }, [ready, wants.length, wantsKey, neededDays, days, setDays]);
 
   useEffect(() => {
     if (!ready) return;
@@ -27,14 +49,6 @@ export function PersonalPlanBuilder() {
     [plan.days],
   );
   const emptyTrailing = days > filledDays && filledDays >= 1;
-
-  // If day 4/5 (etc.) are empty after removals, shrink trip length to match.
-  useEffect(() => {
-    if (!ready || !wants.length) return;
-    if (filledDays >= 1 && filledDays < days) {
-      setDays(filledDays);
-    }
-  }, [ready, wants.length, filledDays, days, setDays]);
 
   if (!ready) {
     return <p className="text-ink-soft">Loading your selections…</p>;
@@ -69,20 +83,24 @@ export function PersonalPlanBuilder() {
           </h1>
           <p className="mt-3 max-w-2xl text-ink-soft">{plan.note}</p>
           <p className="mt-2 max-w-2xl text-sm text-ink-soft">
-            Clear later days (or remove their places) to shorten the trip —
-            empty days drop off automatically.
+            Days adjust automatically when you add or remove places. You can
+            still override the length with the dropdown.
           </p>
         </div>
         <label className="block text-sm">
-          <span className="text-ink-soft">Trip length</span>
+          <span className="text-ink-soft">Trip length (auto-fits wants)</span>
           <select
             value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
+            onChange={(e) => {
+              manualDaysLock.current = true;
+              setDays(Number(e.target.value));
+            }}
             className="mt-1 block border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
           >
             {[1, 2, 3, 4, 5, 6, 7].map((n) => (
               <option key={n} value={n}>
                 {n} day{n === 1 ? "" : "s"}
+                {n === neededDays ? " · suggested" : ""}
               </option>
             ))}
           </select>
