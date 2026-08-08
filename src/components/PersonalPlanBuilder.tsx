@@ -254,15 +254,26 @@ export function PersonalPlanBuilder() {
         <ul className="mt-3 flex flex-wrap gap-2">
           {wants.map((slug) => {
             const p = getPlaceBySlug(slug);
+            const name = p?.name || slug;
             return (
-              <li key={slug}>
+              <li
+                key={slug}
+                className="inline-flex items-center gap-1 border border-amber bg-amber/15 text-sm text-ink"
+              >
+                <Link
+                  href={`/new-york/${slug}`}
+                  className="px-3 py-1.5 hover:text-amber-deep"
+                >
+                  {name}
+                </Link>
                 <button
                   type="button"
                   onClick={() => toggle(slug)}
-                  className="border border-amber bg-amber/15 px-3 py-1.5 text-sm text-ink"
+                  className="border-l border-amber/50 px-2 py-1.5 text-stone hover:bg-amber/25 hover:text-ink"
+                  aria-label={`Remove ${name}`}
                   title="Remove"
                 >
-                  ✓ {p?.name || slug}
+                  ×
                 </button>
               </li>
             );
