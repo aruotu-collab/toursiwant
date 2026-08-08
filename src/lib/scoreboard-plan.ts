@@ -110,21 +110,15 @@ export const HOURS_PER_DAY = 8;
 /** Upper bound for auto day-fit and the plan length dropdown. */
 export const MAX_TRIP_DAYS = 14;
 
-/** How many days the current wants need, from hours + place count. */
+/**
+ * Days the packed plan will actually use — same result as Build my trip.
+ * (Not a rough places÷3 guess, which over-counted empty trailing days.)
+ */
 export function suggestedDaysForSelections(slugs: string[]): number {
-  let hours = 0;
-  let count = 0;
-  for (const slug of slugs) {
-    const place = getPlaceBySlug(slug);
-    if (!place) continue;
-    hours += estimateHours(place);
-    count += 1;
-  }
-  if (!count) return 1;
-  const byHours = Math.ceil(hours / HOURS_PER_DAY - 1e-9) || 1;
-  // ~3 stops/day is a realistic sightseeing pace (28 places ≈ 9–10 days)
-  const byCount = Math.ceil(count / 3);
-  return Math.min(MAX_TRIP_DAYS, Math.max(1, byHours, byCount));
+  if (!slugs.length) return 1;
+  const plan = buildPlanFromSelections(slugs, MAX_TRIP_DAYS);
+  const used = plan.days.filter((d) => d.stops.length > 0).length;
+  return Math.max(1, Math.min(MAX_TRIP_DAYS, used || 1));
 }
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getPlaceBySlug } from "@/lib/nyc-places";
 import {
@@ -15,8 +15,8 @@ export function PersonalPlanBuilder() {
   const router = useRouter();
   const { wants, days, ready, toggle, clear, removeMany, setDays } =
     useNycWants();
-  /** When true, dropdown override wins until wants change again. */
-  const manualDaysLock = useRef(false);
+  /** Dropdown override — ignored again once wants change. */
+  const [manualOverride, setManualOverride] = useState(false);
   const wantsKey = wants.join("|");
 
   const neededDays = useMemo(
@@ -24,16 +24,15 @@ export function PersonalPlanBuilder() {
     [wants],
   );
 
-  // New scoreboard picks (or removals) unlock auto day-fit.
   useEffect(() => {
-    manualDaysLock.current = false;
+    setManualOverride(false);
   }, [wantsKey]);
 
-  // Auto-grow / auto-shrink days so added places appear without using the dropdown.
+  // Match scoreboard projection: days = packed plan length.
   useEffect(() => {
-    if (!ready || !wants.length || manualDaysLock.current) return;
+    if (!ready || !wants.length || manualOverride) return;
     if (neededDays !== days) setDays(neededDays);
-  }, [ready, wants.length, wantsKey, neededDays, days, setDays]);
+  }, [ready, wants.length, wantsKey, neededDays, days, setDays, manualOverride]);
 
   useEffect(() => {
     if (!ready) return;
@@ -49,7 +48,6 @@ export function PersonalPlanBuilder() {
     () => plan.days.filter((d) => d.stops.length > 0).length,
     [plan.days],
   );
-  const emptyTrailing = days > filledDays && filledDays >= 1;
 
   if (!ready) {
     return <p className="text-ink-soft">Loading your selections…</p>;
@@ -93,7 +91,7 @@ export function PersonalPlanBuilder() {
           <select
             value={days}
             onChange={(e) => {
-              manualDaysLock.current = true;
+              setManualOverride(true);
               setDays(Number(e.target.value));
             }}
             className="mt-1 block border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
@@ -110,15 +108,18 @@ export function PersonalPlanBuilder() {
         </label>
       </div>
 
-      {emptyTrailing ? (
+      {manualOverride && filledDays >= 1 && filledDays < days ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border border-amber/40 bg-amber/[0.1] px-4 py-3">
           <p className="text-sm text-ink">
-            Days {filledDays + 1}–{days} are empty. Shorten to a {filledDays}-day
-            trip?
+            You set {days} days, but the plan only fills {filledDays}. Use the
+            fitted length?
           </p>
           <button
             type="button"
-            onClick={() => setDays(filledDays)}
+            onClick={() => {
+              setManualOverride(false);
+              setDays(filledDays);
+            }}
             className="bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink-soft"
           >
             Use {filledDays} days
@@ -215,19 +216,6 @@ export function PersonalPlanBuilder() {
           </section>
         ))}
       </div>
-
-      {days > 3 && filledDays <= 3 ? (
-        <div className="border border-ink/10 bg-white px-4 py-3 text-sm text-ink-soft">
-          This plan fits in {filledDays || 3} days.{" "}
-          <button
-            type="button"
-            onClick={() => setDays(Math.max(1, filledDays || 3))}
-            className="font-semibold text-amber-deep hover:underline"
-          >
-            Switch to {Math.max(1, filledDays || 3)} days
-          </button>
-        </div>
-      ) : null}
 
       {plan.overflow.length ? (
         <section className="border border-ink/10 bg-paper-deep/40 p-5 sm:p-6">
