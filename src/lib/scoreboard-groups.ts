@@ -8,6 +8,8 @@ export type ScoreboardVote = "want" | "maybe" | "skip";
 export type ScoreboardVoter = {
   key: string;
   name: string;
+  /** Signed-in account that owns this voter seat (required for new joins). */
+  userId?: string;
   /** placeSlug → vote */
   votes: Record<string, ScoreboardVote>;
   joinedAt: string;
@@ -143,6 +145,7 @@ async function saveGroup(group: ScoreboardGroup): Promise<ScoreboardGroup> {
 export async function createScoreboardGroup(input: {
   title: string;
   hostName: string;
+  hostUserId: string;
 }): Promise<{ group: ScoreboardGroup; voterKey: string }> {
   const hostKey = voterKey();
   const group: ScoreboardGroup = {
@@ -157,6 +160,7 @@ export async function createScoreboardGroup(input: {
       {
         key: hostKey,
         name: (input.hostName || "Host").slice(0, 40),
+        userId: input.hostUserId,
         votes: {},
         joinedAt: new Date().toISOString(),
       },
@@ -189,17 +193,33 @@ export async function getScoreboardGroup(shareCode: string) {
 export async function joinScoreboardGroup(
   shareCode: string,
   name: string,
-  existingKey?: string,
+  options?: {
+    existingKey?: string;
+    userId?: string;
+  },
 ): Promise<{ group: ScoreboardGroup; voterKey: string } | null> {
   const group = await getScoreboardGroup(shareCode);
   if (!group) return null;
+
+  const existingKey = options?.existingKey;
+  const userId = options?.userId;
 
   if (existingKey) {
     const found = group.voters.find((v) => v.key === existingKey);
     if (found) {
       found.name = name.slice(0, 40) || found.name;
+      if (userId) found.userId = userId;
       await saveGroup(group);
       return { group, voterKey: found.key };
+    }
+  }
+
+  if (userId) {
+    const byUser = group.voters.find((v) => v.userId === userId);
+    if (byUser) {
+      byUser.name = name.slice(0, 40) || byUser.name;
+      await saveGroup(group);
+      return { group, voterKey: byUser.key };
     }
   }
 
@@ -207,6 +227,7 @@ export async function joinScoreboardGroup(
   group.voters.push({
     key,
     name: (name || "Traveller").slice(0, 40),
+    userId,
     votes: {},
     joinedAt: new Date().toISOString(),
   });

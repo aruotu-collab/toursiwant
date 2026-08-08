@@ -49,14 +49,64 @@ export function GroupScoreboardClient({ code }: Props) {
 
   useEffect(() => {
     const existing = localStorage.getItem(storageKey) || "";
-    if (existing) {
-      setVoterKey(existing);
-      setJoined(true);
-    }
+    if (existing) setVoterKey(existing);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const meRes = await fetch("/api/auth/me");
+        const meData = (await meRes.json()) as {
+          user?: { id: string; name?: string } | null;
+        };
+        if (cancelled) return;
+        if (!meData.user) {
+          // Anonymous votes are no longer allowed — ask them to sign in.
+          setJoined(false);
+          return;
+        }
+        if (meData.user.name && !name) {
+          setName(meData.user.name.split(" ")[0] || "");
+        }
+        if (existing) {
+          // Re-claim seat under this account.
+          const res = await fetch(`/api/scoreboard-groups/${code}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "join",
+              name:
+                meData.user.name?.split(" ")[0] ||
+                name ||
+                "Traveller",
+              voterKey: existing,
+            }),
+          });
+          const data = (await res.json()) as {
+            group?: ScoreboardGroup;
+            voterKey?: string;
+            ranks?: GroupPlaceRank[];
+          };
+          if (res.ok && data.voterKey) {
+            localStorage.setItem(storageKey, data.voterKey);
+            setVoterKey(data.voterKey);
+            if (data.group) setGroup(data.group);
+            if (data.ranks) setRanks(data.ranks);
+            setJoined(true);
+            return;
+          }
+        }
+      } catch {
+        /* keep join panel */
+      }
+    })();
+
     refresh();
     const t = setInterval(refresh, 8000);
-    return () => clearInterval(t);
-  }, [refresh, storageKey]);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [refresh, storageKey, code]);
 
   const me = group?.voters.find((v) => v.key === voterKey);
   const myVotes = me?.votes || {};
@@ -104,6 +154,12 @@ export function GroupScoreboardClient({ code }: Props) {
     [planSlugs, days],
   );
 
+  function signInToVote() {
+    window.location.href = `/join?next=${encodeURIComponent(
+      `/new-york/group/${code}`,
+    )}`;
+  }
+
   async function join() {
     setSaving(true);
     setError("");
@@ -123,6 +179,10 @@ export function GroupScoreboardClient({ code }: Props) {
         ranks?: GroupPlaceRank[];
         error?: string;
       };
+      if (res.status === 401) {
+        signInToVote();
+        return;
+      }
       if (!res.ok || !data.group || !data.voterKey) {
         throw new Error(data.error || "Could not join");
       }
@@ -141,6 +201,7 @@ export function GroupScoreboardClient({ code }: Props) {
   async function vote(slug: string, vote: ScoreboardVote) {
     if (!voterKey) return;
     setSaving(true);
+    setError("");
     try {
       const res = await fetch(`/api/scoreboard-groups/${code}`, {
         method: "POST",
@@ -154,7 +215,16 @@ export function GroupScoreboardClient({ code }: Props) {
       const data = (await res.json()) as {
         group?: ScoreboardGroup;
         ranks?: GroupPlaceRank[];
+        error?: string;
       };
+      if (res.status === 401) {
+        signInToVote();
+        return;
+      }
+      if (!res.ok) {
+        setError(data.error || "Could not save vote — sign in and try again.");
+        return;
+      }
       if (data.group) setGroup(data.group);
       if (data.ranks) setRanks(data.ranks);
     } finally {
@@ -219,11 +289,10 @@ export function GroupScoreboardClient({ code }: Props) {
 
       {!joined ? (
         <div className="border border-amber/40 bg-amber/[0.08] p-5">
-          <p className="font-display text-xl text-ink">
-            What would you like to do?
-          </p>
+          <p className="font-display text-xl text-ink">Sign in to join & vote</p>
           <p className="mt-1 text-sm text-ink-soft">
-            Enter your name, then tap Want / Maybe / Skip on the board.
+            Group voting needs an account so your picks stay with you. My trips
+            only shows trips you build and save after signing in.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <input
@@ -238,7 +307,7 @@ export function GroupScoreboardClient({ code }: Props) {
               onClick={join}
               className="bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              Join & vote
+              {saving ? "Joining…" : "Sign in / Join & vote"}
             </button>
           </div>
           {error ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
@@ -247,6 +316,9 @@ export function GroupScoreboardClient({ code }: Props) {
         <p className="text-sm text-ink-soft">
           Voting as <span className="font-semibold text-ink">{me?.name}</span>
           {saving ? " · saving…" : ""}
+          {error ? (
+            <span className="mt-1 block text-red-700">{error}</span>
+          ) : null}
         </p>
       )}
 

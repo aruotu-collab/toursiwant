@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 import {
   createScoreboardGroup,
   getScoreboardGroup,
@@ -8,13 +9,25 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  }
+
   const body = (await request.json()) as {
     title?: string;
     hostName?: string;
   };
+  const hostName =
+    body.hostName?.trim() ||
+    user.name?.split(" ")[0] ||
+    user.email.split("@")[0] ||
+    "Host";
+
   const { group, voterKey } = await createScoreboardGroup({
     title: body.title || "New York Friends Trip",
-    hostName: body.hostName || "Host",
+    hostName,
+    hostUserId: user.id,
   });
   return NextResponse.json({
     group,

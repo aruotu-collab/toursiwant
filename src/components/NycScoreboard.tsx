@@ -159,6 +159,10 @@ export function NycScoreboard({
     );
   }
 
+  function signInForGroup(nextPath: string) {
+    window.location.href = `/join?next=${encodeURIComponent(nextPath)}`;
+  }
+
   async function createGroup() {
     setCreating(true);
     setGroupError("");
@@ -176,6 +180,10 @@ export function NycScoreboard({
         voterKey?: string;
         error?: string;
       };
+      if (res.status === 401) {
+        signInForGroup("/new-york#board");
+        return;
+      }
       if (!res.ok || !data.group || !data.voterKey) {
         throw new Error(data.error || "Could not create group");
       }
@@ -223,6 +231,10 @@ export function NycScoreboard({
         voterKey?: string;
         error?: string;
       };
+      if (res.status === 401) {
+        signInForGroup(`/new-york/group/${code}`);
+        return;
+      }
       if (!res.ok || !data.group || !data.voterKey) {
         throw new Error(data.error || "Group not found — check the code.");
       }
@@ -313,8 +325,8 @@ export function NycScoreboard({
                 Create group scoreboard
               </p>
               <p className="mt-1 text-sm text-ink-soft">
-                Share one link or code. Everyone picks what they want. Build the
-                trip from the group favourites.
+                Sign in required. Share one link or code — friends sign in, vote
+                Want / Maybe / Skip, then build and save the trip to My trips.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm">
@@ -353,8 +365,8 @@ export function NycScoreboard({
                 Join a group scoreboard
               </p>
               <p className="mt-1 text-sm text-ink-soft">
-                Enter the invite code your host shared (from the group page
-                link).
+                Sign in required. Enter the invite code your host shared, then
+                vote — saving the trip still goes to My trips on your account.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm">
