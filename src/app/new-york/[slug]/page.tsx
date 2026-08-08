@@ -154,7 +154,6 @@ export default async function NewYorkPlacePage({ params, searchParams }: Props) 
             <PlaceWantActions
               slug={place.slug}
               placeName={place.name}
-              lens={lens}
               boardHref={boardHref}
             />
           </aside>

@@ -8,12 +8,10 @@ import { useNycWants } from "@/lib/use-nyc-wants";
 export function PlaceWantActions({
   slug,
   placeName,
-  lens,
   boardHref,
 }: {
   slug: string;
   placeName: string;
-  lens: string;
   boardHref: string;
 }) {
   const { wants, days, ready, toggle, isWanted } = useNycWants();
