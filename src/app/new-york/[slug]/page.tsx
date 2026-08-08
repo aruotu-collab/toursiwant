@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PlaceViatorExperiences } from "@/components/PlaceViatorExperiences";
 import { PlaceVideoPanel } from "@/components/PlaceVideoPanel";
+import { PlaceWantActions } from "@/components/PlaceWantActions";
 import {
   getPlaceBySlug,
   nycPlaces,
@@ -69,8 +70,10 @@ export default async function NewYorkPlacePage({ params, searchParams }: Props) 
     place.whyHigh ||
     `${place.name} scores ${score}/100 on the TIW Scoreboard.`;
 
+  const boardHref = `/new-york?lens=${lens}#board`;
+
   return (
-    <main className="max-w-[100vw] flex-1 overflow-x-clip bg-paper pt-[7.5rem] sm:pt-32">
+    <main className="max-w-[100vw] flex-1 overflow-x-clip bg-paper pb-24 pt-[7.5rem] sm:pt-32 lg:pb-0">
       <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8 sm:py-14">
         <p className="text-sm text-ink-soft">
           <Link href="/new-york" className="hover:text-amber-deep">
@@ -133,11 +136,14 @@ export default async function NewYorkPlacePage({ params, searchParams }: Props) 
             </dl>
           </div>
 
-            <aside className="border border-ink/10 bg-ink px-6 py-7 text-white lg:sticky lg:top-28">
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
-                TIW Score
-              </p>
-              <p className="mt-1 text-xs text-white/55">ToursIWant · 0–100</p>
+          <aside
+            id="place-score-card"
+            className="border border-ink/10 bg-ink px-6 py-7 text-white lg:sticky lg:top-28"
+          >
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
+              TIW Score
+            </p>
+            <p className="mt-1 text-xs text-white/55">ToursIWant · 0–100</p>
             <p className="mt-2 font-display text-6xl leading-none tracking-tight">
               {score}
               <span className="text-3xl text-white/50">/100</span>
@@ -145,12 +151,12 @@ export default async function NewYorkPlacePage({ params, searchParams }: Props) 
             <p className="mt-4 text-sm leading-relaxed text-white/70">
               {explanation}
             </p>
-            <Link
-              href={`/new-york?lens=${lens}#board`}
-              className="mt-6 inline-block border border-white/25 px-4 py-2 text-sm hover:border-amber hover:text-amber"
-            >
-              Back to scoreboard
-            </Link>
+            <PlaceWantActions
+              slug={place.slug}
+              placeName={place.name}
+              lens={lens}
+              boardHref={boardHref}
+            />
           </aside>
         </div>
 
