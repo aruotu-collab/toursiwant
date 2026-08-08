@@ -64,9 +64,7 @@ export function NycScoreboard({
   const [groupOpen, setGroupOpen] = useState(false);
   const [groupMode, setGroupMode] = useState<"create" | "join">("create");
   const [groupTitle, setGroupTitle] = useState("New York Friends Trip");
-  const [hostName, setHostName] = useState("");
   const [joinCode, setJoinCode] = useState("");
-  const [joinName, setJoinName] = useState("");
   const [creating, setCreating] = useState(false);
   const [joining, setJoining] = useState(false);
   const [groupError, setGroupError] = useState("");
@@ -172,7 +170,6 @@ export function NycScoreboard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: groupTitle,
-          hostName: hostName || "Host",
         }),
       });
       const data = (await res.json()) as {
@@ -223,7 +220,6 @@ export function NycScoreboard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "join",
-          name: joinName || "Traveller",
         }),
       });
       const data = (await res.json()) as {
@@ -325,28 +321,17 @@ export function NycScoreboard({
                 Create group scoreboard
               </p>
               <p className="mt-1 text-sm text-ink-soft">
-                Sign in required. Share one link or code — friends sign in, vote
-                Want / Maybe / Skip, then build and save the trip to My trips.
+                Sign in with email first. Friends join with email only — no name
+                to remember — then vote and build the trip.
               </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="block text-sm">
-                  <span className="text-ink-soft">Trip name</span>
-                  <input
-                    value={groupTitle}
-                    onChange={(e) => setGroupTitle(e.target.value)}
-                    className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-ink-soft">Your name</span>
-                  <input
-                    value={hostName}
-                    onChange={(e) => setHostName(e.target.value)}
-                    placeholder="Alex"
-                    className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
-                  />
-                </label>
-              </div>
+              <label className="mt-4 block text-sm sm:max-w-md">
+                <span className="text-ink-soft">Trip name</span>
+                <input
+                  value={groupTitle}
+                  onChange={(e) => setGroupTitle(e.target.value)}
+                  className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
+                />
+              </label>
               {groupError ? (
                 <p className="mt-2 text-sm text-red-700">{groupError}</p>
               ) : null}
@@ -365,32 +350,21 @@ export function NycScoreboard({
                 Join a group scoreboard
               </p>
               <p className="mt-1 text-sm text-ink-soft">
-                Sign in required. Enter the invite code your host shared, then
-                vote — saving the trip still goes to My trips on your account.
+                Sign in with email, then enter the invite code. You&apos;ll vote
+                as your email address.
               </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="block text-sm">
-                  <span className="text-ink-soft">Invite code</span>
-                  <input
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value)}
-                    placeholder="e.g. a1b2c3"
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 font-mono uppercase outline-none focus:border-amber"
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-ink-soft">Your name</span>
-                  <input
-                    value={joinName}
-                    onChange={(e) => setJoinName(e.target.value)}
-                    placeholder="Sam"
-                    className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
-                  />
-                </label>
-              </div>
+              <label className="mt-4 block text-sm sm:max-w-md">
+                <span className="text-ink-soft">Invite code</span>
+                <input
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value)}
+                  placeholder="e.g. a1b2c3"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 font-mono uppercase outline-none focus:border-amber"
+                />
+              </label>
               {groupError ? (
                 <p className="mt-2 text-sm text-red-700">{groupError}</p>
               ) : null}
@@ -400,7 +374,7 @@ export function NycScoreboard({
                 onClick={joinGroupByCode}
                 className="mt-4 bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft disabled:opacity-50"
               >
-                {joining ? "Joining…" : "Join group"}
+                {joining ? "Joining…" : "Join with email"}
               </button>
             </>
           )}

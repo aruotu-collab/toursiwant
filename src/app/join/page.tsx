@@ -12,7 +12,6 @@ function JoinContent() {
   const isOperator = roleParam === "operator";
 
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     emailed: boolean;
@@ -33,9 +32,8 @@ function JoinContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
-          name: name || undefined,
           role: isOperator ? "operator" : "traveller",
-          nextPath: nextPath || (isOperator ? "/operator" : "/"),
+          nextPath: nextPath || (isOperator ? "/operator" : "/scorecard"),
         }),
       });
       const payload = (await response.json()) as {
@@ -68,11 +66,11 @@ function JoinContent() {
           Join ToursIWant
         </p>
         <h1 className="mt-3 font-display text-4xl leading-tight text-ink sm:text-5xl">
-          {isOperator ? "Staff sign-in" : "Continue with email"}
+          {isOperator ? "Staff sign-in" : "Sign in with email"}
         </h1>
         <p className="mt-4 max-w-md text-ink-soft">
-          Use the Scorecard freely. Sign in when you want to save trips to My
-          trips.
+          Just your email — no name, no password. We&apos;ll send a one-tap
+          link.
         </p>
         <div className="mt-8">
           <Link
@@ -89,7 +87,7 @@ function JoinContent() {
           <h2 className="font-display text-2xl text-ink">Check your email</h2>
           <p className="mt-3 text-ink-soft">
             {result.emailed
-              ? `We sent a magic link to ${email}. Open it to join ToursIWant.`
+              ? `We sent a magic link to ${email}. Open it to continue.`
               : `Email delivery isn’t configured yet — use the link below to continue as ${email}.`}
           </p>
           {result.magicUrl ? (
@@ -117,17 +115,6 @@ function JoinContent() {
 
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-ink">
-              Your name
-            </span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Alex"
-              className="w-full border border-ink/15 bg-paper/60 px-3 py-2.5 text-ink outline-none transition focus:border-skyline"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-ink">
               Email
             </span>
             <input
@@ -135,6 +122,7 @@ function JoinContent() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               placeholder="you@email.com"
               className="w-full border border-ink/15 bg-paper/60 px-3 py-2.5 text-ink outline-none transition focus:border-skyline"
             />
@@ -156,8 +144,7 @@ function JoinContent() {
                 : "Email me a sign-in link"}
           </button>
           <p className="text-xs text-stone">
-            No password. One click from your inbox (or the on-screen link while
-            email is being set up).
+            No password and no name to remember — only your email.
           </p>
         </form>
       )}

@@ -4,6 +4,7 @@ import { AccountLogoutButton } from "@/components/AccountLogoutButton";
 import { DeleteSavedTripButton } from "@/components/DeleteSavedTripButton";
 import { getCurrentUser } from "@/lib/auth";
 import { isNycPlanTrip, openSavedTripHref } from "@/lib/saved-trip-kinds";
+import { voterDisplay } from "@/lib/scoreboard-group-plan";
 import { listScoreboardGroupsForUser } from "@/lib/scoreboard-groups";
 import { listSavedTripsForUser } from "@/lib/saved-trips";
 
@@ -145,7 +146,27 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                         {votedPeople}/{g.voters.length} voted · {g.placesWanted}{" "}
                         places with Want · you marked {g.myWantCount} Want
                       </p>
-                      <p className="mt-1 font-mono text-[11px] text-stone">
+                      <ul className="mt-3 space-y-1 text-sm text-ink">
+                        {g.voters.map((v) => {
+                          const votes = Object.keys(v.votes).length;
+                          const wants = Object.values(v.votes).filter(
+                            (x) => x === "want",
+                          ).length;
+                          return (
+                            <li key={v.key} className="flex flex-wrap gap-x-2">
+                              <span className="break-all font-medium">
+                                {voterDisplay(v)}
+                              </span>
+                              <span className="text-stone">
+                                {votes === 0
+                                  ? "· not voted"
+                                  : `· ${wants} want`}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <p className="mt-2 font-mono text-[11px] text-stone">
                         Created {new Date(g.createdAt).toLocaleString()}
                       </p>
                       <div className="mt-4 flex flex-wrap gap-2">

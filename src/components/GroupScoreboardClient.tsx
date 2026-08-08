@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { rankNycPlaces } from "@/lib/nyc-places";
-import { selectGroupPlanSlugs } from "@/lib/scoreboard-group-plan";
+import {
+  selectGroupPlanSlugs,
+  voterDisplay,
+} from "@/lib/scoreboard-group-plan";
 import {
   buildPlanFromSelections,
   MAX_TRIP_DAYS,
@@ -20,7 +23,8 @@ export function GroupScoreboardClient({ code }: Props) {
   const [group, setGroup] = useState<ScoreboardGroup | null>(null);
   const [ranks, setRanks] = useState<GroupPlaceRank[]>([]);
   const [voterKey, setVoterKey] = useState("");
-  const [name, setName] = useState("");
+  const [myEmail, setMyEmail] = useState("");
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [joined, setJoined] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,44 +60,36 @@ export function GroupScoreboardClient({ code }: Props) {
       try {
         const meRes = await fetch("/api/auth/me");
         const meData = (await meRes.json()) as {
-          user?: { id: string; name?: string } | null;
+          user?: { id: string; email?: string } | null;
         };
         if (cancelled) return;
         if (!meData.user) {
-          // Anonymous votes are no longer allowed — ask them to sign in.
+          setSignedIn(false);
           setJoined(false);
           return;
         }
-        if (meData.user.name && !name) {
-          setName(meData.user.name.split(" ")[0] || "");
-        }
-        if (existing) {
-          // Re-claim seat under this account.
-          const res = await fetch(`/api/scoreboard-groups/${code}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "join",
-              name:
-                meData.user.name?.split(" ")[0] ||
-                name ||
-                "Traveller",
-              voterKey: existing,
-            }),
-          });
-          const data = (await res.json()) as {
-            group?: ScoreboardGroup;
-            voterKey?: string;
-            ranks?: GroupPlaceRank[];
-          };
-          if (res.ok && data.voterKey) {
-            localStorage.setItem(storageKey, data.voterKey);
-            setVoterKey(data.voterKey);
-            if (data.group) setGroup(data.group);
-            if (data.ranks) setRanks(data.ranks);
-            setJoined(true);
-            return;
-          }
+        setSignedIn(true);
+        setMyEmail(meData.user.email || "");
+        // Auto-join with the signed-in email — no name step.
+        const res = await fetch(`/api/scoreboard-groups/${code}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "join",
+            voterKey: existing || undefined,
+          }),
+        });
+        const data = (await res.json()) as {
+          group?: ScoreboardGroup;
+          voterKey?: string;
+          ranks?: GroupPlaceRank[];
+        };
+        if (res.ok && data.voterKey) {
+          localStorage.setItem(storageKey, data.voterKey);
+          setVoterKey(data.voterKey);
+          if (data.group) setGroup(data.group);
+          if (data.ranks) setRanks(data.ranks);
+          setJoined(true);
         }
       } catch {
         /* keep join panel */
@@ -158,44 +154,6 @@ export function GroupScoreboardClient({ code }: Props) {
     window.location.href = `/join?next=${encodeURIComponent(
       `/new-york/group/${code}`,
     )}`;
-  }
-
-  async function join() {
-    setSaving(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/scoreboard-groups/${code}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "join",
-          name: name || "Traveller",
-          voterKey: voterKey || undefined,
-        }),
-      });
-      const data = (await res.json()) as {
-        group?: ScoreboardGroup;
-        voterKey?: string;
-        ranks?: GroupPlaceRank[];
-        error?: string;
-      };
-      if (res.status === 401) {
-        signInToVote();
-        return;
-      }
-      if (!res.ok || !data.group || !data.voterKey) {
-        throw new Error(data.error || "Could not join");
-      }
-      localStorage.setItem(storageKey, data.voterKey);
-      setVoterKey(data.voterKey);
-      setGroup(data.group);
-      setRanks(data.ranks || []);
-      setJoined(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Join failed");
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function vote(slug: string, vote: ScoreboardVote) {
@@ -267,7 +225,11 @@ export function GroupScoreboardClient({ code }: Props) {
           <h1 className="mt-2 font-display text-4xl text-ink">{group.title}</h1>
           <p className="mt-2 text-ink-soft">
             {votedCount} of {group.voters.length} people have voted · Host{" "}
-            {group.hostName}
+            {voterDisplay(
+              group.voters.find((v) => v.key === group.hostKey) || {
+                name: group.hostName,
+              },
+            )}
           </p>
         </div>
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
@@ -287,40 +249,78 @@ export function GroupScoreboardClient({ code }: Props) {
         </div>
       </div>
 
-      {!joined ? (
+      {signedIn === false ? (
         <div className="border border-amber/40 bg-amber/[0.08] p-5">
-          <p className="font-display text-xl text-ink">Sign in to join & vote</p>
-          <p className="mt-1 text-sm text-ink-soft">
-            Group voting needs an account so your picks stay with you. My trips
-            only shows trips you build and save after signing in.
+          <p className="font-display text-xl text-ink">
+            Sign in with email to vote
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              className="border border-ink/15 bg-white px-3 py-2 text-sm outline-none focus:border-amber"
-            />
-            <button
-              type="button"
-              disabled={saving}
-              onClick={join}
-              className="bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {saving ? "Joining…" : "Sign in / Join & vote"}
-            </button>
-          </div>
+          <p className="mt-1 text-sm text-ink-soft">
+            Use the same email each time — no name or password. After the magic
+            link, you&apos;ll land back here ready to vote.
+          </p>
+          <button
+            type="button"
+            onClick={signInToVote}
+            className="mt-4 bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft"
+          >
+            Continue with email
+          </button>
           {error ? <p className="mt-2 text-sm text-red-700">{error}</p> : null}
         </div>
+      ) : !joined ? (
+        <p className="text-sm text-ink-soft">
+          {signedIn
+            ? `Joining as ${myEmail || "your email"}…`
+            : "Checking sign-in…"}
+        </p>
       ) : (
         <p className="text-sm text-ink-soft">
-          Voting as <span className="font-semibold text-ink">{me?.name}</span>
+          Voting as{" "}
+          <span className="font-semibold text-ink">
+            {me ? voterDisplay(me) : myEmail || "you"}
+          </span>
           {saving ? " · saving…" : ""}
           {error ? (
             <span className="mt-1 block text-red-700">{error}</span>
           ) : null}
         </p>
       )}
+
+      <div className="border border-ink/10 bg-white p-5">
+        <p className="font-mono text-[11px] uppercase tracking-wider text-amber-deep">
+          Who&apos;s in this group
+        </p>
+        <ul className="mt-3 space-y-2">
+          {group.voters.map((v) => {
+            const votes = Object.keys(v.votes).length;
+            const wants = Object.values(v.votes).filter((x) => x === "want")
+              .length;
+            const isHost = v.key === group.hostKey;
+            return (
+              <li
+                key={v.key}
+                className="flex flex-wrap items-baseline justify-between gap-2 border-t border-ink/8 pt-2 first:border-0 first:pt-0"
+              >
+                <span className="min-w-0">
+                  <span className="font-medium text-ink break-all">
+                    {voterDisplay(v)}
+                  </span>
+                  {isHost ? (
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-amber-deep">
+                      Host
+                    </span>
+                  ) : null}
+                </span>
+                <span className="font-mono text-xs text-stone">
+                  {votes === 0
+                    ? "Not voted yet"
+                    : `${wants} want · ${votes} voted`}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
       {/* Group favourites strip */}
       {favourites.length ? (

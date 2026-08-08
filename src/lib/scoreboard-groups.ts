@@ -7,7 +7,9 @@ export type ScoreboardVote = "want" | "maybe" | "skip";
 
 export type ScoreboardVoter = {
   key: string;
+  /** Display label — prefer email; legacy seats may only have a name. */
   name: string;
+  email?: string;
   /** Signed-in account that owns this voter seat (required for new joins). */
   userId?: string;
   /** placeSlug → vote */
@@ -144,10 +146,13 @@ async function saveGroup(group: ScoreboardGroup): Promise<ScoreboardGroup> {
 
 export async function createScoreboardGroup(input: {
   title: string;
-  hostName: string;
   hostUserId: string;
+  hostEmail: string;
+  hostName?: string;
 }): Promise<{ group: ScoreboardGroup; voterKey: string }> {
   const hostKey = voterKey();
+  const email = input.hostEmail.trim().toLowerCase();
+  const label = (email || input.hostName || "Host").slice(0, 80);
   const group: ScoreboardGroup = {
     id: `sg_${Date.now()}_${code()}`,
     shareCode: code(),
@@ -155,11 +160,12 @@ export async function createScoreboardGroup(input: {
     destination: "new-york",
     createdAt: new Date().toISOString(),
     hostKey,
-    hostName: (input.hostName || "Host").slice(0, 40),
+    hostName: label,
     voters: [
       {
         key: hostKey,
-        name: (input.hostName || "Host").slice(0, 40),
+        name: label,
+        email: email || undefined,
         userId: input.hostUserId,
         votes: {},
         joinedAt: new Date().toISOString(),
@@ -244,41 +250,57 @@ export async function listScoreboardGroupsForUser(
 
 export async function joinScoreboardGroup(
   shareCode: string,
-  name: string,
-  options?: {
+  options: {
+    userId: string;
+    email: string;
     existingKey?: string;
-    userId?: string;
+    name?: string;
   },
 ): Promise<{ group: ScoreboardGroup; voterKey: string } | null> {
   const group = await getScoreboardGroup(shareCode);
   if (!group) return null;
 
-  const existingKey = options?.existingKey;
-  const userId = options?.userId;
+  const email = options.email.trim().toLowerCase();
+  const label = (email || options.name || "Traveller").slice(0, 80);
+  const existingKey = options.existingKey;
+  const userId = options.userId;
 
   if (existingKey) {
     const found = group.voters.find((v) => v.key === existingKey);
     if (found) {
-      found.name = name.slice(0, 40) || found.name;
-      if (userId) found.userId = userId;
+      found.name = label || found.name;
+      found.email = email || found.email;
+      found.userId = userId;
       await saveGroup(group);
       return { group, voterKey: found.key };
     }
   }
 
-  if (userId) {
-    const byUser = group.voters.find((v) => v.userId === userId);
-    if (byUser) {
-      byUser.name = name.slice(0, 40) || byUser.name;
+  const byUser = group.voters.find((v) => v.userId === userId);
+  if (byUser) {
+    byUser.name = label || byUser.name;
+    byUser.email = email || byUser.email;
+    await saveGroup(group);
+    return { group, voterKey: byUser.key };
+  }
+
+  if (email) {
+    const byEmail = group.voters.find(
+      (v) => v.email && v.email.toLowerCase() === email,
+    );
+    if (byEmail) {
+      byEmail.name = label || byEmail.name;
+      byEmail.userId = userId;
       await saveGroup(group);
-      return { group, voterKey: byUser.key };
+      return { group, voterKey: byEmail.key };
     }
   }
 
   const key = voterKey();
   group.voters.push({
     key,
-    name: (name || "Traveller").slice(0, 40),
+    name: label,
+    email: email || undefined,
     userId,
     votes: {},
     joinedAt: new Date().toISOString(),

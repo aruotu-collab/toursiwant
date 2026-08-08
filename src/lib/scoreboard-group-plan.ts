@@ -1,5 +1,9 @@
 /** Client-safe helpers for turning group votes into a plan shortlist. */
 
+export function voterDisplay(v: { email?: string; name?: string }) {
+  return (v.email || v.name || "Traveller").trim();
+}
+
 export type GroupRankLite = {
   slug: string;
   wantCount: number;

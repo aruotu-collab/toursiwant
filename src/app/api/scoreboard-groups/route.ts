@@ -16,18 +16,13 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     title?: string;
-    hostName?: string;
   };
-  const hostName =
-    body.hostName?.trim() ||
-    user.name?.split(" ")[0] ||
-    user.email.split("@")[0] ||
-    "Host";
 
   const { group, voterKey } = await createScoreboardGroup({
     title: body.title || "New York Friends Trip",
-    hostName,
     hostUserId: user.id,
+    hostEmail: user.email,
+    hostName: user.name,
   });
   return NextResponse.json({
     group,

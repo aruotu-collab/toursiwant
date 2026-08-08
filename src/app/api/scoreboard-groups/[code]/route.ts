@@ -33,20 +33,16 @@ export async function POST(request: Request, ctx: Ctx) {
   const { code } = await ctx.params;
   const body = (await request.json()) as {
     action?: "join" | "vote";
-    name?: string;
     voterKey?: string;
     votes?: Record<string, ScoreboardVote>;
   };
 
   if (body.action === "join") {
-    const name =
-      body.name?.trim() ||
-      user.name?.split(" ")[0] ||
-      user.email.split("@")[0] ||
-      "Traveller";
-    const result = await joinScoreboardGroup(code, name, {
-      existingKey: body.voterKey,
+    const result = await joinScoreboardGroup(code, {
       userId: user.id,
+      email: user.email,
+      name: user.name,
+      existingKey: body.voterKey,
     });
     if (!result) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -66,7 +62,6 @@ export async function POST(request: Request, ctx: Ctx) {
       );
     }
 
-    // Ensure this voter seat belongs to the signed-in user (or claim legacy seats).
     const existing = await getScoreboardGroup(code);
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -81,12 +76,12 @@ export async function POST(request: Request, ctx: Ctx) {
         { status: 403 },
       );
     }
-    if (!voter.userId) {
-      voter.userId = user.id;
-      // Persist claim via a no-op name update through join helper path:
-      await joinScoreboardGroup(code, voter.name, {
-        existingKey: voter.key,
+    if (!voter.userId || !voter.email) {
+      await joinScoreboardGroup(code, {
         userId: user.id,
+        email: user.email,
+        name: user.name,
+        existingKey: voter.key,
       });
     }
 
