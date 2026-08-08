@@ -310,9 +310,17 @@ export function PersonalPlanBuilder() {
           Save this trip
         </p>
         <p className="mt-2 max-w-2xl text-sm text-white/70">
-          Keep this built plan in My trips so you can come back later — separate
-          from the live “wants” tray on the scoreboard.
+          You can keep as many New York plans as you want — give each one a
+          different name (e.g. First-timers, Food crawl, With kids). They all
+          show up under My trips.
         </p>
+        {savedTripId ? (
+          <p className="mt-2 text-sm text-amber/90">
+            Editing a saved trip. Use <span className="font-semibold">Update</span>{" "}
+            to overwrite it, or <span className="font-semibold">Save as new</span>{" "}
+            to keep the old one and add another.
+          </p>
+        ) : null}
         <label className="mt-4 block max-w-md">
           <span className="mb-1.5 block font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
             Trip name
@@ -320,7 +328,7 @@ export function PersonalPlanBuilder() {
           <input
             value={tripTitle}
             onChange={(e) => setTripTitle(e.target.value)}
-            placeholder="My New York trip"
+            placeholder="e.g. NYC first-timers · 5 days"
             className="w-full border border-white/25 bg-white/5 px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/35 focus:border-amber"
           />
         </label>
@@ -336,7 +344,7 @@ export function PersonalPlanBuilder() {
               : signedIn === false
                 ? "Sign in to save"
                 : savedTripId
-                  ? "Update saved trip"
+                  ? "Update this trip"
                   : "Save as my trip"}
           </button>
           {savedTripId ? (
@@ -346,15 +354,44 @@ export function PersonalPlanBuilder() {
               onClick={() => saveTrip(true)}
               className="border border-white/25 px-4 py-2.5 text-sm hover:border-amber hover:text-amber disabled:opacity-60"
             >
-              Save as new trip
+              Save as a new trip
             </button>
           ) : null}
           <Link
             href="/account#my-trips"
             className="border border-white/25 px-4 py-2.5 text-sm hover:border-amber hover:text-amber"
           >
-            View My trips
+            View all My trips
           </Link>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3 border-t border-white/15 pt-4">
+          <button
+            type="button"
+            onClick={() => {
+              setSavedTripId(null);
+              setTripTitle("My New York trip");
+              setStatus(
+                "Detached from the saved trip. Rename, tweak places, then Save as my trip for another entry in My trips.",
+              );
+              router.replace(`/new-york/plan?days=${days}`, { scroll: false });
+            }}
+            className="text-sm text-white/70 underline-offset-2 hover:text-amber hover:underline"
+          >
+            Start another trip (keep these places)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              clear();
+              setSavedTripId(null);
+              setTripTitle("My New York trip");
+              setStatus("");
+              router.push("/new-york#board");
+            }}
+            className="text-sm text-white/70 underline-offset-2 hover:text-amber hover:underline"
+          >
+            Clear &amp; pick a fresh set on the scoreboard
+          </button>
         </div>
         {status ? (
           <p className="mt-3 text-sm text-amber">{status}</p>
