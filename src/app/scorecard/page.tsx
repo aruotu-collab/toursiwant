@@ -21,7 +21,7 @@ export default function ScorecardPage() {
           <ScorecardLeaderboardCompare />
         </div>
 
-        <h1 className="mt-8 max-w-3xl font-display text-[clamp(1.65rem,3.5vw,2.35rem)] leading-[1.05] tracking-tight text-ink">
+        <h1 className="mt-8 max-w-3xl font-display text-xl leading-snug tracking-tight text-ink sm:text-2xl">
           Where are you going?
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-soft sm:text-lg">
