@@ -173,10 +173,16 @@ export function TripsHome() {
             Tours<span className="text-amber">I</span>Want
           </p>
           <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
-            United States · Proven trips
+            Scoreboard for things to do
           </p>
         </button>
         <nav className="flex items-center gap-3 text-sm text-white/70">
+          <Link
+            href="/new-york"
+            className="hidden font-semibold text-amber hover:text-white sm:inline"
+          >
+            NY Scoreboard
+          </Link>
           <button
             type="button"
             onClick={() => setDoor("explore")}
@@ -210,15 +216,33 @@ export function TripsHome() {
               className="mt-6 max-w-2xl font-display text-[clamp(1.35rem,3.5vw,2.15rem)] leading-snug text-white/90"
               style={{ animation: "rise-in 0.7s ease-out 0.08s both" }}
             >
-              Start with a USA trip that already works. Then make it yours.
+              The scoreboard for things to do.
             </h1>
             <p
               className="mt-4 max-w-xl text-base leading-relaxed text-white/65 sm:text-lg"
               style={{ animation: "rise-in 0.7s ease-out 0.14s both" }}
             >
-              Proven templates for American cities, multi-city routes, and
-              right-now plans from your hotel — not a blank itinerary.
+              See what&apos;s worth doing in a city — ranked with a transparent
+              TIW Score. Then shortlist, plan, and book.
             </p>
+            <div
+              className="mt-8 flex flex-wrap gap-3"
+              style={{ animation: "rise-in 0.7s ease-out 0.18s both" }}
+            >
+              <Link
+                href="/new-york"
+                className="bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
+              >
+                New York Scoreboard
+              </Link>
+              <button
+                type="button"
+                onClick={() => setDoor("explore")}
+                className="border border-white/25 px-5 py-3 text-sm font-semibold text-white hover:border-amber hover:text-amber"
+              >
+                Browse trip templates
+              </button>
+            </div>
             <div
               className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
               style={{ animation: "rise-in 0.7s ease-out 0.2s both" }}

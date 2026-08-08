@@ -26,6 +26,16 @@ export function SiteHeader() {
         </div>
         <nav className="flex shrink-0 items-center gap-2 text-sm text-ink-soft sm:gap-4">
           <Link
+            href="/new-york"
+            className={`transition hover:text-ink ${
+              pathname?.startsWith("/new-york")
+                ? "font-semibold text-ink"
+                : "hidden sm:inline"
+            }`}
+          >
+            NY Scoreboard
+          </Link>
+          <Link
             href="/?door=explore"
             className="hidden transition hover:text-ink sm:inline"
           >

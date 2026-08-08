@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { nycPlaces } from "@/lib/nyc-places";
 import { tripTemplates } from "@/lib/trip-templates";
 
 const siteUrl =
@@ -8,21 +9,31 @@ const siteUrl =
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-  const staticRoutes: MetadataRoute.Sitemap = ["", "/account", "/join"].map(
-    (path) => ({
-      url: `${siteUrl}${path}`,
-      lastModified: now,
-      changeFrequency: path === "" ? "daily" : "monthly",
-      priority: path === "" ? 1 : 0.5,
-    }),
-  );
+  const staticRoutes: MetadataRoute.Sitemap = [
+    "",
+    "/new-york",
+    "/account",
+    "/join",
+  ].map((path) => ({
+    url: `${siteUrl}${path}`,
+    lastModified: now,
+    changeFrequency: path === "" || path === "/new-york" ? "daily" : "monthly",
+    priority: path === "" || path === "/new-york" ? 1 : 0.5,
+  }));
+
+  const scoreboardRoutes: MetadataRoute.Sitemap = nycPlaces.map((p) => ({
+    url: `${siteUrl}/new-york/${p.slug}`,
+    lastModified: now,
+    changeFrequency: "weekly" as const,
+    priority: 0.85,
+  }));
 
   const tripRoutes: MetadataRoute.Sitemap = tripTemplates.map((t) => ({
     url: `${siteUrl}/trips/${t.slug}`,
     lastModified: now,
     changeFrequency: "weekly" as const,
-    priority: 0.9,
+    priority: 0.7,
   }));
 
-  return [...staticRoutes, ...tripRoutes];
+  return [...staticRoutes, ...scoreboardRoutes, ...tripRoutes];
 }
