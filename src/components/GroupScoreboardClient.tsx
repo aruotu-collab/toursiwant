@@ -19,6 +19,16 @@ import type {
 
 type Props = { code: string };
 
+type SortKey = "vote" | "place" | "tiw" | "group" | "fit";
+type SortDir = "asc" | "desc";
+
+const voteRank: Record<ScoreboardVote | "", number> = {
+  want: 3,
+  maybe: 2,
+  skip: 1,
+  "": 0,
+};
+
 export function GroupScoreboardClient({ code }: Props) {
   const [group, setGroup] = useState<ScoreboardGroup | null>(null);
   const [ranks, setRanks] = useState<GroupPlaceRank[]>([]);
@@ -31,6 +41,8 @@ export function GroupScoreboardClient({ code }: Props) {
   const [copied, setCopied] = useState(false);
   const [days, setDays] = useState(3);
   const [saving, setSaving] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("fit");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const storageKey = `tiw_group_voter_${code}`;
 
@@ -112,35 +124,80 @@ export function GroupScoreboardClient({ code }: Props) {
   const groupBoard = useMemo(() => {
     const bySlug = new Map(ranks.map((r) => [r.slug, r]));
     // Include all places; unvoted show 0
-    return board
-      .map((p) => {
-        const g = bySlug.get(p.slug);
-        const want = g?.wantCount || 0;
-        const maybe = g?.maybeCount || 0;
-        const voters = group?.voters.length || 1;
-        const support = g?.supportPercent ?? 0;
-        const groupFit = Math.round(
-          p.tiwScore * 0.45 + support * 0.55,
-        );
-        return {
-          ...p,
-          wantCount: want,
-          maybeCount: maybe,
-          skipCount: g?.skipCount || 0,
-          supportPercent: support,
-          groupFit,
-          votersTotal: voters,
-        };
-      })
-      .sort(
-        (a, b) =>
-          b.wantCount - a.wantCount ||
-          b.groupFit - a.groupFit ||
-          b.tiwScore - a.tiwScore,
-      );
-  }, [board, ranks, group?.voters.length]);
+    const rows = board.map((p) => {
+      const g = bySlug.get(p.slug);
+      const want = g?.wantCount || 0;
+      const maybe = g?.maybeCount || 0;
+      const voters = group?.voters.length || 1;
+      const support = g?.supportPercent ?? 0;
+      const groupFit = Math.round(p.tiwScore * 0.45 + support * 0.55);
+      return {
+        ...p,
+        wantCount: want,
+        maybeCount: maybe,
+        skipCount: g?.skipCount || 0,
+        supportPercent: support,
+        groupFit,
+        votersTotal: voters,
+      };
+    });
 
-  const favourites = groupBoard.filter((p) => p.wantCount > 0);
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "vote":
+          cmp =
+            voteRank[myVotes[a.slug] || ""] - voteRank[myVotes[b.slug] || ""];
+          break;
+        case "place":
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case "tiw":
+          cmp = a.tiwScore - b.tiwScore;
+          break;
+        case "group":
+          cmp =
+            a.wantCount - b.wantCount ||
+            a.maybeCount - b.maybeCount ||
+            a.supportPercent - b.supportPercent;
+          break;
+        case "fit":
+        default:
+          cmp =
+            a.groupFit - b.groupFit ||
+            a.wantCount - b.wantCount ||
+            a.tiwScore - b.tiwScore;
+          break;
+      }
+      if (cmp !== 0) return cmp * dir;
+      return a.name.localeCompare(b.name);
+    });
+  }, [board, ranks, group?.voters.length, sortKey, sortDir, myVotes]);
+
+  const favourites = useMemo(
+    () =>
+      [...groupBoard]
+        .filter((p) => p.wantCount > 0)
+        .sort(
+          (a, b) =>
+            b.wantCount - a.wantCount ||
+            b.groupFit - a.groupFit ||
+            b.tiwScore - a.tiwScore,
+        ),
+    [groupBoard],
+  );
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(
+      key === "place" || key === "vote" ? "asc" : "desc",
+    );
+  }
   const planSlugs = useMemo(
     () => selectGroupPlanSlugs(groupBoard),
     [groupBoard],
@@ -355,12 +412,53 @@ export function GroupScoreboardClient({ code }: Props) {
       ) : null}
 
       <div className="overflow-hidden border border-ink/10 bg-white">
-        <div className="hidden grid-cols-[5.5rem_1fr_4.5rem_5.5rem_7rem] gap-3 border-b border-ink/10 bg-paper-deep/60 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-stone sm:grid sm:px-5">
-          <span>Your vote</span>
-          <span>Place</span>
-          <span className="text-right">TIW</span>
-          <span className="text-right">Group</span>
-          <span className="text-right">Group Fit</span>
+        <div className="flex gap-2 overflow-x-auto overscroll-x-contain border-b border-ink/10 bg-paper-deep/40 px-3 py-2 sm:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {(
+            [
+              ["vote", "Your vote"],
+              ["place", "Place"],
+              ["tiw", "TIW"],
+              ["group", "Group"],
+              ["fit", "Group Fit"],
+            ] as Array<[SortKey, string]>
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => toggleSort(key)}
+              className={`shrink-0 border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${
+                sortKey === key
+                  ? "border-amber bg-amber text-ink"
+                  : "border-ink/15 bg-white text-stone"
+              }`}
+            >
+              {label}
+              {sortKey === key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+            </button>
+          ))}
+        </div>
+        <div className="hidden grid-cols-[5.5rem_1fr_4.5rem_5.5rem_7rem] gap-3 border-b border-ink/10 bg-paper-deep/60 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-stone sm:grid sm:px-5">
+          {(
+            [
+              ["vote", "Your vote", "text-left"],
+              ["place", "Place", "text-left"],
+              ["tiw", "TIW", "text-right"],
+              ["group", "Group", "text-right"],
+              ["fit", "Group Fit", "text-right"],
+            ] as Array<[SortKey, string, string]>
+          ).map(([key, label, align]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => toggleSort(key)}
+              className={`${align} font-mono text-[10px] uppercase tracking-[0.14em] transition hover:text-ink ${
+                sortKey === key ? "text-amber-deep" : "text-stone"
+              }`}
+            >
+              {label}
+              {sortKey === key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+            </button>
+          ))}
         </div>
         <ol>
           {groupBoard.map((p, i) => {
