@@ -16,3 +16,27 @@ export function sampleLikeBase(slug: string, tiwScore: number): number {
 export function formatLikeCount(n: number): string {
   return Math.max(0, Math.round(n)).toLocaleString("en-US");
 }
+
+/** Compact counts for hub cards: 21400 → "21.4k", 98000 → "98k". */
+export function formatCompactCount(n: number): string {
+  const v = Math.max(0, Math.round(n));
+  if (v >= 1_000_000) {
+    const m = v / 1_000_000;
+    return `${m >= 10 ? Math.round(m) : m.toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  if (v >= 1000) {
+    const k = v / 1000;
+    return `${k >= 10 ? Math.round(k) : k.toFixed(1).replace(/\.0$/, "")}k`;
+  }
+  return formatLikeCount(v);
+}
+
+/** Stable sample “explorers” for a destination hub card. */
+export function sampleExplorerBase(destinationId: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < destinationId.length; i++) {
+    h ^= destinationId.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return 14_200 + ((h >>> 0) % 12_800); // ~14k–27k
+}

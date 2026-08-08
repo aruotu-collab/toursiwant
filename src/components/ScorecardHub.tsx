@@ -147,11 +147,20 @@ export function ScorecardHub() {
                 <p className="mt-2 text-sm leading-relaxed text-ink-soft">
                   {d.blurb}
                 </p>
+                {live && d.stats ? (
+                  <p className="mt-4 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] uppercase tracking-[0.12em] text-stone">
+                    <span>{d.stats.placesLabel}</span>
+                    <span>{d.stats.likesLabel}</span>
+                    <span>{d.stats.explorersLabel}</span>
+                    {d.stats.topScoreLabel ? (
+                      <span className="text-amber-deep">{d.stats.topScoreLabel}</span>
+                    ) : null}
+                  </p>
+                ) : null}
                 <p className="mt-4 text-sm font-semibold">
                   {live ? (
                     <span className="text-amber-deep">
-                      Open scorecard
-                      {d.placeCount ? ` · ${d.placeCount} places` : ""} →
+                      {d.cta || "Open scorecard"} →
                     </span>
                   ) : (
                     <span className="text-stone">Coming soon</span>

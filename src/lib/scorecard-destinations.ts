@@ -1,4 +1,16 @@
-import { nycPlaces } from "@/lib/nyc-places";
+import { rankNycPlaces } from "@/lib/nyc-places";
+import {
+  formatCompactCount,
+  sampleExplorerBase,
+  sampleLikeBase,
+} from "@/lib/sample-likes";
+
+export type ScorecardDestinationStats = {
+  placesLabel: string;
+  likesLabel: string;
+  explorersLabel: string;
+  topScoreLabel?: string;
+};
 
 export type ScorecardDestination = {
   id: string;
@@ -9,7 +21,34 @@ export type ScorecardDestination = {
   href: string | null;
   placeCount?: number;
   blurb: string;
+  /** Social proof + board teaser for live destinations */
+  stats?: ScorecardDestinationStats;
+  cta?: string;
 };
+
+function nycLiveCard() {
+  const ranked = rankNycPlaces("overall");
+  const likes = ranked.reduce(
+    (sum, p) => sum + sampleLikeBase(p.slug, p.tiwScore),
+    0,
+  );
+  const top = ranked[0]?.tiwScore;
+  return {
+    placeCount: ranked.length,
+    blurb:
+      "Icons, neighborhoods, and hidden gems — ranked so you know what's worth your days.",
+    stats: {
+      placesLabel: `${ranked.length} places ranked`,
+      likesLabel: `${formatCompactCount(likes)} likes`,
+      explorersLabel: `${formatCompactCount(sampleExplorerBase("new-york-ny"))} explorers`,
+      topScoreLabel:
+        typeof top === "number" ? `Top score ${Math.round(top)}` : undefined,
+    } satisfies ScorecardDestinationStats,
+    cta: "See what's worth doing",
+  };
+}
+
+const nyc = nycLiveCard();
 
 /** Destinations people can open from the Scorecard hub. */
 export const scorecardDestinations: ScorecardDestination[] = [
@@ -19,8 +58,10 @@ export const scorecardDestinations: ScorecardDestination[] = [
     state: "New York",
     city: "New York City",
     href: "/new-york",
-    placeCount: nycPlaces.length,
-    blurb: "TIW Scorecard live — rank places, shortlist, and build a trip.",
+    placeCount: nyc.placeCount,
+    blurb: nyc.blurb,
+    stats: nyc.stats,
+    cta: nyc.cta,
   },
   {
     id: "los-angeles-ca",
