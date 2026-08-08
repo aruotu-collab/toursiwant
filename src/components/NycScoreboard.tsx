@@ -9,6 +9,7 @@ import {
   type RankedPlace,
 } from "@/lib/nyc-places";
 import { suggestedDaysForSelections } from "@/lib/scoreboard-plan";
+import { saveNycPlanTrip } from "@/lib/save-nyc-plan";
 import {
   interestLenses,
   practicalLenses,
@@ -41,12 +42,25 @@ export function NycScoreboard({
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [query, setQuery] = useState("");
-  const { wants, days, ready, toggle, clear, isWanted, setDays } = useNycWants();
+  const {
+    wants,
+    days,
+    dayAssignments,
+    ready,
+    toggle,
+    clear,
+    isWanted,
+    setDays,
+  } = useNycWants();
   const [groupOpen, setGroupOpen] = useState(false);
   const [groupTitle, setGroupTitle] = useState("New York Friends Trip");
   const [hostName, setHostName] = useState("");
   const [creating, setCreating] = useState(false);
   const [groupError, setGroupError] = useState("");
+  const [clearAsk, setClearAsk] = useState(false);
+  const [clearTitle, setClearTitle] = useState("");
+  const [clearBusy, setClearBusy] = useState(false);
+  const [clearStatus, setClearStatus] = useState("");
 
   const projectedDays = useMemo(
     () => (wants.length ? suggestedDaysForSelections(wants) : days),
@@ -434,56 +448,157 @@ export function NycScoreboard({
       </p>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink/15 bg-ink text-white shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-8">
-          <div className="min-w-0">
-            <p className="font-display text-lg">
-              {wants.length} place{wants.length === 1 ? "" : "s"} selected
-            </p>
-            {wants.length ? (
-              <p className="mt-0.5 text-sm text-amber">
-                Your trip is now {projectedDays} day
-                {projectedDays === 1 ? "" : "s"} to fit all selections
-              </p>
-            ) : (
-              <p className="text-xs text-white/55">
-                Tap Want to go on places you like.
-              </p>
-            )}
-            {wants.length ? (
-              <p className="mt-0.5 text-xs text-white/50">
-                Days update as you select — then build when you&apos;re ready.
-              </p>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {wants.length ? (
-              <button
-                type="button"
-                onClick={clear}
-                className="border border-white/25 px-3 py-2 text-sm hover:border-amber hover:text-amber"
-              >
-                Clear
-              </button>
-            ) : null}
-            <Link
-              href={
-                wants.length
-                  ? `/new-york/plan?days=${projectedDays}`
-                  : "/new-york/plan"
-              }
-              className={`px-4 py-2 text-sm font-semibold ${
-                wants.length
-                  ? "bg-amber text-ink hover:bg-amber-deep"
-                  : "cursor-not-allowed bg-white/20 text-white/50"
-              }`}
-              aria-disabled={!wants.length}
-              onClick={(e) => {
-                if (!wants.length) e.preventDefault();
-              }}
-            >
-              Build my {projectedDays}-day trip
-            </Link>
-          </div>
+        <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-8">
+          {clearAsk && wants.length ? (
+            <div className="space-y-3">
+              <div>
+                <p className="font-display text-lg">Save before starting fresh?</p>
+                <p className="mt-1 text-sm text-white/65">
+                  Keep these {wants.length} places in My trips, then clear the
+                  tray so you can build another New York trip.
+                </p>
+              </div>
+              <label className="block max-w-md">
+                <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+                  Trip name
+                </span>
+                <input
+                  value={clearTitle}
+                  onChange={(e) => setClearTitle(e.target.value)}
+                  className="w-full border border-white/25 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-white/35 focus:border-amber"
+                  placeholder={`New York · ${projectedDays} days`}
+                />
+              </label>
+              {clearStatus ? (
+                <p className="text-sm text-amber">{clearStatus}</p>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={clearBusy}
+                  onClick={async () => {
+                    setClearBusy(true);
+                    setClearStatus("");
+                    try {
+                      const trip = await saveNycPlanTrip({
+                        title:
+                          clearTitle.trim() ||
+                          `New York · ${projectedDays} days`,
+                        placeSlugs: wants,
+                        planDays: projectedDays,
+                        dayAssignments,
+                      });
+                      clear();
+                      setClearAsk(false);
+                      setClearStatus(`Saved “${trip.title}” — tray cleared.`);
+                    } catch (e) {
+                      if (e instanceof Error && e.message === "SIGN_IN_REQUIRED") {
+                        const next = encodeURIComponent("/new-york#board");
+                        window.location.href = `/join?next=${next}`;
+                        return;
+                      }
+                      setClearStatus(
+                        e instanceof Error ? e.message : "Could not save trip",
+                      );
+                    } finally {
+                      setClearBusy(false);
+                    }
+                  }}
+                  className="bg-amber px-4 py-2 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-60"
+                >
+                  {clearBusy ? "Saving…" : "Save & clear"}
+                </button>
+                <button
+                  type="button"
+                  disabled={clearBusy}
+                  onClick={() => {
+                    clear();
+                    setClearAsk(false);
+                    setClearStatus("");
+                  }}
+                  className="border border-white/25 px-3 py-2 text-sm hover:border-amber hover:text-amber disabled:opacity-60"
+                >
+                  Clear without saving
+                </button>
+                <button
+                  type="button"
+                  disabled={clearBusy}
+                  onClick={() => {
+                    setClearAsk(false);
+                    setClearStatus("");
+                  }}
+                  className="px-3 py-2 text-sm text-white/70 hover:text-white disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <Link
+                  href="/account#my-trips"
+                  className="px-3 py-2 text-sm text-white/70 underline-offset-2 hover:text-amber hover:underline"
+                >
+                  View My trips
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-display text-lg">
+                  {wants.length} place{wants.length === 1 ? "" : "s"} selected
+                </p>
+                {wants.length ? (
+                  <p className="mt-0.5 text-sm text-amber">
+                    Your trip is now {projectedDays} day
+                    {projectedDays === 1 ? "" : "s"} to fit all selections
+                  </p>
+                ) : (
+                  <p className="text-xs text-white/55">
+                    Tap Want to go on places you like.
+                  </p>
+                )}
+                {wants.length ? (
+                  <p className="mt-0.5 text-xs text-white/50">
+                    Days update as you select — then build when you&apos;re
+                    ready.
+                  </p>
+                ) : clearStatus ? (
+                  <p className="mt-0.5 text-sm text-amber">{clearStatus}</p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {wants.length ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClearTitle(`New York · ${projectedDays} days`);
+                      setClearStatus("");
+                      setClearAsk(true);
+                    }}
+                    className="border border-white/25 px-3 py-2 text-sm hover:border-amber hover:text-amber"
+                  >
+                    Clear
+                  </button>
+                ) : null}
+                <Link
+                  href={
+                    wants.length
+                      ? `/new-york/plan?days=${projectedDays}`
+                      : "/new-york/plan"
+                  }
+                  className={`px-4 py-2 text-sm font-semibold ${
+                    wants.length
+                      ? "bg-amber text-ink hover:bg-amber-deep"
+                      : "cursor-not-allowed bg-white/20 text-white/50"
+                  }`}
+                  aria-disabled={!wants.length}
+                  onClick={(e) => {
+                    if (!wants.length) e.preventDefault();
+                  }}
+                >
+                  Build my {projectedDays}-day trip
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
