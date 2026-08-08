@@ -452,10 +452,13 @@ export function NycScoreboard({
           {clearAsk && wants.length ? (
             <div className="space-y-3">
               <div>
-                <p className="font-display text-lg">Save before starting fresh?</p>
+                <p className="font-display text-lg">
+                  Start a new trip — save this one first?
+                </p>
                 <p className="mt-1 text-sm text-white/65">
-                  Keep these {wants.length} places in My trips, then clear the
-                  tray so you can build another New York trip.
+                  Nothing is deleted until you choose. Save these{" "}
+                  {wants.length} places to My trips, or discard them and start
+                  over.
                 </p>
               </div>
               <label className="block max-w-md">
@@ -490,7 +493,9 @@ export function NycScoreboard({
                       });
                       clear();
                       setClearAsk(false);
-                      setClearStatus(`Saved “${trip.title}” — tray cleared.`);
+                      setClearStatus(
+                        `Saved “${trip.title}” — ready for a new selection.`,
+                      );
                     } catch (e) {
                       if (e instanceof Error && e.message === "SIGN_IN_REQUIRED") {
                         const next = encodeURIComponent("/new-york#board");
@@ -506,7 +511,7 @@ export function NycScoreboard({
                   }}
                   className="bg-amber px-4 py-2 text-sm font-semibold text-ink hover:bg-amber-deep disabled:opacity-60"
                 >
-                  {clearBusy ? "Saving…" : "Save & clear"}
+                  {clearBusy ? "Saving…" : "Save to My trips & start new"}
                 </button>
                 <button
                   type="button"
@@ -518,7 +523,7 @@ export function NycScoreboard({
                   }}
                   className="border border-white/25 px-3 py-2 text-sm hover:border-amber hover:text-amber disabled:opacity-60"
                 >
-                  Clear without saving
+                  Discard & start new
                 </button>
                 <button
                   type="button"
@@ -529,7 +534,7 @@ export function NycScoreboard({
                   }}
                   className="px-3 py-2 text-sm text-white/70 hover:text-white disabled:opacity-60"
                 >
-                  Cancel
+                  Keep selecting
                 </button>
                 <Link
                   href="/account#my-trips"
@@ -557,8 +562,8 @@ export function NycScoreboard({
                 )}
                 {wants.length ? (
                   <p className="mt-0.5 text-xs text-white/50">
-                    Days update as you select — then build when you&apos;re
-                    ready.
+                    Build when ready — or start a new trip (you can save this
+                    selection first).
                   </p>
                 ) : clearStatus ? (
                   <p className="mt-0.5 text-sm text-amber">{clearStatus}</p>
@@ -573,9 +578,10 @@ export function NycScoreboard({
                       setClearStatus("");
                       setClearAsk(true);
                     }}
+                    title="Does not delete immediately — you can save this selection to My trips first"
                     className="border border-white/25 px-3 py-2 text-sm hover:border-amber hover:text-amber"
                   >
-                    Clear
+                    Start new trip
                   </button>
                 ) : null}
                 <Link
