@@ -190,6 +190,58 @@ export async function getScoreboardGroup(shareCode: string) {
   );
 }
 
+async function listRecentGroups(limit = 300): Promise<ScoreboardGroup[]> {
+  if (hasDatabase()) {
+    await ensureTable();
+    const sql = getSql();
+    const rows = await sql`
+      SELECT * FROM scoreboard_groups
+      ORDER BY updated_at DESC
+      LIMIT ${limit}
+    `;
+    return (rows as Array<Parameters<typeof fromRow>[0]>).map(fromRow);
+  }
+  const store = await readFileStore();
+  return store.groups.slice(0, limit);
+}
+
+export type UserScoreboardGroup = ScoreboardGroup & {
+  role: "host" | "member";
+  myWantCount: number;
+  totalWantVotes: number;
+  placesWanted: number;
+};
+
+/** Groups this account created or joined (for My trips). */
+export async function listScoreboardGroupsForUser(
+  userId: string,
+): Promise<UserScoreboardGroup[]> {
+  const groups = await listRecentGroups(400);
+  const mine: UserScoreboardGroup[] = [];
+
+  for (const group of groups) {
+    const me = group.voters.find((v) => v.userId === userId);
+    if (!me) continue;
+    const ranks = rankGroupPlaces(group);
+    const placesWanted = ranks.filter((r) => r.wantCount > 0).length;
+    const totalWantVotes = ranks.reduce((n, r) => n + r.wantCount, 0);
+    const myWantCount = Object.values(me.votes).filter((v) => v === "want")
+      .length;
+    mine.push({
+      ...group,
+      role: me.key === group.hostKey ? "host" : "member",
+      myWantCount,
+      totalWantVotes,
+      placesWanted,
+    });
+  }
+
+  return mine.sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
 export async function joinScoreboardGroup(
   shareCode: string,
   name: string,
