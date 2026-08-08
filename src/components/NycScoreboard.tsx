@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   costBandSortValue,
   placeMatchesCategory,
   rankNycPlaces,
   type RankedPlace,
 } from "@/lib/nyc-places";
+import { suggestedDaysForSelections } from "@/lib/scoreboard-plan";
 import {
   interestLenses,
   practicalLenses,
@@ -40,12 +41,23 @@ export function NycScoreboard({
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [query, setQuery] = useState("");
-  const { wants, days, ready, toggle, clear, isWanted } = useNycWants();
+  const { wants, days, ready, toggle, clear, isWanted, setDays } = useNycWants();
   const [groupOpen, setGroupOpen] = useState(false);
   const [groupTitle, setGroupTitle] = useState("New York Friends Trip");
   const [hostName, setHostName] = useState("");
   const [creating, setCreating] = useState(false);
   const [groupError, setGroupError] = useState("");
+
+  const projectedDays = useMemo(
+    () => (wants.length ? suggestedDaysForSelections(wants) : days),
+    [wants, days],
+  );
+
+  // Keep saved trip length in sync while picking on the scoreboard.
+  useEffect(() => {
+    if (!ready || !wants.length) return;
+    if (projectedDays !== days) setDays(projectedDays);
+  }, [ready, wants, projectedDays, days, setDays]);
 
   const ranked = useMemo(() => rankNycPlaces(lens), [lens]);
 
@@ -423,15 +435,25 @@ export function NycScoreboard({
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink/15 bg-ink text-white shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-8">
-          <div>
+          <div className="min-w-0">
             <p className="font-display text-lg">
               {wants.length} place{wants.length === 1 ? "" : "s"} selected
             </p>
-            <p className="text-xs text-white/55">
-              {wants.length
-                ? `${days}-day plan ready — add more wants anytime, then rebuild.`
-                : "Tap Want to go on places you like."}
-            </p>
+            {wants.length ? (
+              <p className="mt-0.5 text-sm text-amber">
+                Your trip is now {projectedDays} day
+                {projectedDays === 1 ? "" : "s"} to fit all selections
+              </p>
+            ) : (
+              <p className="text-xs text-white/55">
+                Tap Want to go on places you like.
+              </p>
+            )}
+            {wants.length ? (
+              <p className="mt-0.5 text-xs text-white/50">
+                Days update as you select — then build when you&apos;re ready.
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             {wants.length ? (
@@ -446,7 +468,7 @@ export function NycScoreboard({
             <Link
               href={
                 wants.length
-                  ? `/new-york/plan?days=${days}`
+                  ? `/new-york/plan?days=${projectedDays}`
                   : "/new-york/plan"
               }
               className={`px-4 py-2 text-sm font-semibold ${
@@ -459,7 +481,7 @@ export function NycScoreboard({
                 if (!wants.length) e.preventDefault();
               }}
             >
-              Build my {days}-day trip
+              Build my {projectedDays}-day trip
             </Link>
           </div>
         </div>
