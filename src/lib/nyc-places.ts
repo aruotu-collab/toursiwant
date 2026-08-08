@@ -152,7 +152,15 @@ export const nycPlaces: NycPlace[] = [
     typicalCostLabel: "Free",
     durationLabel: "1–2 hours",
     bestFor: ["Free", "Photography", "Walking"],
-    tags: ["first-time", "free", "walking", "photography", "views", "couples"],
+    tags: [
+      "first-time",
+      "free",
+      "walking",
+      "photography",
+      "views",
+      "couples",
+      "history",
+    ],
     factors: {
       travellerSatisfaction: 94,
       popularity: 96,
@@ -402,7 +410,7 @@ export const nycPlaces: NycPlace[] = [
     typicalCostLabel: "Free",
     durationLabel: "45–90 min",
     bestFor: ["Free", "Architecture", "Rainy day"],
-    tags: ["free", "culture", "rainy-day", "first-time", "photography"],
+    tags: ["free", "culture", "history", "rainy-day", "first-time", "photography"],
     factors: {
       travellerSatisfaction: 90,
       popularity: 88,
@@ -1041,7 +1049,7 @@ export const nycPlaces: NycPlace[] = [
     typicalCostLabel: "Free",
     durationLabel: "30–60 min",
     bestFor: ["Free", "Culture", "Low walking"],
-    tags: ["free", "culture", "rainy-day"],
+    tags: ["free", "culture", "history", "rainy-day"],
     factors: {
       travellerSatisfaction: 88,
       popularity: 86,
@@ -1167,8 +1175,10 @@ function matchesLens(place: NycPlace, lens: ScoreboardLens): boolean {
       return place.tags.includes("views");
     case "food":
       return place.tags.includes("food");
+    case "history":
+      return place.tags.includes("history");
     case "culture":
-      return place.tags.includes("culture") || place.tags.includes("history");
+      return place.tags.includes("culture");
     case "families":
       return place.tags.includes("family") || place.factors.familyAppeal >= 85;
     case "couples":

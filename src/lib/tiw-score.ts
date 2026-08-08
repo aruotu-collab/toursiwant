@@ -23,11 +23,32 @@ export type ScoreboardLens =
   | "views"
   | "food"
   | "culture"
+  | "history"
   | "low_walking"
   | "under_50"
   | "first_visit"
   | "evening"
   | "rainy_day";
+
+/** Interest sorts — pick History, then Art & culture, etc. while building a trip. */
+export const interestLenses: ScoreboardLens[] = [
+  "history",
+  "culture",
+  "food",
+  "views",
+  "evening",
+  "rainy_day",
+];
+
+export const practicalLenses: ScoreboardLens[] = [
+  "overall",
+  "first_visit",
+  "families",
+  "couples",
+  "free",
+  "under_50",
+  "low_walking",
+];
 
 export const scoreFactorLabel: Record<keyof ScoreFactors, string> = {
   travellerSatisfaction: "Traveller satisfaction",
@@ -99,6 +120,13 @@ const lensWeights: Record<
     value: 0.15,
     popularity: 0.1,
   },
+  history: {
+    uniqueness: 0.3,
+    firstTimerValue: 0.25,
+    travellerSatisfaction: 0.2,
+    popularity: 0.15,
+    value: 0.1,
+  },
   low_walking: {
     convenience: 0.35,
     travellerSatisfaction: 0.25,
@@ -140,19 +168,41 @@ export const scoreboardLenses: Array<{
   id: ScoreboardLens;
   label: string;
   blurb: string;
+  group: "practical" | "interest";
 }> = [
-  { id: "overall", label: "Overall", blurb: "Balanced TIW Score" },
-  { id: "first_visit", label: "First visit", blurb: "Icons you should not miss" },
-  { id: "families", label: "Families", blurb: "Kid-friendly picks" },
-  { id: "couples", label: "Couples", blurb: "Date-night energy" },
-  { id: "free", label: "Free", blurb: "No ticket required" },
-  { id: "under_50", label: "Under $50", blurb: "Strong value" },
-  { id: "views", label: "Views", blurb: "Skyline & vistas" },
-  { id: "food", label: "Food", blurb: "Eat your way through" },
-  { id: "culture", label: "Culture", blurb: "Museums & heritage" },
-  { id: "low_walking", label: "Low walking", blurb: "Easier on the feet" },
-  { id: "evening", label: "Evening", blurb: "After dark" },
-  { id: "rainy_day", label: "Rainy day", blurb: "Mostly indoors" },
+  { id: "overall", label: "Overall", blurb: "Balanced TIW Score", group: "practical" },
+  {
+    id: "first_visit",
+    label: "First visit",
+    blurb: "Icons you should not miss",
+    group: "practical",
+  },
+  { id: "families", label: "Families", blurb: "Kid-friendly picks", group: "practical" },
+  { id: "couples", label: "Couples", blurb: "Date-night energy", group: "practical" },
+  { id: "free", label: "Free", blurb: "No ticket required", group: "practical" },
+  { id: "under_50", label: "Under $50", blurb: "Strong value", group: "practical" },
+  {
+    id: "low_walking",
+    label: "Low walking",
+    blurb: "Easier on the feet",
+    group: "practical",
+  },
+  {
+    id: "history",
+    label: "History",
+    blurb: "Heritage, memorials, and historic sites",
+    group: "interest",
+  },
+  {
+    id: "culture",
+    label: "Art & culture",
+    blurb: "Museums, galleries, and the arts",
+    group: "interest",
+  },
+  { id: "food", label: "Food", blurb: "Eat your way through", group: "interest" },
+  { id: "views", label: "Views", blurb: "Skyline & vistas", group: "interest" },
+  { id: "evening", label: "Evening", blurb: "After dark", group: "interest" },
+  { id: "rainy_day", label: "Rainy day", blurb: "Mostly indoors", group: "interest" },
 ];
 
 function clampScore(n: number) {

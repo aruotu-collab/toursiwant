@@ -7,10 +7,16 @@ import {
   type RankedPlace,
 } from "@/lib/nyc-places";
 import {
+  interestLenses,
+  practicalLenses,
   scoreboardLenses,
   type ScoreboardLens,
 } from "@/lib/tiw-score";
 import { useNycWants } from "@/lib/use-nyc-wants";
+
+function lensMeta(id: ScoreboardLens) {
+  return scoreboardLenses.find((l) => l.id === id);
+}
 
 export function NycScoreboard({
   initialLens = "overall",
@@ -95,12 +101,13 @@ export function NycScoreboard({
           <h2 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
             {lens === "overall"
               ? "New York Top Places"
-              : `Best for ${active?.label || "you"}`}
+              : active?.group === "interest"
+                ? `${active.label} in New York`
+                : `Best for ${active?.label || "you"}`}
           </h2>
           <p className="mt-2 max-w-xl text-sm text-ink-soft sm:text-base">
-            Tap <span className="text-ink">Want to go</span> on what you like —
-            then build a personal plan, or invite friends to vote on the same
-            board.
+            Sort by interest — e.g. History, then Art &amp; culture — pick what
+            you want from each list. Your selections stay in the tray below.
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:max-w-xs">
@@ -165,24 +172,59 @@ export function NycScoreboard({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        {scoreboardLenses.map((l) => {
-          const on = l.id === lens;
-          return (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => setLens(l.id)}
-              className={`border px-3 py-1.5 text-sm transition ${
-                on
-                  ? "border-ink bg-ink text-white"
-                  : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
-              }`}
-            >
-              {l.label}
-            </button>
-          );
-        })}
+      <div className="space-y-3">
+        <div>
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-amber-deep">
+            Sort by interest
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {interestLenses.map((id) => {
+              const l = lensMeta(id);
+              if (!l) return null;
+              const on = lens === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setLens(id)}
+                  className={`border px-3 py-1.5 text-sm transition ${
+                    on
+                      ? "border-amber bg-amber text-ink"
+                      : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div>
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-stone">
+            Or sort by who / practical
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {practicalLenses.map((id) => {
+              const l = lensMeta(id);
+              if (!l) return null;
+              const on = lens === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setLens(id)}
+                  className={`border px-3 py-1.5 text-sm transition ${
+                    on
+                      ? "border-ink bg-ink text-white"
+                      : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="overflow-hidden border border-ink/10 bg-white">
@@ -190,8 +232,38 @@ export function NycScoreboard({
           <span>Select</span>
           <span>Rank</span>
           <span>Place / experience</span>
-          <span className="text-right">TIW Score</span>
-          <span className="text-right">Best for</span>
+          <button
+            type="button"
+            onClick={() => setLens("overall")}
+            className="text-right transition hover:text-ink"
+            title="Sort by TIW Score (overall)"
+          >
+            TIW Score{lens === "overall" ? " ↓" : ""}
+          </button>
+          <div className="relative text-right">
+            <label className="sr-only" htmlFor="best-for-sort">
+              Sort by interest
+            </label>
+            <select
+              id="best-for-sort"
+              value={interestLenses.includes(lens) ? lens : ""}
+              onChange={(e) => {
+                const v = e.target.value as ScoreboardLens | "";
+                if (v) setLens(v);
+              }}
+              className="w-full cursor-pointer appearance-none bg-transparent text-right font-mono text-[10px] uppercase tracking-[0.14em] text-stone outline-none hover:text-ink"
+            >
+              <option value="">Best for</option>
+              {interestLenses.map((id) => {
+                const l = lensMeta(id);
+                return (
+                  <option key={id} value={id}>
+                    {l?.label}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
         </div>
         <ol>
           {filtered.map((place, i) => (
