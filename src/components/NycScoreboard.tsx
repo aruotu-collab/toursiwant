@@ -581,7 +581,7 @@ export function NycScoreboard({
                     title="Does not delete immediately — you can save this selection to My trips first"
                     className="border border-white/25 px-3 py-2 text-sm hover:border-amber hover:text-amber"
                   >
-                    Start new trip
+                    Save / start new
                   </button>
                 ) : null}
                 <Link
