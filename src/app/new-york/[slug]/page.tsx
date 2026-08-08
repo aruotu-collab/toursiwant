@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PlaceViatorExperiences } from "@/components/PlaceViatorExperiences";
+import { PlaceVideoPanel } from "@/components/PlaceVideoPanel";
 import {
   getPlaceBySlug,
   nycPlaces,
@@ -132,24 +133,27 @@ export default async function NewYorkPlacePage({ params, searchParams }: Props) 
             </dl>
           </div>
 
-          <aside className="border border-ink/10 bg-ink px-6 py-7 text-white">
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
-              TIW Score
-            </p>
-            <p className="mt-2 font-display text-6xl leading-none tracking-tight">
-              {score}
-              <span className="text-3xl text-white/50">/100</span>
-            </p>
-            <p className="mt-4 text-sm leading-relaxed text-white/70">
-              {explanation}
-            </p>
-            <Link
-              href={`/new-york?lens=${lens}#board`}
-              className="mt-6 inline-block border border-white/25 px-4 py-2 text-sm hover:border-amber hover:text-amber"
-            >
-              Back to scoreboard
-            </Link>
-          </aside>
+          <div className="flex flex-col gap-4">
+            <aside className="border border-ink/10 bg-ink px-6 py-7 text-white">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
+                TIW Score
+              </p>
+              <p className="mt-2 font-display text-6xl leading-none tracking-tight">
+                {score}
+                <span className="text-3xl text-white/50">/100</span>
+              </p>
+              <p className="mt-4 text-sm leading-relaxed text-white/70">
+                {explanation}
+              </p>
+              <Link
+                href={`/new-york?lens=${lens}#board`}
+                className="mt-6 inline-block border border-white/25 px-4 py-2 text-sm hover:border-amber hover:text-amber"
+              >
+                Back to scoreboard
+              </Link>
+            </aside>
+            <PlaceVideoPanel placeName={place.name} slug={place.slug} />
+          </div>
         </div>
 
         <section className="mt-12 border border-ink/10 bg-white p-5 sm:p-8">
