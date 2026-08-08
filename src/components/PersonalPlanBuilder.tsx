@@ -7,7 +7,9 @@ import { getPlaceBySlug } from "@/lib/nyc-places";
 import {
   buildPlanFromSelections,
   MAX_TRIP_DAYS,
+  pinPlanDays,
   suggestedDaysForSelections,
+  type BuiltPlan,
 } from "@/lib/scoreboard-plan";
 import { NYC_PLAN_TEMPLATE_SLUG } from "@/lib/saved-trip-kinds";
 import { useNycWants } from "@/lib/use-nyc-wants";
@@ -19,12 +21,13 @@ export function PersonalPlanBuilder() {
   const {
     wants,
     days,
+    dayAssignments,
     ready,
     toggle,
     clear,
-    removeMany,
     setDays,
     setWants,
+    setDayAssignments,
   } = useNycWants();
   /** Dropdown override — ignored again once wants change. */
   const [manualOverride, setManualOverride] = useState(false);
@@ -86,6 +89,7 @@ export function PersonalPlanBuilder() {
             title: string;
             placeSlugs?: string[];
             planDays?: number;
+            dayAssignments?: Record<string, number>;
             templateSlug?: string;
           };
         };
@@ -100,6 +104,7 @@ export function PersonalPlanBuilder() {
           setManualOverride(true);
           setDays(data.trip.planDays);
         }
+        setDayAssignments(data.trip.dayAssignments || {});
         setSavedTripId(data.trip.id);
         setTripTitle(data.trip.title || "My New York trip");
         setStatus(`Loaded “${data.trip.title}”.`);
@@ -113,7 +118,7 @@ export function PersonalPlanBuilder() {
     return () => {
       cancelled = true;
     };
-  }, [ready, savedIdParam, setWants, setDays]);
+  }, [ready, savedIdParam, setWants, setDays, setDayAssignments]);
 
   useEffect(() => {
     if (loadingSaved) return;
@@ -144,14 +149,26 @@ export function PersonalPlanBuilder() {
   }, [ready, loadingSaved, days, savedTripId, router]);
 
   const plan = useMemo(
-    () => buildPlanFromSelections(wants, days),
-    [wants, days],
+    () => buildPlanFromSelections(wants, days, dayAssignments),
+    [wants, days, dayAssignments],
   );
 
   const filledDays = useMemo(
     () => plan.days.filter((d) => d.stops.length > 0).length,
     [plan.days],
   );
+
+  function moveStopToDay(
+    slug: string,
+    toDay: number,
+    currentPlan: BuiltPlan,
+  ) {
+    const pinned = pinPlanDays(currentPlan);
+    // Keep overflow pins if any already exist.
+    const next = { ...dayAssignments, ...pinned, [slug]: toDay };
+    setDayAssignments(next);
+    setManualOverride(true);
+  }
 
   async function saveTrip(asNew = false) {
     if (signedIn === false) {
@@ -193,6 +210,10 @@ export function PersonalPlanBuilder() {
                 route: `${filledDays || days} days · ${wants.length} places`,
                 placeSlugs: wants,
                 planDays: days,
+                dayAssignments: {
+                  ...pinPlanDays(plan),
+                  ...dayAssignments,
+                },
                 routeNodes,
               }
             : {
@@ -205,6 +226,10 @@ export function PersonalPlanBuilder() {
                 cityCodes: ["NYC"],
                 placeSlugs: wants,
                 planDays: days,
+                dayAssignments: {
+                  ...pinPlanDays(plan),
+                  ...dayAssignments,
+                },
                 routeNodes,
               },
         ),
@@ -477,13 +502,37 @@ export function PersonalPlanBuilder() {
                         {s.neighborhood} · ~{s.hours}h · TIW {s.tiwScore}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => toggle(s.slug)}
-                      className="text-xs text-stone hover:text-ink"
-                    >
-                      Remove
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="flex items-center gap-1.5 text-xs text-ink-soft">
+                        <span className="sr-only">Move {s.name} to day</span>
+                        <select
+                          value={day.dayIndex}
+                          onChange={(e) =>
+                            moveStopToDay(
+                              s.slug,
+                              Number(e.target.value),
+                              plan,
+                            )
+                          }
+                          className="border border-ink/15 bg-white px-2 py-1 text-xs text-ink outline-none focus:border-amber"
+                        >
+                          {Array.from({ length: days }, (_, n) => n + 1).map(
+                            (n) => (
+                              <option key={n} value={n}>
+                                Day {n}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => toggle(s.slug)}
+                        className="text-xs text-stone hover:text-ink"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ol>
@@ -511,13 +560,33 @@ export function PersonalPlanBuilder() {
                     TIW {s.tiwScore} · ~{s.hours}h
                   </span>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => toggle(s.slug)}
-                  className="text-xs text-stone hover:text-ink"
-                >
-                  Remove
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      if (!n) return;
+                      moveStopToDay(s.slug, n, plan);
+                    }}
+                    className="border border-ink/15 bg-white px-2 py-1 text-xs text-ink outline-none focus:border-amber"
+                  >
+                    <option value="" disabled>
+                      Move to day…
+                    </option>
+                    {Array.from({ length: days }, (_, n) => n + 1).map((n) => (
+                      <option key={n} value={n}>
+                        Day {n}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => toggle(s.slug)}
+                    className="text-xs text-stone hover:text-ink"
+                  >
+                    Remove
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

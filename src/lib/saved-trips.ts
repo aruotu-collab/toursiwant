@@ -46,6 +46,8 @@ export type SavedTrip = {
   placeSlugs?: string[];
   /** NYC scoreboard plan: trip length in days */
   planDays?: number;
+  /** NYC scoreboard plan: manual day placements (slug → day) */
+  dayAssignments?: Record<string, number>;
   /** If forked from a live group room */
   sourceShareCode?: string;
   createdAt: string;
@@ -97,6 +99,7 @@ function toPayload(trip: SavedTrip) {
     routeNodes: trip.routeNodes || [],
     placeSlugs: trip.placeSlugs || [],
     planDays: trip.planDays,
+    dayAssignments: trip.dayAssignments || {},
     sourceShareCode: trip.sourceShareCode,
   };
 }
@@ -146,6 +149,12 @@ function fromRow(row: {
       typeof payload.planDays === "number" && Number.isFinite(payload.planDays)
         ? payload.planDays
         : undefined,
+    dayAssignments:
+      payload.dayAssignments &&
+      typeof payload.dayAssignments === "object" &&
+      !Array.isArray(payload.dayAssignments)
+        ? (payload.dayAssignments as Record<string, number>)
+        : {},
     sourceShareCode: payload.sourceShareCode as string | undefined,
     createdAt,
     updatedAt,
@@ -181,6 +190,7 @@ export async function createSavedTrip(input: {
   routeNodes?: SavedRouteNode[];
   placeSlugs?: string[];
   planDays?: number;
+  dayAssignments?: Record<string, number>;
   sourceShareCode?: string;
 }): Promise<SavedTrip> {
   const now = new Date().toISOString();
@@ -200,6 +210,7 @@ export async function createSavedTrip(input: {
     routeNodes: input.routeNodes || [],
     placeSlugs: input.placeSlugs || [],
     planDays: input.planDays,
+    dayAssignments: input.dayAssignments || {},
     sourceShareCode: input.sourceShareCode,
     createdAt: now,
     updatedAt: now,
@@ -306,6 +317,7 @@ export async function updateSavedTrip(
     routeNodes?: SavedRouteNode[];
     placeSlugs?: string[];
     planDays?: number;
+    dayAssignments?: Record<string, number>;
   },
 ) {
   const trip = await getSavedTrip(id, userId);
@@ -317,6 +329,7 @@ export async function updateSavedTrip(
   if (patch.routeNodes) trip.routeNodes = patch.routeNodes;
   if (patch.placeSlugs) trip.placeSlugs = patch.placeSlugs;
   if (patch.planDays !== undefined) trip.planDays = patch.planDays;
+  if (patch.dayAssignments) trip.dayAssignments = patch.dayAssignments;
   trip.updatedAt = new Date().toISOString();
 
   if (hasDatabase()) {
