@@ -8,14 +8,14 @@ import {
 } from "@/lib/tiw-score";
 
 export const metadata: Metadata = {
-  title: "New York Scoreboard — Top things to do ranked",
+  title: "New York Scorecard — Top things to do ranked",
   description:
     "See the best places to visit in New York ranked by the ToursIWant Score. Filter for families, free, views, food, couples, and more.",
   alternates: { canonical: "/new-york" },
   openGraph: {
-    title: "New York Scoreboard — ToursIWant",
+    title: "New York Scorecard — ToursIWant",
     description:
-      "The scoreboard for things to do in New York. Transparent 0–100 TIW Scores you can re-rank by what matters.",
+      "The scorecard for things to do in New York. Transparent 0–100 TIW Scores you can re-rank by what matters.",
     url: "/new-york",
   },
 };
@@ -33,67 +33,41 @@ export default async function NewYorkScoreboardPage({
   const sp = await searchParams;
   const initialLens = parseLens(sp.lens);
   return (
-    <main className="flex-1 bg-paper pt-24">
+    <main className="flex-1 bg-paper pt-20">
       <div
         className="border-b border-ink/10"
         style={{
           background:
-            "radial-gradient(ellipse at 10% 0%, rgba(212,160,23,0.18), transparent 50%), linear-gradient(180deg, #eef3f7 0%, #f3efe6 55%)",
+            "radial-gradient(ellipse at 10% 0%, rgba(212,160,23,0.14), transparent 45%), linear-gradient(180deg, #eef3f7 0%, #f3efe6 100%)",
         }}
       >
-        <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-8 sm:py-16">
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-amber-deep">
-            ToursIWant Scoreboard
-          </p>
-          <h1 className="mt-3 max-w-3xl font-display text-[clamp(2.4rem,6vw,4rem)] leading-[0.98] tracking-tight text-ink">
-            New York Top {nycPlaces.length}
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-soft sm:text-lg">
-            What&apos;s actually worth doing — ranked. Every place gets a
-            transparent TIW Score (ToursIWant, 0–100). Change the filter and the
-            board re-ranks for families, free activities, views, food, and more.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <a
-              href="#board"
-              className="bg-ink px-5 py-3 text-sm font-semibold text-white hover:bg-ink-soft"
-            >
-              See the scoreboard
-            </a>
-            <Link
-              href="/?door=explore"
-              className="border border-ink/20 bg-white px-5 py-3 text-sm font-semibold text-ink hover:border-amber"
-            >
-              Or browse trip templates
-            </Link>
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-end justify-between gap-4 px-4 py-5 sm:px-8 sm:py-6">
+          <div className="min-w-0 max-w-3xl">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-deep sm:text-[11px]">
+              <Link href="/scorecard" className="hover:text-ink">
+                Scorecard
+              </Link>
+              <span className="mx-1.5 text-stone">/</span>
+              New York
+            </p>
+            <h1 className="mt-1.5 font-display text-[clamp(1.75rem,4vw,2.75rem)] leading-tight tracking-tight text-ink">
+              New York Top {nycPlaces.length}
+            </h1>
+            <p className="mt-1.5 max-w-2xl text-sm leading-snug text-ink-soft sm:text-base">
+              TIW Scorecard (ToursIWant, 0–100) — scroll the filters, tap Want,
+              build a trip.
+            </p>
           </div>
-          <dl className="mt-10 grid max-w-3xl gap-4 sm:grid-cols-3">
-            {[
-              ["0–100", "TIW Score (ToursIWant) on every place"],
-              ["12 lenses", "Re-rank by what matters"],
-              ["Then book", "Optional Viator experiences"],
-            ].map(([k, v]) => (
-              <div key={k} className="border-l border-amber pl-3">
-                <dt className="font-display text-xl text-ink">{k}</dt>
-                <dd className="mt-1 text-sm text-ink-soft">{v}</dd>
-              </div>
-            ))}
-          </dl>
+          <Link
+            href="/scorecard"
+            className="shrink-0 text-sm font-semibold text-amber-deep underline-offset-2 hover:underline"
+          >
+            Change city →
+          </Link>
         </div>
       </div>
 
-      <div id="board" className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-8 sm:py-16">
-        <div className="mb-8 flex flex-wrap gap-2 border-b border-ink/10 pb-4">
-          <span className="border border-ink bg-ink px-3 py-1.5 text-sm text-white">
-            Places
-          </span>
-          <span
-            className="border border-ink/15 px-3 py-1.5 text-sm text-stone"
-            title="Coming next"
-          >
-            Tours &amp; experiences
-          </span>
-        </div>
+      <div id="board" className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-8 sm:py-6">
         <NycScoreboard initialLens={initialLens} />
       </div>
     </main>

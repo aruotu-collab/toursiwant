@@ -198,43 +198,36 @@ export function NycScoreboard({
   }
 
   return (
-    <div className="space-y-8 pb-28">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber-deep">
-            Places · {filtered.length} shown
+    <div className="space-y-4 pb-28">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber-deep">
+            Scorecard · {filtered.length} places
           </p>
-          <h2 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
+          <h2 className="mt-1 font-display text-2xl text-ink sm:text-3xl">
             {categoryFilter
               ? experienceCategoryLabel[categoryFilter]
               : lens === "overall"
-                ? "New York Top Places"
+                ? "Top places"
                 : active?.group === "interest"
                   ? `${active.label} in New York`
                   : `Best for ${active?.label || "you"}`}
           </h2>
-          <p className="mt-2 max-w-xl text-sm text-ink-soft sm:text-base">
-            Use personalize categories and column headers to sort. Click a
-            heading again to flip ascending / descending. Your wants stay in
-            the tray.
-          </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:max-w-xs">
           <label className="block">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-stone">
-              Search the board
-            </span>
+            <span className="sr-only">Search the board</span>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Central Park, food, views…"
-              className="mt-1 w-full border border-ink/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-amber"
+              placeholder="Search places…"
+              className="w-full border border-ink/15 bg-white px-3 py-2 text-sm outline-none focus:border-amber"
             />
           </label>
           <button
             type="button"
             onClick={() => setGroupOpen((v) => !v)}
-            className="border border-ink/20 bg-white px-3 py-2 text-left text-sm font-semibold text-ink hover:border-amber"
+            className="border border-ink/20 bg-white px-3 py-1.5 text-left text-xs font-semibold text-ink hover:border-amber sm:text-sm"
           >
             Planning with friends?
           </button>
