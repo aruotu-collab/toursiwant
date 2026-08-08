@@ -25,7 +25,7 @@ export default async function TripTemplatePage({ params }: PageProps) {
   const template = getTemplateBySlug(slug);
   if (!template) notFound();
   return (
-    <main className="flex-1">
+    <main className="w-full max-w-full flex-1 overflow-x-clip overscroll-x-none [touch-action:pan-y]">
       <TemplateWorkspace initial={template} />
     </main>
   );

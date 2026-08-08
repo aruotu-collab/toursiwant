@@ -311,13 +311,13 @@ export function PersonalPlanBuilder() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-full space-y-8 overflow-x-clip">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber-deep">
             Your New York plan
           </p>
-          <h1 className="mt-2 font-display text-4xl text-ink">
+          <h1 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
             Built from {wants.length} wants
           </h1>
           <p className="mt-3 max-w-2xl text-ink-soft">{plan.note}</p>

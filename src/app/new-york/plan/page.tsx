@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 
 export default function NewYorkPlanPage() {
   return (
-    <main className="max-w-[100vw] flex-1 overflow-x-clip bg-paper pt-[7.5rem] sm:pt-32">
-      <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8 sm:py-14">
+    <main className="w-full max-w-full flex-1 overflow-x-clip overscroll-x-none bg-paper pt-[7.5rem] [touch-action:pan-y] sm:pt-32">
+      <div className="mx-auto w-full max-w-6xl overflow-x-clip px-4 py-10 sm:px-8 sm:py-14">
         <p className="text-sm text-ink-soft">
           <Link href="/new-york" className="hover:text-amber-deep">
             New York Scoreboard

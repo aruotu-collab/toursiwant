@@ -880,16 +880,16 @@ export function TemplateWorkspace({
   }
 
   return (
-    <div className="relative min-h-screen bg-[#071018] text-white">
+    <div className="relative min-h-screen w-full max-w-full overflow-x-clip bg-[#071018] text-white [touch-action:pan-y]">
       <div
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-0 overflow-hidden"
         style={{
           background:
             "radial-gradient(ellipse 70% 40% at 80% 0%, rgba(212,160,23,0.12), transparent), linear-gradient(180deg,#071018,#0c1b2a 40%,#071018)",
         }}
       />
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-5 py-8 sm:px-8">
+      <div className="relative z-10 mx-auto w-full max-w-6xl overflow-x-clip px-5 py-8 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/"

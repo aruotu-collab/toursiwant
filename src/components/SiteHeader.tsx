@@ -86,8 +86,8 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="absolute inset-x-0 top-0 z-40 border-b border-ink/10 bg-paper/95 backdrop-blur-md">
-      <div className="mx-auto w-full max-w-6xl px-4 pt-3 sm:px-8 sm:pt-5">
+    <header className="absolute inset-x-0 top-0 z-40 max-w-[100%] overflow-x-clip border-b border-ink/10 bg-paper/95 backdrop-blur-md">
+      <div className="mx-auto w-full max-w-6xl overflow-x-clip px-4 pt-3 sm:px-8 sm:pt-5">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <Link
@@ -163,8 +163,9 @@ export function SiteHeader() {
         <nav
           className="mt-3 max-w-full overflow-x-auto overscroll-x-contain touch-pan-x pb-3 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
           aria-label="Main"
+          style={{ overscrollBehaviorX: "contain", WebkitOverflowScrolling: "touch" }}
         >
-          <ul className="flex w-max items-center gap-2">
+          <ul className="flex w-max max-w-none items-center gap-2">
             {navItems.map((item) => (
               <li
                 key={`${item.href}-${item.label}`}

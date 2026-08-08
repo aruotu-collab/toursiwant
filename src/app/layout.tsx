@@ -76,9 +76,11 @@ export default function RootLayout({
       lang="en"
       className={`${display.variable} ${body.variable} ${mono.variable} h-full`}
     >
-      <body className="min-h-full bg-paper font-sans text-ink antialiased">
+      <body className="min-h-full max-w-full overflow-x-hidden bg-paper font-sans text-ink antialiased">
         <SiteHeader />
-        <div className="flex min-h-full flex-1 flex-col">{children}</div>
+        <div className="flex min-h-full w-full max-w-full flex-1 flex-col overflow-x-clip">
+          {children}
+        </div>
         <SiteFooter />
         <VisitBeacon />
         {gaId ? <GoogleAnalytics gaId={gaId} /> : null}
