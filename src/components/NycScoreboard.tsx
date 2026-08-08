@@ -376,7 +376,58 @@ export function NycScoreboard({
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-ink/10 bg-white">
+      {/* Mobile / narrow: tap-friendly cards. Wide screens: full table. */}
+      <div className="lg:hidden">
+        <ChipScrollRow>
+          {(
+            [
+              ["score", "TIW Score"],
+              ["rank", "Rank"],
+              ["likes", "Liked by"],
+              ["cost", "Free / Paid"],
+              ["bestFor", "Best for"],
+              ["name", "A–Z"],
+            ] as Array<[SortKey, string]>
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => toggleSort(key)}
+              className={`shrink-0 border px-3 py-1.5 text-xs font-semibold transition ${
+                sortKey === key
+                  ? "border-ink bg-ink text-white"
+                  : "border-ink/15 bg-white text-ink-soft"
+              }`}
+            >
+              Sort: {label}
+              {sortKey === key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+            </button>
+          ))}
+        </ChipScrollRow>
+        <ol className="mt-3 space-y-2">
+          {filtered.map((place) => (
+            <ScoreCard
+              key={place.slug}
+              place={place}
+              lens={lens}
+              wanted={ready && isWanted(place.slug)}
+              onToggle={() => toggle(place.slug)}
+              onCategoryClick={(cat) => {
+                setCategoryFilter(cat);
+                setSortKey("score");
+                setSortDir("desc");
+              }}
+            />
+          ))}
+        </ol>
+        {!filtered.length ? (
+          <p className="px-2 py-10 text-center text-sm text-ink-soft">
+            No places match these filters. Try All categories or Overall.
+          </p>
+        ) : null}
+      </div>
+
+      <div className="hidden overflow-x-auto border border-ink/10 bg-white lg:block">
         <div className="min-w-[66rem]">
           <div className="grid grid-cols-[5.5rem_4rem_minmax(12rem,1.3fr)_5.5rem_7rem_5.5rem_7.5rem_8.5rem] gap-3 border-b border-ink/10 bg-paper-deep/60 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-stone sm:px-5">
             <span className="self-center">Select</span>
@@ -456,7 +507,7 @@ export function NycScoreboard({
         </div>
       </div>
 
-      <p className="text-xs leading-relaxed text-stone">
+      <p className="hidden text-xs leading-relaxed text-stone lg:block">
         TIW = ToursIWant — our 0–100 quality rating for each place. Best for =
         who it suits (Families, Couples, First-time visitors…). Free / Paid is
         cost. Personalize matches trip day types. Click headings to sort.
@@ -560,31 +611,31 @@ export function NycScoreboard({
               </div>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
               <div className="min-w-0">
-                <p className="font-display text-lg">
+                <p className="font-display text-base sm:text-lg">
                   {wants.length} place{wants.length === 1 ? "" : "s"} selected
+                  {wants.length ? (
+                    <span className="text-amber">
+                      {" "}
+                      · {projectedDays} day{projectedDays === 1 ? "" : "s"}
+                    </span>
+                  ) : null}
                 </p>
                 {wants.length ? (
-                  <p className="mt-0.5 text-sm text-amber">
-                    Your trip is now {projectedDays} day
-                    {projectedDays === 1 ? "" : "s"} to fit all selections
+                  <p className="mt-0.5 hidden text-xs text-white/50 sm:block">
+                    Build when ready — or save this selection first.
                   </p>
                 ) : (
                   <p className="text-xs text-white/55">
-                    Tap Want to go on places you like.
+                    Tap Want on places you like.
                   </p>
                 )}
-                {wants.length ? (
-                  <p className="mt-0.5 text-xs text-white/50">
-                    Build when ready — or start a new trip (you can save this
-                    selection first).
-                  </p>
-                ) : clearStatus ? (
+                {clearStatus ? (
                   <p className="mt-0.5 text-sm text-amber">{clearStatus}</p>
                 ) : null}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                 {wants.length ? (
                   <button
                     type="button"
@@ -594,21 +645,23 @@ export function NycScoreboard({
                       setClearAsk(true);
                     }}
                     title="Does not delete immediately — you can save this selection to My trips first"
-                    className="border border-white/25 px-3 py-2 text-sm hover:border-amber hover:text-amber"
+                    className="border border-white/25 px-3 py-2.5 text-sm hover:border-amber hover:text-amber sm:py-2"
                   >
                     Save / start new
                   </button>
-                ) : null}
+                ) : (
+                  <span className="sm:hidden" />
+                )}
                 <Link
                   href={
                     wants.length
                       ? `/new-york/plan?days=${projectedDays}`
                       : "/new-york/plan"
                   }
-                  className={`px-4 py-2 text-sm font-semibold ${
+                  className={`px-4 py-2.5 text-center text-sm font-semibold sm:py-2 ${
                     wants.length
-                      ? "bg-amber text-ink hover:bg-amber-deep"
-                      : "cursor-not-allowed bg-white/20 text-white/50"
+                      ? "col-span-2 bg-amber text-ink hover:bg-amber-deep sm:col-span-1"
+                      : "col-span-2 cursor-not-allowed bg-white/20 text-white/50 sm:col-span-1"
                   }`}
                   aria-disabled={!wants.length}
                   onClick={(e) => {
@@ -674,6 +727,105 @@ function SortHeading({
         </span>
       ) : null}
     </button>
+  );
+}
+
+/** Phone / tablet portrait: one place per card, big tap targets. */
+function ScoreCard({
+  place,
+  lens,
+  wanted,
+  onToggle,
+  onCategoryClick,
+}: {
+  place: RankedPlace;
+  lens: ScoreboardLens;
+  wanted: boolean;
+  onToggle: () => void;
+  onCategoryClick: (cat: ExperienceCategory) => void;
+}) {
+  return (
+    <li className="border border-ink/10 bg-white p-3.5">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[11px] font-semibold text-amber-deep">
+            #{place.rank}
+            <span className="ml-2 font-normal text-stone">
+              {place.neighborhood}
+            </span>
+          </p>
+          <Link
+            href={`/new-york/${place.slug}?lens=${lens}`}
+            className="mt-0.5 block font-display text-xl leading-snug text-ink"
+          >
+            {place.name}
+          </Link>
+          <p className="mt-1 text-xs text-ink-soft">
+            {place.typicalCostLabel} · {place.audience}
+          </p>
+        </div>
+        <Link
+          href={`/new-york/${place.slug}?lens=${lens}`}
+          className="shrink-0 text-right"
+          title="TIW Score = ToursIWant quality rating (0–100)"
+        >
+          <span className="block font-display text-3xl leading-none text-ink">
+            {place.tiwScore}
+          </span>
+          <span className="mt-0.5 block font-mono text-[9px] uppercase tracking-wider text-stone">
+            TIW
+          </span>
+        </Link>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <span
+          className={`border px-2 py-0.5 font-semibold ${
+            place.costBand === "Free"
+              ? "border-amber/40 bg-amber/15 text-amber-deep"
+              : "border-ink/10 text-ink-soft"
+          }`}
+        >
+          {place.costBand}
+        </span>
+        <LikedByCounter
+          slug={place.slug}
+          tiwScore={place.tiwScore}
+          compact
+        />
+        {place.categories.slice(0, 2).map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => onCategoryClick(cat)}
+            className="border border-ink/10 px-2 py-0.5 text-ink-soft"
+          >
+            {shortCategory(experienceCategoryLabel[cat])}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`min-h-11 border px-3 py-2.5 text-sm font-semibold transition ${
+            wanted
+              ? "border-amber bg-amber text-ink"
+              : "border-ink/20 bg-paper text-ink"
+          }`}
+          aria-pressed={wanted}
+        >
+          {wanted ? "✓ In my trip" : "♡ Want"}
+        </button>
+        <Link
+          href={`/new-york/${place.slug}?lens=${lens}`}
+          className="flex min-h-11 items-center justify-center border border-ink/15 px-3 py-2.5 text-sm font-semibold text-ink"
+        >
+          Details
+        </Link>
+      </div>
+    </li>
   );
 }
 
@@ -795,9 +947,11 @@ function shortCategory(label: string) {
 function LikedByCounter({
   slug,
   tiwScore,
+  compact = false,
 }: {
   slug: string;
   tiwScore: number;
+  compact?: boolean;
 }) {
   const base = sampleLikeBase(slug, tiwScore);
   const [count, setCount] = useState(base);
@@ -809,6 +963,17 @@ function LikedByCounter({
     }, 3500 + (base % 2500));
     return () => window.clearInterval(id);
   }, [base, slug]);
+
+  if (compact) {
+    return (
+      <span
+        className="border border-ink/10 px-2 py-0.5 tabular-nums text-ink-soft"
+        title="Sample interest counter — for demo atmosphere"
+      >
+        Liked by {formatLikeCount(count)}
+      </span>
+    );
+  }
 
   return (
     <div

@@ -27,11 +27,11 @@ export function SiteHeader() {
         <nav className="flex shrink-0 items-center gap-2 text-sm text-ink-soft sm:gap-4">
           <Link
             href="/scorecard"
-            className={`transition hover:text-ink ${
+            className={`text-xs transition hover:text-ink sm:text-sm ${
               pathname?.startsWith("/scorecard") ||
               pathname?.startsWith("/new-york")
                 ? "font-semibold text-ink"
-                : "hidden sm:inline"
+                : ""
             }`}
           >
             Scorecard
