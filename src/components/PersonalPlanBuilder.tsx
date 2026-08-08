@@ -8,6 +8,10 @@ import {
   getPlaceBySlug,
 } from "@/lib/nyc-places";
 import {
+  selectGroupPlanSlugs,
+  normalizeGroupCode,
+} from "@/lib/scoreboard-group-plan";
+import {
   buildPlanFromSelections,
   MAX_TRIP_DAYS,
   pinPlanDays,
@@ -36,6 +40,7 @@ export function PersonalPlanBuilder() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const savedIdParam = searchParams.get("saved");
+  const groupParam = normalizeGroupCode(searchParams.get("group") || "");
   const {
     wants,
     days,
@@ -51,10 +56,13 @@ export function PersonalPlanBuilder() {
   const [manualOverride, setManualOverride] = useState(false);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [savedTripId, setSavedTripId] = useState<string | null>(null);
+  const [groupCode, setGroupCode] = useState(groupParam);
   const [tripTitle, setTripTitle] = useState("My New York trip");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
-  const [loadingSaved, setLoadingSaved] = useState(Boolean(savedIdParam));
+  const [loadingSaved, setLoadingSaved] = useState(
+    Boolean(savedIdParam) || Boolean(groupParam),
+  );
   const wantsKey = wants.join("|");
 
   const neededDays = useMemo(
@@ -79,7 +87,67 @@ export function PersonalPlanBuilder() {
 
   useEffect(() => {
     if (!ready) return;
-    if (!savedIdParam) {
+
+    // Saved trip wins over group seed.
+    if (savedIdParam) {
+      let cancelled = false;
+      setLoadingSaved(true);
+      (async () => {
+        try {
+          const res = await fetch(
+            `/api/saved-trips?id=${encodeURIComponent(savedIdParam)}`,
+          );
+          if (!res.ok) {
+            if (!cancelled) {
+              setStatus(
+                res.status === 401
+                  ? "Sign in to open this saved trip."
+                  : "Could not load that saved trip.",
+              );
+            }
+            return;
+          }
+          const data = (await res.json()) as {
+            trip?: {
+              id: string;
+              title: string;
+              placeSlugs?: string[];
+              planDays?: number;
+              dayAssignments?: Record<string, number>;
+              templateSlug?: string;
+              sourceShareCode?: string;
+            };
+          };
+          if (cancelled || !data.trip) return;
+          if (data.trip.templateSlug !== NYC_PLAN_TEMPLATE_SLUG) {
+            setStatus("That saved trip is a template — open it from My trips.");
+            return;
+          }
+          const slugs = (data.trip.placeSlugs || []).filter(Boolean);
+          setWants(slugs);
+          if (data.trip.planDays) {
+            setManualOverride(true);
+            setDays(data.trip.planDays);
+          }
+          setDayAssignments(data.trip.dayAssignments || {});
+          setSavedTripId(data.trip.id);
+          setTripTitle(data.trip.title || "My New York trip");
+          if (data.trip.sourceShareCode) {
+            setGroupCode(normalizeGroupCode(data.trip.sourceShareCode));
+          }
+          setStatus(`Loaded “${data.trip.title}”.`);
+        } catch {
+          if (!cancelled) setStatus("Could not load that saved trip.");
+        } finally {
+          if (!cancelled) setLoadingSaved(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!groupParam) {
       setLoadingSaved(false);
       return;
     }
@@ -88,46 +156,46 @@ export function PersonalPlanBuilder() {
     setLoadingSaved(true);
     (async () => {
       try {
-        const res = await fetch(
-          `/api/saved-trips?id=${encodeURIComponent(savedIdParam)}`,
-        );
-        if (!res.ok) {
+        const res = await fetch(`/api/scoreboard-groups/${groupParam}`);
+        const data = (await res.json()) as {
+          group?: { title: string; shareCode: string };
+          ranks?: Array<{
+            slug: string;
+            wantCount: number;
+            votersTotal: number;
+          }>;
+          error?: string;
+        };
+        if (!res.ok || !data.group) {
+          if (!cancelled) {
+            setStatus(data.error || "Group not found.");
+          }
+          return;
+        }
+        const slugs = selectGroupPlanSlugs(data.ranks || []);
+        if (!slugs.length) {
           if (!cancelled) {
             setStatus(
-              res.status === 401
-                ? "Sign in to open this saved trip."
-                : "Could not load that saved trip.",
+              "Not enough group favourites yet — go back and collect more Want votes.",
             );
           }
           return;
         }
-        const data = (await res.json()) as {
-          trip?: {
-            id: string;
-            title: string;
-            placeSlugs?: string[];
-            planDays?: number;
-            dayAssignments?: Record<string, number>;
-            templateSlug?: string;
-          };
-        };
-        if (cancelled || !data.trip) return;
-        if (data.trip.templateSlug !== NYC_PLAN_TEMPLATE_SLUG) {
-          setStatus("That saved trip is a template — open it from My trips.");
-          return;
-        }
-        const slugs = (data.trip.placeSlugs || []).filter(Boolean);
+        if (cancelled) return;
+        setGroupCode(normalizeGroupCode(data.group.shareCode));
         setWants(slugs);
-        if (data.trip.planDays) {
+        setDayAssignments({});
+        setTripTitle(data.group.title || "Group New York trip");
+        const daysParam = Number(searchParams.get("days") || 0);
+        if (daysParam >= 1 && daysParam <= MAX_TRIP_DAYS) {
           setManualOverride(true);
-          setDays(data.trip.planDays);
+          setDays(daysParam);
         }
-        setDayAssignments(data.trip.dayAssignments || {});
-        setSavedTripId(data.trip.id);
-        setTripTitle(data.trip.title || "My New York trip");
-        setStatus(`Loaded “${data.trip.title}”.`);
+        setStatus(
+          `Loaded ${slugs.length} places from group “${data.group.title}”.`,
+        );
       } catch {
-        if (!cancelled) setStatus("Could not load that saved trip.");
+        if (!cancelled) setStatus("Could not load that group trip.");
       } finally {
         if (!cancelled) setLoadingSaved(false);
       }
@@ -136,7 +204,15 @@ export function PersonalPlanBuilder() {
     return () => {
       cancelled = true;
     };
-  }, [ready, savedIdParam, setWants, setDays, setDayAssignments]);
+  }, [
+    ready,
+    savedIdParam,
+    groupParam,
+    searchParams,
+    setWants,
+    setDays,
+    setDayAssignments,
+  ]);
 
   useEffect(() => {
     if (loadingSaved) return;
@@ -163,8 +239,9 @@ export function PersonalPlanBuilder() {
     const params = new URLSearchParams();
     params.set("days", String(days));
     if (savedTripId) params.set("saved", savedTripId);
+    if (groupCode) params.set("group", groupCode);
     router.replace(`/new-york/plan?${params.toString()}`, { scroll: false });
-  }, [ready, loadingSaved, days, savedTripId, router]);
+  }, [ready, loadingSaved, days, savedTripId, groupCode, router]);
 
   const plan = useMemo(
     () => buildPlanFromSelections(wants, days, dayAssignments),
@@ -190,9 +267,11 @@ export function PersonalPlanBuilder() {
 
   async function saveTrip(asNew = false) {
     if (signedIn === false) {
-      const next = encodeURIComponent(
-        `/new-york/plan?days=${days}${savedTripId ? `&saved=${savedTripId}` : ""}`,
-      );
+      const params = new URLSearchParams();
+      params.set("days", String(days));
+      if (savedTripId) params.set("saved", savedTripId);
+      if (groupCode) params.set("group", groupCode);
+      const next = encodeURIComponent(`/new-york/plan?${params.toString()}`);
       window.location.href = `/join?next=${next}`;
       return;
     }
@@ -237,7 +316,9 @@ export function PersonalPlanBuilder() {
             : {
                 action: "create",
                 templateSlug: NYC_PLAN_TEMPLATE_SLUG,
-                templateTitle: "New York scoreboard plan",
+                templateTitle: groupCode
+                  ? "New York group scoreboard plan"
+                  : "New York scoreboard plan",
                 title,
                 route: `${filledDays || days} days · ${wants.length} places`,
                 region: "New York",
@@ -249,6 +330,7 @@ export function PersonalPlanBuilder() {
                   ...dayAssignments,
                 },
                 routeNodes,
+                sourceShareCode: groupCode || undefined,
               },
         ),
       });
@@ -258,7 +340,10 @@ export function PersonalPlanBuilder() {
       };
       if (!res.ok || !data.trip) {
         if (res.status === 401) {
-          const next = encodeURIComponent(`/new-york/plan?days=${days}`);
+          const params = new URLSearchParams();
+          params.set("days", String(days));
+          if (groupCode) params.set("group", groupCode);
+          const next = encodeURIComponent(`/new-york/plan?${params.toString()}`);
           window.location.href = `/join?next=${next}`;
           return;
         }
@@ -269,7 +354,9 @@ export function PersonalPlanBuilder() {
       setStatus(
         updating
           ? "Trip updated — find it under My trips."
-          : "Saved — find it under My trips in the menu.",
+          : groupCode
+            ? "Saved group trip — find it under My trips."
+            : "Saved — find it under My trips in the menu.",
       );
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Could not save trip");
@@ -315,11 +402,26 @@ export function PersonalPlanBuilder() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber-deep">
-            Your New York plan
+            {groupCode ? "Group New York plan" : "Your New York plan"}
           </p>
           <h1 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
             Built from {wants.length} wants
           </h1>
+          {groupCode ? (
+            <p className="mt-2 text-sm text-ink-soft">
+              From group code{" "}
+              <span className="font-mono font-semibold uppercase text-ink">
+                {groupCode}
+              </span>
+              {" · "}
+              <Link
+                href={`/new-york/group/${groupCode}`}
+                className="font-semibold text-amber-deep hover:underline"
+              >
+                Back to group board
+              </Link>
+            </p>
+          ) : null}
           <p className="mt-3 max-w-2xl text-ink-soft">{plan.note}</p>
           <p className="mt-2 max-w-2xl text-sm text-ink-soft">
             Days adjust automatically when you add or remove places. You can

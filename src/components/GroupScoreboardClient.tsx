@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { rankNycPlaces } from "@/lib/nyc-places";
-import { buildPlanFromSelections } from "@/lib/scoreboard-plan";
+import { selectGroupPlanSlugs } from "@/lib/scoreboard-group-plan";
+import {
+  buildPlanFromSelections,
+  MAX_TRIP_DAYS,
+} from "@/lib/scoreboard-plan";
 import type {
   GroupPlaceRank,
   ScoreboardGroup,
@@ -91,14 +95,14 @@ export function GroupScoreboardClient({ code }: Props) {
   }, [board, ranks, group?.voters.length]);
 
   const favourites = groupBoard.filter((p) => p.wantCount > 0);
-  const plan = useMemo(() => {
-    const top = groupBoard.filter(
-      (p) => p.wantCount > 0 && p.wantCount / Math.max(1, p.votersTotal) >= 0.5,
-    );
-    const fallback = groupBoard.filter((p) => p.wantCount > 0).slice(0, 8);
-    const slugs = (top.length ? top : fallback).map((p) => p.slug);
-    return buildPlanFromSelections(slugs, days);
-  }, [groupBoard, days]);
+  const planSlugs = useMemo(
+    () => selectGroupPlanSlugs(groupBoard),
+    [groupBoard],
+  );
+  const plan = useMemo(
+    () => buildPlanFromSelections(planSlugs, days),
+    [planSlugs, days],
+  );
 
   async function join() {
     setSaving(true);
@@ -196,13 +200,21 @@ export function GroupScoreboardClient({ code }: Props) {
             {group.hostName}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={copyLink}
-          className="bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft"
-        >
-          {copied ? "Link copied" : "Copy invite link"}
-        </button>
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <p className="font-mono text-sm text-ink">
+            Code{" "}
+            <span className="bg-amber/20 px-2 py-1 font-semibold uppercase tracking-wider text-ink">
+              {group.shareCode}
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={copyLink}
+            className="bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft"
+          >
+            {copied ? "Link copied" : "Copy invite link"}
+          </button>
+        </div>
       </div>
 
       {!joined ? (
@@ -351,7 +363,7 @@ export function GroupScoreboardClient({ code }: Props) {
               </h2>
               <p className="mt-1 text-sm text-ink-soft">
                 Uses places with ~50%+ group support (or top picks if still
-                early).
+                early). Open the full plan editor to rearrange days and save.
               </p>
             </div>
             <label className="text-sm">
@@ -361,11 +373,13 @@ export function GroupScoreboardClient({ code }: Props) {
                 onChange={(e) => setDays(Number(e.target.value))}
                 className="ml-1 border border-ink/15 bg-white px-2 py-1"
               >
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
+                {Array.from({ length: MAX_TRIP_DAYS }, (_, i) => i + 1).map(
+                  (n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ),
+                )}
               </select>
             </label>
           </div>
@@ -388,6 +402,12 @@ export function GroupScoreboardClient({ code }: Props) {
               </div>
             ))}
           </div>
+          <Link
+            href={`/new-york/plan?group=${encodeURIComponent(code)}&days=${days}`}
+            className="mt-5 inline-flex bg-amber px-5 py-3 text-sm font-semibold text-ink hover:bg-amber-deep"
+          >
+            Open full plan builder →
+          </Link>
         </section>
       ) : null}
 

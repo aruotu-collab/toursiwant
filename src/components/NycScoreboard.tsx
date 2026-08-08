@@ -8,6 +8,7 @@ import {
   rankNycPlaces,
   type RankedPlace,
 } from "@/lib/nyc-places";
+import { normalizeGroupCode } from "@/lib/scoreboard-group-plan";
 import { suggestedDaysForSelections } from "@/lib/scoreboard-plan";
 import { saveNycPlanTrip } from "@/lib/save-nyc-plan";
 import { formatLikeCount, sampleLikeBase } from "@/lib/sample-likes";
@@ -61,9 +62,13 @@ export function NycScoreboard({
     setDays,
   } = useNycWants();
   const [groupOpen, setGroupOpen] = useState(false);
+  const [groupMode, setGroupMode] = useState<"create" | "join">("create");
   const [groupTitle, setGroupTitle] = useState("New York Friends Trip");
   const [hostName, setHostName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [joinName, setJoinName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [groupError, setGroupError] = useState("");
   const [clearAsk, setClearAsk] = useState(false);
   const [clearTitle, setClearTitle] = useState("");
@@ -197,6 +202,41 @@ export function NycScoreboard({
     }
   }
 
+  async function joinGroupByCode() {
+    setJoining(true);
+    setGroupError("");
+    try {
+      const code = normalizeGroupCode(joinCode);
+      if (code.length < 4) {
+        throw new Error("Enter the invite code from your host.");
+      }
+      const res = await fetch(`/api/scoreboard-groups/${code}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "join",
+          name: joinName || "Traveller",
+        }),
+      });
+      const data = (await res.json()) as {
+        group?: { shareCode: string };
+        voterKey?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.group || !data.voterKey) {
+        throw new Error(data.error || "Group not found — check the code.");
+      }
+      localStorage.setItem(
+        `tiw_group_voter_${data.group.shareCode}`,
+        data.voterKey,
+      );
+      window.location.href = `/new-york/group/${data.group.shareCode}`;
+    } catch (e) {
+      setGroupError(e instanceof Error ? e.message : "Could not join");
+      setJoining(false);
+    }
+  }
+
   return (
     <div className="max-w-full space-y-4 overflow-x-clip pb-28">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -236,41 +276,122 @@ export function NycScoreboard({
 
       {groupOpen ? (
         <div className="border border-amber/40 bg-amber/[0.08] p-4 sm:p-5">
-          <p className="font-display text-xl text-ink">Create group scoreboard</p>
-          <p className="mt-1 text-sm text-ink-soft">
-            Share one link. Everyone picks what they want. You see the group
-            ranking live.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="text-ink-soft">Trip name</span>
-              <input
-                value={groupTitle}
-                onChange={(e) => setGroupTitle(e.target.value)}
-                className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="text-ink-soft">Your name</span>
-              <input
-                value={hostName}
-                onChange={(e) => setHostName(e.target.value)}
-                placeholder="Alex"
-                className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
-              />
-            </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setGroupMode("create");
+                setGroupError("");
+              }}
+              className={`border px-3 py-1.5 text-xs font-semibold sm:text-sm ${
+                groupMode === "create"
+                  ? "border-amber bg-amber text-ink"
+                  : "border-ink/15 bg-white text-ink-soft"
+              }`}
+            >
+              Create group
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setGroupMode("join");
+                setGroupError("");
+              }}
+              className={`border px-3 py-1.5 text-xs font-semibold sm:text-sm ${
+                groupMode === "join"
+                  ? "border-amber bg-amber text-ink"
+                  : "border-ink/15 bg-white text-ink-soft"
+              }`}
+            >
+              Join with code
+            </button>
           </div>
-          {groupError ? (
-            <p className="mt-2 text-sm text-red-700">{groupError}</p>
-          ) : null}
-          <button
-            type="button"
-            disabled={creating}
-            onClick={createGroup}
-            className="mt-4 bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft disabled:opacity-50"
-          >
-            {creating ? "Creating…" : "Create & get invite link"}
-          </button>
+
+          {groupMode === "create" ? (
+            <>
+              <p className="mt-4 font-display text-xl text-ink">
+                Create group scoreboard
+              </p>
+              <p className="mt-1 text-sm text-ink-soft">
+                Share one link or code. Everyone picks what they want. Build the
+                trip from the group favourites.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="text-ink-soft">Trip name</span>
+                  <input
+                    value={groupTitle}
+                    onChange={(e) => setGroupTitle(e.target.value)}
+                    className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-ink-soft">Your name</span>
+                  <input
+                    value={hostName}
+                    onChange={(e) => setHostName(e.target.value)}
+                    placeholder="Alex"
+                    className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
+                  />
+                </label>
+              </div>
+              {groupError ? (
+                <p className="mt-2 text-sm text-red-700">{groupError}</p>
+              ) : null}
+              <button
+                type="button"
+                disabled={creating}
+                onClick={createGroup}
+                className="mt-4 bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft disabled:opacity-50"
+              >
+                {creating ? "Creating…" : "Create & get invite link"}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="mt-4 font-display text-xl text-ink">
+                Join a group scoreboard
+              </p>
+              <p className="mt-1 text-sm text-ink-soft">
+                Enter the invite code your host shared (from the group page
+                link).
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="text-ink-soft">Invite code</span>
+                  <input
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value)}
+                    placeholder="e.g. a1b2c3"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 font-mono uppercase outline-none focus:border-amber"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-ink-soft">Your name</span>
+                  <input
+                    value={joinName}
+                    onChange={(e) => setJoinName(e.target.value)}
+                    placeholder="Sam"
+                    className="mt-1 w-full border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
+                  />
+                </label>
+              </div>
+              {groupError ? (
+                <p className="mt-2 text-sm text-red-700">{groupError}</p>
+              ) : null}
+              <button
+                type="button"
+                disabled={joining}
+                onClick={joinGroupByCode}
+                className="mt-4 bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft disabled:opacity-50"
+              >
+                {joining ? "Joining…" : "Join group"}
+              </button>
+            </>
+          )}
         </div>
       ) : null}
 

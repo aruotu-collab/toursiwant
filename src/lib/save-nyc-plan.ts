@@ -10,6 +10,7 @@ export async function saveNycPlanTrip(input: {
   placeSlugs: string[];
   planDays: number;
   dayAssignments?: DayAssignments;
+  sourceShareCode?: string;
 }): Promise<{ id: string; title: string }> {
   const plan = buildPlanFromSelections(
     input.placeSlugs,
@@ -52,6 +53,7 @@ export async function saveNycPlanTrip(input: {
         ...(input.dayAssignments || {}),
       },
       routeNodes,
+      sourceShareCode: input.sourceShareCode,
     }),
   });
 
