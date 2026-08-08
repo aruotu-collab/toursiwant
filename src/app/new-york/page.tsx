@@ -33,7 +33,7 @@ export default async function NewYorkScoreboardPage({
   const sp = await searchParams;
   const initialLens = parseLens(sp.lens);
   return (
-    <main className="flex-1 bg-paper pt-20">
+    <main className="max-w-[100vw] flex-1 overflow-x-clip bg-paper pt-20">
       <div
         className="border-b border-ink/10"
         style={{

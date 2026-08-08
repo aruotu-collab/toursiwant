@@ -39,16 +39,18 @@
 
 html {
   scroll-behavior: smooth;
-  overflow-x: hidden;
+  overflow-x: clip;
   overscroll-behavior-x: none;
+  max-width: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), Georgia, serif;
-  overflow-x: hidden;
+  overflow-x: clip;
   overscroll-behavior-x: none;
+  max-width: 100%;
 }
 
 ::selection {

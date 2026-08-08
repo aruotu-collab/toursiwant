@@ -198,7 +198,7 @@ export function NycScoreboard({
   }
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="max-w-full space-y-4 overflow-x-clip pb-28">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-amber-deep">
@@ -681,8 +681,8 @@ export function NycScoreboard({
 
 function ChipScrollRow({ children }: { children: ReactNode }) {
   return (
-    <div className="-mx-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
-      <div className="flex w-max gap-2 px-1">{children}</div>
+    <div className="max-w-full overflow-x-auto overscroll-x-contain touch-pan-x pb-1 [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
+      <div className="flex w-max gap-2 pr-1">{children}</div>
     </div>
   );
 }

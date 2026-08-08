@@ -14,6 +14,9 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-white/75">
+          <Link href="/scorecard" className="hover:text-white">
+            Scorecard
+          </Link>
           <Link href="/?door=explore" className="hover:text-white">
             Explore USA
           </Link>
