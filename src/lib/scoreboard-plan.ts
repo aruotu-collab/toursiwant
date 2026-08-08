@@ -107,8 +107,10 @@ export function estimateHours(place: NycPlace): number {
 }
 
 export const HOURS_PER_DAY = 8;
+/** Upper bound for auto day-fit and the plan length dropdown. */
+export const MAX_TRIP_DAYS = 14;
 
-/** How many days the current wants need (1–7), from hours + place count. */
+/** How many days the current wants need, from hours + place count. */
 export function suggestedDaysForSelections(slugs: string[]): number {
   let hours = 0;
   let count = 0;
@@ -120,8 +122,9 @@ export function suggestedDaysForSelections(slugs: string[]): number {
   }
   if (!count) return 1;
   const byHours = Math.ceil(hours / HOURS_PER_DAY - 1e-9) || 1;
-  const byCount = Math.ceil(count / 4); // ~4 stops per day before adding a day
-  return Math.min(7, Math.max(1, byHours, byCount));
+  // ~3 stops/day is a realistic sightseeing pace (28 places ≈ 9–10 days)
+  const byCount = Math.ceil(count / 3);
+  return Math.min(MAX_TRIP_DAYS, Math.max(1, byHours, byCount));
 }
 
 /**
@@ -132,7 +135,7 @@ export function buildPlanFromSelections(
   slugs: string[],
   dayCount: number,
 ): BuiltPlan {
-  const daysN = Math.max(1, Math.min(7, dayCount || 3));
+  const daysN = Math.max(1, Math.min(MAX_TRIP_DAYS, dayCount || 3));
   const capacityHours = daysN * HOURS_PER_DAY;
 
   const stops: PlannedStop[] = [];

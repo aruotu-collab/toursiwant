@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { MAX_TRIP_DAYS } from "@/lib/scoreboard-plan";
 
 const WANTS_KEY = "tiw_nyc_wants_v1";
 const DAYS_KEY = "tiw_nyc_plan_days_v1";
 
 function clampDays(n: number) {
   if (!Number.isFinite(n)) return 3;
-  return Math.min(7, Math.max(1, Math.round(n)));
+  return Math.min(MAX_TRIP_DAYS, Math.max(1, Math.round(n)));
 }
 
 export function useNycWants() {

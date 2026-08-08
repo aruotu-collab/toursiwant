@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { getPlaceBySlug } from "@/lib/nyc-places";
 import {
   buildPlanFromSelections,
+  MAX_TRIP_DAYS,
   suggestedDaysForSelections,
 } from "@/lib/scoreboard-plan";
 import { useNycWants } from "@/lib/use-nyc-wants";
@@ -97,12 +98,14 @@ export function PersonalPlanBuilder() {
             }}
             className="mt-1 block border border-ink/15 bg-white px-3 py-2 outline-none focus:border-amber"
           >
-            {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-              <option key={n} value={n}>
-                {n} day{n === 1 ? "" : "s"}
-                {n === neededDays ? " · suggested" : ""}
-              </option>
-            ))}
+            {Array.from({ length: MAX_TRIP_DAYS }, (_, i) => i + 1).map(
+              (n) => (
+                <option key={n} value={n}>
+                  {n} day{n === 1 ? "" : "s"}
+                  {n === neededDays ? " · suggested" : ""}
+                </option>
+              ),
+            )}
           </select>
         </label>
       </div>
