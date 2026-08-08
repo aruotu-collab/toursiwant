@@ -9,9 +9,9 @@ import { useNycWants } from "@/lib/use-nyc-wants";
 
 export function PersonalPlanBuilder() {
   const router = useRouter();
-  const { wants, days, ready, toggle, clear, setDays } = useNycWants();
+  const { wants, days, ready, toggle, clear, removeMany, setDays } =
+    useNycWants();
 
-  // Keep the URL in sync with the saved trip length (storage is source of truth).
   useEffect(() => {
     if (!ready) return;
     router.replace(`/new-york/plan?days=${days}`, { scroll: false });
@@ -22,10 +22,22 @@ export function PersonalPlanBuilder() {
     [wants, days],
   );
 
+  const filledDays = useMemo(
+    () => plan.days.filter((d) => d.stops.length > 0).length,
+    [plan.days],
+  );
+  const emptyTrailing = days > filledDays && filledDays >= 1;
+
+  // If day 4/5 (etc.) are empty after removals, shrink trip length to match.
+  useEffect(() => {
+    if (!ready || !wants.length) return;
+    if (filledDays >= 1 && filledDays < days) {
+      setDays(filledDays);
+    }
+  }, [ready, wants.length, filledDays, days, setDays]);
+
   if (!ready) {
-    return (
-      <p className="text-ink-soft">Loading your selections…</p>
-    );
+    return <p className="text-ink-soft">Loading your selections…</p>;
   }
 
   if (!wants.length) {
@@ -56,6 +68,10 @@ export function PersonalPlanBuilder() {
             Built from {wants.length} wants
           </h1>
           <p className="mt-3 max-w-2xl text-ink-soft">{plan.note}</p>
+          <p className="mt-2 max-w-2xl text-sm text-ink-soft">
+            Clear later days (or remove their places) to shorten the trip —
+            empty days drop off automatically.
+          </p>
         </div>
         <label className="block text-sm">
           <span className="text-ink-soft">Trip length</span>
@@ -72,6 +88,22 @@ export function PersonalPlanBuilder() {
           </select>
         </label>
       </div>
+
+      {emptyTrailing ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border border-amber/40 bg-amber/[0.1] px-4 py-3">
+          <p className="text-sm text-ink">
+            Days {filledDays + 1}–{days} are empty. Shorten to a {filledDays}-day
+            trip?
+          </p>
+          <button
+            type="button"
+            onClick={() => setDays(filledDays)}
+            className="bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink-soft"
+          >
+            Use {filledDays} days
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Selected hours" value={`${plan.selectedHours}h`} />
@@ -90,14 +122,43 @@ export function PersonalPlanBuilder() {
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-display text-2xl text-ink">{day.title}</h2>
-              <p className="font-mono text-xs text-stone">
-                ~{day.hours}h · grouped to reduce travel
-              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="font-mono text-xs text-stone">
+                  ~{day.hours}h · grouped to reduce travel
+                </p>
+                {day.stops.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const slugs = day.stops.map((s) => s.slug);
+                      removeMany(slugs);
+                      // Clearing a later day should also shorten the trip.
+                      if (day.dayIndex === days && days > 1) {
+                        setDays(days - 1);
+                      }
+                    }}
+                    className="text-xs font-semibold text-ink-soft underline decoration-ink/20 hover:text-ink"
+                  >
+                    Clear this day
+                  </button>
+                ) : null}
+              </div>
             </div>
             {day.stops.length === 0 ? (
-              <p className="mt-3 text-sm text-ink-soft">
-                Light day — add more wants or shorten the trip.
-              </p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-ink-soft">
+                  Empty day — clear it from the trip length, or add wants.
+                </p>
+                {day.dayIndex > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setDays(day.dayIndex - 1)}
+                    className="text-sm font-semibold text-amber-deep hover:underline"
+                  >
+                    Drop to {day.dayIndex - 1} days
+                  </button>
+                ) : null}
+              </div>
             ) : (
               <ol className="mt-4 space-y-2">
                 {day.stops.map((s, i) => (
@@ -133,6 +194,19 @@ export function PersonalPlanBuilder() {
           </section>
         ))}
       </div>
+
+      {days > 3 && filledDays <= 3 ? (
+        <div className="border border-ink/10 bg-white px-4 py-3 text-sm text-ink-soft">
+          This plan fits in {filledDays || 3} days.{" "}
+          <button
+            type="button"
+            onClick={() => setDays(Math.max(1, filledDays || 3))}
+            className="font-semibold text-amber-deep hover:underline"
+          >
+            Switch to {Math.max(1, filledDays || 3)} days
+          </button>
+        </div>
+      ) : null}
 
       {plan.overflow.length ? (
         <section className="border border-ink/10 bg-paper-deep/40 p-5 sm:p-6">

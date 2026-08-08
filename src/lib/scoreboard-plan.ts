@@ -163,29 +163,26 @@ export function buildPlanFromSelections(
   const dayBuckets: PlannedStop[][] = Array.from({ length: daysN }, () => []);
   const dayHours = Array.from({ length: daysN }, () => 0);
 
-  const flat = areaChunks
-    .sort((a, b) => b.stops.length - a.stops.length)
-    .flatMap((c) => c.stops);
+  // Pack area groups into the earliest days that still have room so later
+  // days can stay empty (and the trip can shrink when those days are cleared).
+  const flat = areaChunks.flatMap((c) => c.stops);
 
   for (const stop of flat) {
-    let best = 0;
-    for (let i = 1; i < daysN; i++) {
-      const score =
-        dayHours[i] +
-        (dayBuckets[i].some((x) => x.area === stop.area) ? -0.5 : 0);
-      const bestScore =
-        dayHours[best] +
-        (dayBuckets[best].some((x) => x.area === stop.area) ? -0.5 : 0);
-      if (score < bestScore) best = i;
-    }
-    let target = best;
+    let target = -1;
+    // Prefer an earlier day that already has this area and has capacity.
     for (let i = 0; i < daysN; i++) {
-      if (
-        dayBuckets[i].some((x) => x.area === stop.area) &&
-        dayHours[i] + stop.hours <= HOURS_PER_DAY + 1.5
-      ) {
+      if (dayHours[i] + stop.hours > HOURS_PER_DAY + 1.5) continue;
+      if (dayBuckets[i].some((x) => x.area === stop.area)) {
         target = i;
         break;
+      }
+      if (target < 0) target = i; // first day with room
+    }
+    if (target < 0) {
+      // Over capacity — put on the earliest lightest day
+      target = 0;
+      for (let i = 1; i < daysN; i++) {
+        if (dayHours[i] < dayHours[target]) target = i;
       }
     }
     dayBuckets[target].push(stop);

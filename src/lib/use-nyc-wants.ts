@@ -66,6 +66,15 @@ export function useNycWants() {
 
   const clear = useCallback(() => persist([]), [persist]);
 
+  const removeMany = useCallback(
+    (slugs: string[]) => {
+      if (!slugs.length) return;
+      const drop = new Set(slugs);
+      persist(wants.filter((s) => !drop.has(s)));
+    },
+    [persist, wants],
+  );
+
   const isWanted = useCallback(
     (slug: string) => wants.includes(slug),
     [wants],
@@ -77,6 +86,7 @@ export function useNycWants() {
     ready,
     toggle,
     clear,
+    removeMany,
     isWanted,
     setWants: persist,
     setDays,
