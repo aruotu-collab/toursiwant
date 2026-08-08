@@ -38,27 +38,49 @@ export function ScorecardLeaderboardRail() {
         }
       }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink/10 px-4 py-3 sm:px-5">
-        <div className="flex items-center gap-2">
-          <span className="live-dot" aria-hidden />
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber-deep">
+      <div className="flex items-center justify-between gap-3 border-b border-ink/10 px-3 py-1.5 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="live-dot shrink-0" aria-hidden />
+          <p className="truncate font-mono text-[10px] uppercase tracking-[0.16em] text-amber-deep">
             Leaderboards
+            <span className="text-ink/25"> · </span>
+            <span className="text-stone">
+              {active.city}
+              <span className="hidden sm:inline">
+                {" "}
+                · {active.title}
+              </span>
+            </span>
           </p>
         </div>
-        <div className="flex items-center gap-1.5" role="tablist" aria-label="Boards">
-          {boards.map((b, i) => (
-            <button
-              key={b.id}
-              type="button"
-              role="tab"
-              aria-selected={i === index}
-              aria-label={`${b.city}: ${b.title}`}
-              onClick={() => setIndex(i)}
-              className={`h-1.5 w-5 transition ${
-                i === index ? "bg-amber" : "bg-ink/15 hover:bg-ink/30"
-              }`}
-            />
-          ))}
+        <div className="flex shrink-0 items-center gap-3">
+          {active.href ? (
+            <Link
+              href={active.href}
+              className="hidden text-xs font-semibold text-ink underline-offset-2 hover:text-amber-deep hover:underline sm:inline"
+            >
+              Open →
+            </Link>
+          ) : null}
+          <div
+            className="flex items-center gap-1"
+            role="tablist"
+            aria-label="Boards"
+          >
+            {boards.map((b, i) => (
+              <button
+                key={b.id}
+                type="button"
+                role="tab"
+                aria-selected={i === index}
+                aria-label={`${b.city}: ${b.title}`}
+                onClick={() => setIndex(i)}
+                className={`h-1 w-4 transition ${
+                  i === index ? "bg-amber" : "bg-ink/15 hover:bg-ink/30"
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
@@ -70,7 +92,7 @@ export function ScorecardLeaderboardRail() {
           {boards.map((board) => (
             <div
               key={board.id}
-              className="w-full shrink-0 px-4 py-5 sm:px-5 sm:py-6"
+              className="w-full shrink-0 px-3 py-2 sm:px-4"
               aria-hidden={board.id !== active.id}
             >
               <BoardPanel board={board} />
@@ -84,68 +106,39 @@ export function ScorecardLeaderboardRail() {
 
 function BoardPanel({ board }: { board: ScorecardLeaderboard }) {
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-stone">
-            {board.region}
-            <span className="text-ink/25"> · </span>
-            {board.live ? "Live" : "Coming soon"}
-          </p>
-          <h2 className="mt-1 font-display text-2xl text-ink sm:text-[1.75rem]">
-            {board.city}
-          </h2>
-          <p className="mt-1 text-sm font-semibold text-amber-deep">{board.title}</p>
-          <p className="mt-1 max-w-xl text-sm text-ink-soft">{board.blurb}</p>
-        </div>
-        {board.href ? (
-          <Link
-            href={board.href}
-            className="shrink-0 text-sm font-semibold text-ink underline-offset-2 hover:text-amber-deep hover:underline"
-          >
-            Open scorecard →
-          </Link>
-        ) : (
-          <span className="shrink-0 font-mono text-[11px] uppercase tracking-[0.14em] text-stone">
-            Preview
-          </span>
-        )}
-      </div>
+    <ol className="divide-y divide-ink/8">
+      {board.rows.map((row) => {
+        const inner = (
+          <>
+            <span className="w-6 shrink-0 font-mono text-[11px] text-amber-deep">
+              #{row.rank}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm text-ink">
+              {row.name}
+            </span>
+            <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-stone">
+              {row.meta}
+            </span>
+          </>
+        );
 
-      <ol className="mt-5 divide-y divide-ink/10 border-y border-ink/10">
-        {board.rows.map((row) => {
-          const inner = (
-            <>
-              <span className="w-8 shrink-0 font-mono text-xs text-amber-deep">
-                #{row.rank}
-              </span>
-              <span className="min-w-0 flex-1 truncate font-medium text-ink">
-                {row.name}
-              </span>
-              <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-stone">
-                {row.meta}
-              </span>
-            </>
-          );
-
-          return (
-            <li key={`${board.id}-${row.rank}-${row.name}`}>
-              {row.href ? (
-                <Link
-                  href={row.href}
-                  className="flex items-center gap-3 py-2.5 text-sm transition hover:bg-paper"
-                >
-                  {inner}
-                </Link>
-              ) : (
-                <div className="flex items-center gap-3 py-2.5 text-sm opacity-80">
-                  {inner}
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+        return (
+          <li key={`${board.id}-${row.rank}-${row.name}`}>
+            {row.href ? (
+              <Link
+                href={row.href}
+                className="flex items-center gap-2 py-1.5 transition hover:bg-paper"
+              >
+                {inner}
+              </Link>
+            ) : (
+              <div className="flex items-center gap-2 py-1.5 opacity-80">
+                {inner}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }

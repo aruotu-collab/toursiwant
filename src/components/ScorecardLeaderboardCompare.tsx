@@ -11,9 +11,9 @@ export function ScorecardLeaderboardCompare() {
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone">
-          Compare leaderboard styles
+          Compare styles
         </p>
         <div
           className="inline-flex border border-ink/15 bg-white p-0.5"
@@ -23,7 +23,7 @@ export function ScorecardLeaderboardCompare() {
           <button
             type="button"
             onClick={() => setStyle("gallery")}
-            className={`px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
+            className={`px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
               style === "gallery"
                 ? "bg-ink text-paper"
                 : "text-ink-soft hover:text-ink"
@@ -34,7 +34,7 @@ export function ScorecardLeaderboardCompare() {
           <button
             type="button"
             onClick={() => setStyle("bloomberg")}
-            className={`px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
+            className={`px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] transition ${
               style === "bloomberg"
                 ? "bg-ink text-paper"
                 : "text-ink-soft hover:text-ink"
@@ -50,12 +50,6 @@ export function ScorecardLeaderboardCompare() {
       ) : (
         <ScorecardLeaderboardBloomberg />
       )}
-
-      <p className="mt-2 text-xs text-ink-soft">
-        {style === "gallery"
-          ? "Gallery: warm editorial panels — easier for travelers."
-          : "Bloomberg: dense terminal board — score, change, volume, live tape."}
-      </p>
     </div>
   );
 }
