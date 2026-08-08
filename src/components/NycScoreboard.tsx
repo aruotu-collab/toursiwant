@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  pageSlice,
+  ScoreboardPagination,
+  totalPages,
+} from "@/components/ScoreboardPagination";
+import {
   costBandSortValue,
   placeMatchesCategory,
   rankNycPlaces,
@@ -72,6 +77,7 @@ export function NycScoreboard({
   const [clearTitle, setClearTitle] = useState("");
   const [clearBusy, setClearBusy] = useState(false);
   const [clearStatus, setClearStatus] = useState("");
+  const [page, setPage] = useState(1);
 
   const projectedDays = useMemo(
     () => (wants.length ? suggestedDaysForSelections(wants) : days),
@@ -141,6 +147,17 @@ export function NycScoreboard({
     return sorted;
   }, [ranked, query, categoryFilter, sortKey, sortDir]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [lens, query, categoryFilter, sortKey, sortDir]);
+
+  useEffect(() => {
+    const pages = totalPages(filtered.length);
+    if (page > pages) setPage(pages);
+  }, [filtered.length, page]);
+
+  const paged = useMemo(() => pageSlice(filtered, page), [filtered, page]);
+
   const active = scoreboardLenses.find((l) => l.id === lens);
 
   function toggleSort(key: SortKey) {
@@ -155,6 +172,11 @@ export function NycScoreboard({
         ? "asc"
         : "desc",
     );
+  }
+
+  function goToPage(next: number) {
+    setPage(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function signInForGroup(nextPath: string) {
@@ -512,7 +534,7 @@ export function NycScoreboard({
           ))}
         </ChipScrollRow>
         <ol className="mt-3 space-y-2">
-          {filtered.map((place) => (
+          {paged.map((place) => (
             <ScoreCard
               key={place.slug}
               place={place}
@@ -531,7 +553,15 @@ export function NycScoreboard({
           <p className="px-2 py-10 text-center text-sm text-ink-soft">
             No places match these filters. Try All categories or Overall.
           </p>
-        ) : null}
+        ) : (
+          <div className="mt-3 overflow-hidden border border-ink/10 bg-white">
+            <ScoreboardPagination
+              page={page}
+              total={filtered.length}
+              onPageChange={goToPage}
+            />
+          </div>
+        )}
       </div>
 
       <div className="hidden overflow-x-auto border border-ink/10 bg-white lg:block">
@@ -590,7 +620,7 @@ export function NycScoreboard({
             />
           </div>
           <ol>
-            {filtered.map((place, i) => (
+            {paged.map((place, i) => (
               <ScoreRow
                 key={place.slug}
                 place={place}
@@ -610,7 +640,13 @@ export function NycScoreboard({
             <p className="px-5 py-10 text-center text-sm text-ink-soft">
               No places match these filters. Try All categories or Overall.
             </p>
-          ) : null}
+          ) : (
+            <ScoreboardPagination
+              page={page}
+              total={filtered.length}
+              onPageChange={goToPage}
+            />
+          )}
         </div>
       </div>
 

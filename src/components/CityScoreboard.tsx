@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   rankCityPlaces,
   type RankedCityPlace,
@@ -13,6 +13,11 @@ import {
   scoreboardLenses,
   type ScoreboardLens,
 } from "@/lib/tiw-score";
+import {
+  pageSlice,
+  ScoreboardPagination,
+  totalPages,
+} from "@/components/ScoreboardPagination";
 
 type SortKey = "rank" | "score" | "name" | "cost";
 type SortDir = "asc" | "desc";
@@ -32,6 +37,7 @@ export function CityScoreboard({
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(1);
 
   const ranked = useMemo(() => rankCityPlaces(places, lens), [places, lens]);
 
@@ -59,6 +65,17 @@ export function CityScoreboard({
     });
   }, [ranked, query, sortKey, sortDir]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [lens, query, sortKey, sortDir]);
+
+  useEffect(() => {
+    const pages = totalPages(filtered.length);
+    if (page > pages) setPage(pages);
+  }, [filtered.length, page]);
+
+  const paged = useMemo(() => pageSlice(filtered, page), [filtered, page]);
+
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -66,6 +83,11 @@ export function CityScoreboard({
     }
     setSortKey(key);
     setSortDir(key === "name" ? "asc" : "desc");
+  }
+
+  function goToPage(next: number) {
+    setPage(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   const active = scoreboardLenses.find((l) => l.id === lens);
@@ -164,7 +186,7 @@ export function CityScoreboard({
           ))}
         </div>
         <ol>
-          {filtered.map((p, i) => (
+          {paged.map((p, i) => (
             <PlaceRow
               key={p.slug}
               place={p}
@@ -175,7 +197,13 @@ export function CityScoreboard({
         </ol>
         {!filtered.length ? (
           <p className="p-6 text-sm text-ink-soft">No places match that search.</p>
-        ) : null}
+        ) : (
+          <ScoreboardPagination
+            page={page}
+            total={filtered.length}
+            onPageChange={goToPage}
+          />
+        )}
       </div>
     </div>
   );
