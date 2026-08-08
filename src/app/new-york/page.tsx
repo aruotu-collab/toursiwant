@@ -50,8 +50,8 @@ export default async function NewYorkScoreboardPage({
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-soft sm:text-lg">
             What&apos;s actually worth doing — ranked. Every place gets a
-            transparent TIW Score. Change the filter and the board re-ranks for
-            families, free activities, views, food, and more.
+            transparent TIW Score (ToursIWant, 0–100). Change the filter and the
+            board re-ranks for families, free activities, views, food, and more.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a
@@ -69,7 +69,7 @@ export default async function NewYorkScoreboardPage({
           </div>
           <dl className="mt-10 grid max-w-3xl gap-4 sm:grid-cols-3">
             {[
-              ["0–100", "TIW Score on every place"],
+              ["0–100", "TIW Score (ToursIWant) on every place"],
               ["12 lenses", "Re-rank by what matters"],
               ["Then book", "Optional Viator experiences"],
             ].map(([k, v]) => (

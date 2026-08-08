@@ -133,10 +133,11 @@ export default async function NewYorkPlacePage({ params, searchParams }: Props) 
             </dl>
           </div>
 
-          <aside className="border border-ink/10 bg-ink px-6 py-7 text-white lg:sticky lg:top-28">
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
-              TIW Score
-            </p>
+            <aside className="border border-ink/10 bg-ink px-6 py-7 text-white lg:sticky lg:top-28">
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber">
+                TIW Score
+              </p>
+              <p className="mt-1 text-xs text-white/55">ToursIWant · 0–100</p>
             <p className="mt-2 font-display text-6xl leading-none tracking-tight">
               {score}
               <span className="text-3xl text-white/50">/100</span>

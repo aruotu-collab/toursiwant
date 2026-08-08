@@ -392,7 +392,7 @@ export function GroupScoreboardClient({ code }: Props) {
       ) : null}
 
       <p className="text-xs text-stone">
-        TIW Score = ToursIWant quality rating. Group column = how many of you
+        TIW = ToursIWant quality rating (0–100). Group column = how many of you
         want it. Group Fit blends both so you can see agreement + quality
         together.
       </p>

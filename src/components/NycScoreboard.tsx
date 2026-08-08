@@ -402,6 +402,8 @@ export function NycScoreboard({
             />
             <SortHeading
               label="TIW Score"
+              hint="ToursIWant"
+              title="TIW = ToursIWant — our 0–100 quality rating"
               active={sortKey === "score"}
               dir={sortDir}
               onClick={() => toggleSort("score")}
@@ -462,9 +464,9 @@ export function NycScoreboard({
       </div>
 
       <p className="text-xs leading-relaxed text-stone">
-        Best for = who it suits (Families, Couples, First-time visitors…). Free
-        / Paid is cost. Personalize matches trip day types. Click headings to
-        sort ascending or descending.
+        TIW = ToursIWant — our 0–100 quality rating for each place. Best for =
+        who it suits (Families, Couples, First-time visitors…). Free / Paid is
+        cost. Personalize matches trip day types. Click headings to sort.
       </p>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink/15 bg-ink text-white shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">
@@ -633,12 +635,16 @@ export function NycScoreboard({
 
 function SortHeading({
   label,
+  hint,
+  title,
   active,
   dir,
   onClick,
   align = "left",
 }: {
   label: string;
+  hint?: string;
+  title?: string;
   active: boolean;
   dir: SortDir;
   onClick: () => void;
@@ -652,10 +658,20 @@ function SortHeading({
       className={`self-center transition hover:text-ink ${
         align === "right" ? "text-right" : "text-left"
       } ${active ? "font-semibold text-ink" : ""}`}
-      title={`Sort by ${label} (${active ? (dir === "asc" ? "ascending — click for descending" : "descending — click for ascending") : "click to sort"})`}
+      title={
+        title ||
+        `Sort by ${label} (${active ? (dir === "asc" ? "ascending — click for descending" : "descending — click for ascending") : "click to sort"})`
+      }
     >
-      {label}
-      {arrow}
+      <span className="block">
+        {label}
+        {arrow}
+      </span>
+      {hint ? (
+        <span className="mt-0.5 block text-[9px] font-normal normal-case tracking-normal text-stone">
+          {hint}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -713,12 +729,13 @@ function ScoreRow({
       <Link
         href={`/new-york/${place.slug}?lens=${lens}`}
         className="text-right"
+        title="TIW Score = ToursIWant quality rating (0–100)"
       >
         <span className="font-display text-2xl text-ink sm:text-3xl">
           {place.tiwScore}
         </span>
         <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wider text-stone">
-          /100
+          /100 TIW
         </span>
       </Link>
 
