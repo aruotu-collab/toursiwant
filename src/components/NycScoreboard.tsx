@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  costBandSortValue,
   placeMatchesCategory,
   rankNycPlaces,
   type RankedPlace,
@@ -24,7 +25,7 @@ function lensMeta(id: ScoreboardLens) {
   return scoreboardLenses.find((l) => l.id === id);
 }
 
-type SortKey = "rank" | "score" | "bestFor" | "category" | "name";
+type SortKey = "rank" | "score" | "bestFor" | "cost" | "category" | "name";
 type SortDir = "asc" | "desc";
 
 export function NycScoreboard({
@@ -78,7 +79,10 @@ export function NycScoreboard({
           cmp = a.tiwScore - b.tiwScore;
           break;
         case "bestFor":
-          cmp = (a.bestFor[0] || "").localeCompare(b.bestFor[0] || "");
+          cmp = a.audience.localeCompare(b.audience);
+          break;
+        case "cost":
+          cmp = costBandSortValue(a) - costBandSortValue(b);
           break;
         case "category":
           cmp = a.primaryCategoryLabel.localeCompare(b.primaryCategoryLabel);
@@ -104,7 +108,11 @@ export function NycScoreboard({
     }
     setSortKey(key);
     // Text columns default ascending; numbers default descending (high first)
-    setSortDir(key === "bestFor" || key === "category" || key === "name" ? "asc" : "desc");
+    setSortDir(
+      key === "bestFor" || key === "category" || key === "name" || key === "cost"
+        ? "asc"
+        : "desc",
+    );
   }
 
   async function createGroup() {
@@ -337,8 +345,8 @@ export function NycScoreboard({
       </div>
 
       <div className="overflow-x-auto border border-ink/10 bg-white">
-        <div className="min-w-[52rem]">
-          <div className="grid grid-cols-[5.5rem_4rem_minmax(12rem,1.4fr)_5.5rem_7rem_9rem] gap-3 border-b border-ink/10 bg-paper-deep/60 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-stone sm:px-5">
+        <div className="min-w-[58rem]">
+          <div className="grid grid-cols-[5.5rem_4rem_minmax(12rem,1.3fr)_5.5rem_5.5rem_7.5rem_8.5rem] gap-3 border-b border-ink/10 bg-paper-deep/60 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-stone sm:px-5">
             <span className="self-center">Select</span>
             <SortHeading
               label="Rank"
@@ -358,6 +366,13 @@ export function NycScoreboard({
               active={sortKey === "score"}
               dir={sortDir}
               onClick={() => toggleSort("score")}
+              align="right"
+            />
+            <SortHeading
+              label="Free / Paid"
+              active={sortKey === "cost"}
+              dir={sortDir}
+              onClick={() => toggleSort("cost")}
               align="right"
             />
             <SortHeading
@@ -401,9 +416,9 @@ export function NycScoreboard({
       </div>
 
       <p className="text-xs leading-relaxed text-stone">
-        Personalize categories match the day types used when you build a trip
-        (Famous sights, Food tour, Museums / culture, and so on). Click column
-        headings to sort ascending or descending.
+        Best for = who it suits (Families, Couples, First-time visitors…). Free
+        / Paid is cost. Personalize matches trip day types. Click headings to
+        sort ascending or descending.
       </p>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink/15 bg-ink text-white shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">
@@ -493,10 +508,9 @@ function ScoreRow({
   onToggle: () => void;
   onCategoryClick: (cat: ExperienceCategory) => void;
 }) {
-  const best = place.bestFor[0] || place.tags[0] || "—";
   return (
     <li
-      className={`grid grid-cols-[5.5rem_4rem_minmax(12rem,1.4fr)_5.5rem_7rem_9rem] items-center gap-3 border-b border-ink/8 px-4 py-3 sm:px-5 sm:py-4 ${
+      className={`grid grid-cols-[5.5rem_4rem_minmax(12rem,1.3fr)_5.5rem_5.5rem_7.5rem_8.5rem] items-center gap-3 border-b border-ink/8 px-4 py-3 sm:px-5 sm:py-4 ${
         stripe ? "bg-paper/40" : "bg-white"
       }`}
     >
@@ -541,7 +555,21 @@ function ScoreRow({
         </span>
       </Link>
 
-      <span className="truncate text-right text-sm text-ink-soft">{best}</span>
+      <span
+        className={`truncate text-right text-sm font-semibold ${
+          place.costBand === "Free"
+            ? "text-amber-deep"
+            : place.costBand === "Under $50"
+              ? "text-ink"
+              : "text-ink-soft"
+        }`}
+      >
+        {place.costBand}
+      </span>
+
+      <span className="truncate text-right text-sm text-ink-soft">
+        {place.audience}
+      </span>
 
       <div className="flex flex-wrap justify-end gap-1">
         {place.categories.slice(0, 2).map((cat) => (

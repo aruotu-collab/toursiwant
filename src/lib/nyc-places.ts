@@ -1167,6 +1167,10 @@ export type RankedPlace = NycPlace & {
   categories: ExperienceCategory[];
   primaryCategory: ExperienceCategory;
   primaryCategoryLabel: string;
+  /** Who it's for (Families, Couples, …) — never Free/Paid */
+  audience: string;
+  /** Free / Under $50 / Paid */
+  costBand: "Free" | "Under $50" | "Paid";
 };
 
 /** Map scoreboard places onto the same personalize categories used in trip templates. */
@@ -1208,6 +1212,40 @@ export function placeMatchesCategory(
   category: ExperienceCategory,
 ): boolean {
   return categoriesForPlace(place).includes(category);
+}
+
+/** Who the place is best for — people / traveller types only (not Free/Paid). */
+const AUDIENCE_LABELS = new Set([
+  "First-time visitors",
+  "Families",
+  "Couples",
+  "Everyone",
+  "Groups",
+  "Solo travellers",
+]);
+
+export function audienceForPlace(place: NycPlace): string {
+  for (const b of place.bestFor) {
+    if (AUDIENCE_LABELS.has(b)) return b;
+  }
+  if (place.tags.includes("family")) return "Families";
+  if (place.tags.includes("couples")) return "Couples";
+  if (place.tags.includes("first-time")) return "First-time visitors";
+  return "Everyone";
+}
+
+/** Cost band for the Free / Paid column. */
+export function costBandLabel(place: NycPlace): "Free" | "Under $50" | "Paid" {
+  if (place.cost === "free") return "Free";
+  if (place.cost === "under_50") return "Under $50";
+  return "Paid";
+}
+
+/** Sort key: Free → Under $50 → Paid */
+export function costBandSortValue(place: NycPlace): number {
+  if (place.cost === "free") return 0;
+  if (place.cost === "under_50") return 1;
+  return 2;
 }
 
 function matchesLens(place: NycPlace, lens: ScoreboardLens): boolean {
@@ -1259,6 +1297,8 @@ export function rankNycPlaces(lens: ScoreboardLens = "overall"): RankedPlace[] {
         categories,
         primaryCategory,
         primaryCategoryLabel: experienceCategoryLabel[primaryCategory],
+        audience: audienceForPlace(p),
+        costBand: costBandLabel(p),
       };
     })
     .sort((a, b) => b.tiwScore - a.tiwScore || a.name.localeCompare(b.name));
