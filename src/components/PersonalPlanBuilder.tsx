@@ -1,17 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { getPlaceBySlug } from "@/lib/nyc-places";
 import { buildPlanFromSelections } from "@/lib/scoreboard-plan";
 import { useNycWants } from "@/lib/use-nyc-wants";
 
 export function PersonalPlanBuilder() {
-  const searchParams = useSearchParams();
-  const initialDays = Number(searchParams.get("days") || 3) || 3;
-  const [days, setDays] = useState(Math.min(7, Math.max(1, initialDays)));
-  const { wants, ready, toggle, clear } = useNycWants();
+  const router = useRouter();
+  const { wants, days, ready, toggle, clear, setDays } = useNycWants();
+
+  // Keep the URL in sync with the saved trip length (storage is source of truth).
+  useEffect(() => {
+    if (!ready) return;
+    router.replace(`/new-york/plan?days=${days}`, { scroll: false });
+  }, [ready, days, router]);
 
   const plan = useMemo(
     () => buildPlanFromSelections(wants, days),

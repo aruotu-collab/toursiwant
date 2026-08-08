@@ -40,7 +40,7 @@ export function NycScoreboard({
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [query, setQuery] = useState("");
-  const { wants, ready, toggle, clear, isWanted } = useNycWants();
+  const { wants, days, ready, toggle, clear, isWanted } = useNycWants();
   const [groupOpen, setGroupOpen] = useState(false);
   const [groupTitle, setGroupTitle] = useState("New York Friends Trip");
   const [hostName, setHostName] = useState("");
@@ -429,7 +429,7 @@ export function NycScoreboard({
             </p>
             <p className="text-xs text-white/55">
               {wants.length
-                ? "Build a trip from your wants — or start a group vote."
+                ? `${days}-day plan ready — add more wants anytime, then rebuild.`
                 : "Tap Want to go on places you like."}
             </p>
           </div>
@@ -444,7 +444,11 @@ export function NycScoreboard({
               </button>
             ) : null}
             <Link
-              href={wants.length ? `/new-york/plan?days=3` : "/new-york/plan"}
+              href={
+                wants.length
+                  ? `/new-york/plan?days=${days}`
+                  : "/new-york/plan"
+              }
               className={`px-4 py-2 text-sm font-semibold ${
                 wants.length
                   ? "bg-amber text-ink hover:bg-amber-deep"
@@ -455,7 +459,7 @@ export function NycScoreboard({
                 if (!wants.length) e.preventDefault();
               }}
             >
-              Build my trip
+              Build my {days}-day trip
             </Link>
           </div>
         </div>
