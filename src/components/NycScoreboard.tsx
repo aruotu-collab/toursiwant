@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  placeMatchesCategory,
   rankNycPlaces,
   type RankedPlace,
 } from "@/lib/nyc-places";
@@ -12,11 +13,19 @@ import {
   scoreboardLenses,
   type ScoreboardLens,
 } from "@/lib/tiw-score";
+import {
+  experienceCategoryLabel,
+  personalizeOptions,
+  type ExperienceCategory,
+} from "@/lib/trip-templates";
 import { useNycWants } from "@/lib/use-nyc-wants";
 
 function lensMeta(id: ScoreboardLens) {
   return scoreboardLenses.find((l) => l.id === id);
 }
+
+type SortKey = "rank" | "score" | "bestFor" | "category" | "name";
+type SortDir = "asc" | "desc";
 
 export function NycScoreboard({
   initialLens = "overall",
@@ -24,6 +33,11 @@ export function NycScoreboard({
   initialLens?: ScoreboardLens;
 }) {
   const [lens, setLens] = useState<ScoreboardLens>(initialLens);
+  const [categoryFilter, setCategoryFilter] = useState<ExperienceCategory | "">(
+    "",
+  );
+  const [sortKey, setSortKey] = useState<SortKey>("score");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [query, setQuery] = useState("");
   const { wants, ready, toggle, clear, isWanted } = useNycWants();
   const [groupOpen, setGroupOpen] = useState(false);
@@ -33,19 +47,65 @@ export function NycScoreboard({
   const [groupError, setGroupError] = useState("");
 
   const ranked = useMemo(() => rankNycPlaces(lens), [lens]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return ranked;
-    return ranked.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.neighborhood.toLowerCase().includes(q) ||
-        p.bestFor.some((b) => b.toLowerCase().includes(q)) ||
-        p.tags.some((t) => t.includes(q)),
-    );
-  }, [ranked, query]);
+    let list = ranked;
+    if (categoryFilter) {
+      list = list.filter((p) => placeMatchesCategory(p, categoryFilter));
+    }
+    if (q) {
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.neighborhood.toLowerCase().includes(q) ||
+          p.bestFor.some((b) => b.toLowerCase().includes(q)) ||
+          p.tags.some((t) => t.includes(q)) ||
+          p.categories.some((c) =>
+            experienceCategoryLabel[c].toLowerCase().includes(q),
+          ),
+      );
+    }
+
+    const dir = sortDir === "asc" ? 1 : -1;
+    const sorted = [...list].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "rank":
+          cmp = a.rank - b.rank;
+          break;
+        case "score":
+          cmp = a.tiwScore - b.tiwScore;
+          break;
+        case "bestFor":
+          cmp = (a.bestFor[0] || "").localeCompare(b.bestFor[0] || "");
+          break;
+        case "category":
+          cmp = a.primaryCategoryLabel.localeCompare(b.primaryCategoryLabel);
+          break;
+        case "name":
+          cmp = a.name.localeCompare(b.name);
+          break;
+        default:
+          cmp = 0;
+      }
+      if (cmp !== 0) return cmp * dir;
+      return a.name.localeCompare(b.name);
+    });
+    return sorted;
+  }, [ranked, query, categoryFilter, sortKey, sortDir]);
 
   const active = scoreboardLenses.find((l) => l.id === lens);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    // Text columns default ascending; numbers default descending (high first)
+    setSortDir(key === "bestFor" || key === "category" || key === "name" ? "asc" : "desc");
+  }
 
   async function createGroup() {
     setCreating(true);
@@ -71,7 +131,6 @@ export function NycScoreboard({
         `tiw_group_voter_${data.group.shareCode}`,
         data.voterKey,
       );
-      // Seed host wants into group votes if they already selected
       if (wants.length) {
         const votes = Object.fromEntries(wants.map((s) => [s, "want" as const]));
         await fetch(`/api/scoreboard-groups/${data.group.shareCode}`, {
@@ -96,18 +155,21 @@ export function NycScoreboard({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber-deep">
-            Places · {filtered.length} ranked
+            Places · {filtered.length} shown
           </p>
           <h2 className="mt-2 font-display text-3xl text-ink sm:text-4xl">
-            {lens === "overall"
-              ? "New York Top Places"
-              : active?.group === "interest"
-                ? `${active.label} in New York`
-                : `Best for ${active?.label || "you"}`}
+            {categoryFilter
+              ? experienceCategoryLabel[categoryFilter]
+              : lens === "overall"
+                ? "New York Top Places"
+                : active?.group === "interest"
+                  ? `${active.label} in New York`
+                  : `Best for ${active?.label || "you"}`}
           </h2>
           <p className="mt-2 max-w-xl text-sm text-ink-soft sm:text-base">
-            Sort by interest — e.g. History, then Art &amp; culture — pick what
-            you want from each list. Your selections stay in the tray below.
+            Use personalize categories and column headers to sort. Click a
+            heading again to flip ascending / descending. Your wants stay in
+            the tray.
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:max-w-xs">
@@ -175,21 +237,64 @@ export function NycScoreboard({
       <div className="space-y-3">
         <div>
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-amber-deep">
+            Personalize categories
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter("")}
+              className={`border px-3 py-1.5 text-sm transition ${
+                !categoryFilter
+                  ? "border-amber bg-amber text-ink"
+                  : "border-ink/15 bg-white text-ink-soft hover:border-amber"
+              }`}
+            >
+              All categories
+            </button>
+            {personalizeOptions.map((opt) => {
+              const on = categoryFilter === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    setCategoryFilter(opt.id);
+                    setSortKey("score");
+                    setSortDir("desc");
+                  }}
+                  className={`border px-3 py-1.5 text-sm transition ${
+                    on
+                      ? "border-amber bg-amber text-ink"
+                      : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-stone">
             Sort by interest
           </p>
           <div className="flex flex-wrap gap-2">
             {interestLenses.map((id) => {
               const l = lensMeta(id);
               if (!l) return null;
-              const on = lens === id;
+              const on = lens === id && !categoryFilter;
               return (
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setLens(id)}
+                  onClick={() => {
+                    setLens(id);
+                    setCategoryFilter("");
+                  }}
                   className={`border px-3 py-1.5 text-sm transition ${
                     on
-                      ? "border-amber bg-amber text-ink"
+                      ? "border-ink bg-ink text-white"
                       : "border-ink/15 bg-white text-ink-soft hover:border-amber hover:text-ink"
                   }`}
                 >
@@ -199,6 +304,7 @@ export function NycScoreboard({
             })}
           </div>
         </div>
+
         <div>
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-stone">
             Or sort by who / practical
@@ -207,12 +313,15 @@ export function NycScoreboard({
             {practicalLenses.map((id) => {
               const l = lensMeta(id);
               if (!l) return null;
-              const on = lens === id;
+              const on = lens === id && !categoryFilter;
               return (
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setLens(id)}
+                  onClick={() => {
+                    setLens(id);
+                    setCategoryFilter("");
+                  }}
                   className={`border px-3 py-1.5 text-sm transition ${
                     on
                       ? "border-ink bg-ink text-white"
@@ -227,72 +336,76 @@ export function NycScoreboard({
         </div>
       </div>
 
-      <div className="overflow-hidden border border-ink/10 bg-white">
-        <div className="hidden grid-cols-[5.5rem_4rem_1fr_5.5rem_7rem] gap-3 border-b border-ink/10 bg-paper-deep/60 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-stone sm:grid sm:px-5">
-          <span>Select</span>
-          <span>Rank</span>
-          <span>Place / experience</span>
-          <button
-            type="button"
-            onClick={() => setLens("overall")}
-            className="text-right transition hover:text-ink"
-            title="Sort by TIW Score (overall)"
-          >
-            TIW Score{lens === "overall" ? " ↓" : ""}
-          </button>
-          <div className="relative text-right">
-            <label className="sr-only" htmlFor="best-for-sort">
-              Sort by interest
-            </label>
-            <select
-              id="best-for-sort"
-              value={interestLenses.includes(lens) ? lens : ""}
-              onChange={(e) => {
-                const v = e.target.value as ScoreboardLens | "";
-                if (v) setLens(v);
-              }}
-              className="w-full cursor-pointer appearance-none bg-transparent text-right font-mono text-[10px] uppercase tracking-[0.14em] text-stone outline-none hover:text-ink"
-            >
-              <option value="">Best for</option>
-              {interestLenses.map((id) => {
-                const l = lensMeta(id);
-                return (
-                  <option key={id} value={id}>
-                    {l?.label}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-        </div>
-        <ol>
-          {filtered.map((place, i) => (
-            <ScoreRow
-              key={place.slug}
-              place={place}
-              stripe={i % 2 === 1}
-              lens={lens}
-              wanted={ready && isWanted(place.slug)}
-              onToggle={() => toggle(place.slug)}
+      <div className="overflow-x-auto border border-ink/10 bg-white">
+        <div className="min-w-[52rem]">
+          <div className="grid grid-cols-[5.5rem_4rem_minmax(12rem,1.4fr)_5.5rem_7rem_9rem] gap-3 border-b border-ink/10 bg-paper-deep/60 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-stone sm:px-5">
+            <span className="self-center">Select</span>
+            <SortHeading
+              label="Rank"
+              active={sortKey === "rank"}
+              dir={sortDir}
+              onClick={() => toggleSort("rank")}
             />
-          ))}
-        </ol>
-        {!filtered.length ? (
-          <p className="px-5 py-10 text-center text-sm text-ink-soft">
-            No places match this lens and search. Try Overall or clear the
-            search.
-          </p>
-        ) : null}
+            <SortHeading
+              label="Place / experience"
+              active={sortKey === "name"}
+              dir={sortDir}
+              onClick={() => toggleSort("name")}
+              align="left"
+            />
+            <SortHeading
+              label="TIW Score"
+              active={sortKey === "score"}
+              dir={sortDir}
+              onClick={() => toggleSort("score")}
+              align="right"
+            />
+            <SortHeading
+              label="Best for"
+              active={sortKey === "bestFor"}
+              dir={sortDir}
+              onClick={() => toggleSort("bestFor")}
+              align="right"
+            />
+            <SortHeading
+              label="Personalize"
+              active={sortKey === "category"}
+              dir={sortDir}
+              onClick={() => toggleSort("category")}
+              align="right"
+            />
+          </div>
+          <ol>
+            {filtered.map((place, i) => (
+              <ScoreRow
+                key={place.slug}
+                place={place}
+                stripe={i % 2 === 1}
+                lens={lens}
+                wanted={ready && isWanted(place.slug)}
+                onToggle={() => toggle(place.slug)}
+                onCategoryClick={(cat) => {
+                  setCategoryFilter(cat);
+                  setSortKey("score");
+                  setSortDir("desc");
+                }}
+              />
+            ))}
+          </ol>
+          {!filtered.length ? (
+            <p className="px-5 py-10 text-center text-sm text-ink-soft">
+              No places match these filters. Try All categories or Overall.
+            </p>
+          ) : null}
+        </div>
       </div>
 
       <p className="text-xs leading-relaxed text-stone">
-        TIW Score is a 0–100 rating from traveller satisfaction, popularity,
-        value, uniqueness, convenience, and first-visit importance. Your
-        selections become a personal plan — or a group scoreboard when you
-        invite friends.
+        Personalize categories match the day types used when you build a trip
+        (Famous sights, Food tour, Museums / culture, and so on). Click column
+        headings to sort ascending or descending.
       </p>
 
-      {/* Persistent selection tray */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink/15 bg-ink text-white shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-8">
           <div>
@@ -316,11 +429,7 @@ export function NycScoreboard({
               </button>
             ) : null}
             <Link
-              href={
-                wants.length
-                  ? `/new-york/plan?days=3`
-                  : "/new-york/plan"
-              }
+              href={wants.length ? `/new-york/plan?days=3` : "/new-york/plan"}
               className={`px-4 py-2 text-sm font-semibold ${
                 wants.length
                   ? "bg-amber text-ink hover:bg-amber-deep"
@@ -340,30 +449,61 @@ export function NycScoreboard({
   );
 }
 
+function SortHeading({
+  label,
+  active,
+  dir,
+  onClick,
+  align = "left",
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+  align?: "left" | "right";
+}) {
+  const arrow = active ? (dir === "asc" ? " ↑" : " ↓") : "";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`self-center transition hover:text-ink ${
+        align === "right" ? "text-right" : "text-left"
+      } ${active ? "font-semibold text-ink" : ""}`}
+      title={`Sort by ${label} (${active ? (dir === "asc" ? "ascending — click for descending" : "descending — click for ascending") : "click to sort"})`}
+    >
+      {label}
+      {arrow}
+    </button>
+  );
+}
+
 function ScoreRow({
   place,
   stripe,
   lens,
   wanted,
   onToggle,
+  onCategoryClick,
 }: {
   place: RankedPlace;
   stripe: boolean;
   lens: ScoreboardLens;
   wanted: boolean;
   onToggle: () => void;
+  onCategoryClick: (cat: ExperienceCategory) => void;
 }) {
   const best = place.bestFor[0] || place.tags[0] || "—";
   return (
     <li
-      className={`grid grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-ink/8 px-3 py-3 sm:grid-cols-[5.5rem_4rem_1fr_5.5rem_7rem] sm:gap-3 sm:px-5 sm:py-4 ${
+      className={`grid grid-cols-[5.5rem_4rem_minmax(12rem,1.4fr)_5.5rem_7rem_9rem] items-center gap-3 border-b border-ink/8 px-4 py-3 sm:px-5 sm:py-4 ${
         stripe ? "bg-paper/40" : "bg-white"
       }`}
     >
       <button
         type="button"
         onClick={onToggle}
-        className={`shrink-0 border px-2 py-1.5 text-left text-xs font-semibold transition sm:px-2.5 sm:text-sm ${
+        className={`shrink-0 border px-2 py-1.5 text-left text-xs font-semibold transition sm:text-sm ${
           wanted
             ? "border-amber bg-amber text-ink"
             : "border-ink/20 bg-white text-ink-soft hover:border-amber hover:text-ink"
@@ -375,34 +515,63 @@ function ScoreRow({
 
       <Link
         href={`/new-york/${place.slug}?lens=${lens}`}
-        className="contents"
+        className="font-mono text-sm font-semibold text-amber-deep sm:text-base"
       >
-        <span className="font-mono text-sm font-semibold text-amber-deep sm:text-base">
-          #{place.rank}
+        #{place.rank}
+      </Link>
+
+      <Link href={`/new-york/${place.slug}?lens=${lens}`} className="min-w-0">
+        <span className="block truncate font-display text-base text-ink sm:text-xl">
+          {place.name}
         </span>
-        <span className="col-span-2 min-w-0 sm:col-span-1">
-          <span className="block truncate font-display text-base text-ink sm:text-xl">
-            {place.name}
-          </span>
-          <span className="mt-0.5 block truncate text-xs text-ink-soft sm:text-sm">
-            {place.neighborhood} · {place.typicalCostLabel}
-          </span>
-          <span className="mt-1 block text-xs text-ink-soft sm:hidden">
-            Best for {best}
-          </span>
-        </span>
-        <span className="text-right">
-          <span className="font-display text-2xl text-ink sm:text-3xl">
-            {place.tiwScore}
-          </span>
-          <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wider text-stone">
-            /100
-          </span>
-        </span>
-        <span className="hidden truncate text-right text-sm text-ink-soft sm:block">
-          {best}
+        <span className="mt-0.5 block truncate text-xs text-ink-soft sm:text-sm">
+          {place.neighborhood} · {place.typicalCostLabel}
         </span>
       </Link>
+
+      <Link
+        href={`/new-york/${place.slug}?lens=${lens}`}
+        className="text-right"
+      >
+        <span className="font-display text-2xl text-ink sm:text-3xl">
+          {place.tiwScore}
+        </span>
+        <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wider text-stone">
+          /100
+        </span>
+      </Link>
+
+      <span className="truncate text-right text-sm text-ink-soft">{best}</span>
+
+      <div className="flex flex-wrap justify-end gap-1">
+        {place.categories.slice(0, 2).map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => onCategoryClick(cat)}
+            className="max-w-full truncate border border-ink/10 bg-white px-1.5 py-0.5 text-[10px] text-ink-soft hover:border-amber hover:text-ink"
+            title={experienceCategoryLabel[cat]}
+          >
+            {shortCategory(experienceCategoryLabel[cat])}
+          </button>
+        ))}
+      </div>
     </li>
   );
+}
+
+function shortCategory(label: string) {
+  return label
+    .replace("Museums / culture", "Culture")
+    .replace("Live entertainment / show", "Shows")
+    .replace("Children’s activities", "Family")
+    .replace("Religious / spiritual sites", "Spiritual")
+    .replace("Free time / slow day", "Free time")
+    .replace("Waterpark / theme park", "Water")
+    .replace("Private group dinner", "Private dinner")
+    .replace("Relaxation / spa", "Relax")
+    .replace("Famous sights", "Sights")
+    .replace("Nature / parks day", "Nature")
+    .replace("Food tour", "Food")
+    .replace("Shopping day", "Shopping");
 }

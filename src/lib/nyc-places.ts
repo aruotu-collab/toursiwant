@@ -4,6 +4,10 @@ import {
   type ScoreFactors,
   type ScoreboardLens,
 } from "@/lib/tiw-score";
+import {
+  experienceCategoryLabel,
+  type ExperienceCategory,
+} from "@/lib/trip-templates";
 
 export type PlaceTag =
   | "first-time"
@@ -1159,10 +1163,51 @@ export type RankedPlace = NycPlace & {
   tiwScore: number;
   rank: number;
   explanation: string;
+  /** Personalize categories aligned with trip day options */
+  categories: ExperienceCategory[];
+  primaryCategory: ExperienceCategory;
+  primaryCategoryLabel: string;
 };
+
+/** Map scoreboard places onto the same personalize categories used in trip templates. */
+export function categoriesForPlace(place: NycPlace): ExperienceCategory[] {
+  const cats = new Set<ExperienceCategory>();
+  const blob = `${place.name} ${place.neighborhood} ${place.summary}`.toLowerCase();
+
+  for (const t of place.tags) {
+    if (t === "food") cats.add("FOOD");
+    if (t === "culture" || t === "history") cats.add("CULTURE");
+    if (t === "family") cats.add("FAMILY");
+    if (t === "shopping") cats.add("SHOPPING");
+    if (t === "nightlife") cats.add("NIGHTLIFE");
+    if (t === "evening") cats.add("LIVE_ENTERTAINMENT");
+    if (t === "views" || t === "first-time" || t === "photography")
+      cats.add("SIGHTS");
+    if (t === "walking" && /park|high line|garden|lawn/.test(blob))
+      cats.add("NATURE");
+  }
+
+  if (/park|high line|garden|island|lawn|nature/.test(blob)) cats.add("NATURE");
+  if (/cathedral|church|memorial|synagogue|temple/.test(blob))
+    cats.add("RELIGIOUS");
+  if (/cruise|ferry|harbor|boat/.test(blob)) cats.add("WATER_ACTIVITY");
+  if (/spa|soft reset|relax/.test(blob)) cats.add("RELAX");
+  if (/broadway|apollo|lincoln center|radio city|show|jazz/.test(blob))
+    cats.add("LIVE_ENTERTAINMENT");
+
+  if (!cats.size) cats.add("SIGHTS");
+  return [...cats];
+}
 
 export function getPlaceBySlug(slug: string): NycPlace | null {
   return nycPlaces.find((p) => p.slug === slug) || null;
+}
+
+export function placeMatchesCategory(
+  place: NycPlace,
+  category: ExperienceCategory,
+): boolean {
+  return categoriesForPlace(place).includes(category);
 }
 
 function matchesLens(place: NycPlace, lens: ScoreboardLens): boolean {
@@ -1203,12 +1248,17 @@ export function rankNycPlaces(lens: ScoreboardLens = "overall"): RankedPlace[] {
     .filter((p) => matchesLens(p, lens))
     .map((p) => {
       const tiwScore = computeTiwScore(p.factors, lens);
+      const categories = categoriesForPlace(p);
+      const primaryCategory = categories[0]!;
       return {
         ...p,
         tiwScore,
         rank: 0,
         explanation:
           p.whyHigh || scoreExplanation(p.name, p.factors, tiwScore),
+        categories,
+        primaryCategory,
+        primaryCategoryLabel: experienceCategoryLabel[primaryCategory],
       };
     })
     .sort((a, b) => b.tiwScore - a.tiwScore || a.name.localeCompare(b.name));
