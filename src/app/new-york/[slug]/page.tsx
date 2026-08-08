@@ -70,13 +70,13 @@ export default async function NewYorkPlacePage({ params, searchParams }: Props) 
     place.whyHigh ||
     `${place.name} scores ${score}/100 on the TIW Scoreboard.`;
 
-  const boardHref = `/new-york?lens=${lens}#board`;
+  const boardHref = `/new-york?lens=${lens}&focus=${encodeURIComponent(place.slug)}`;
 
   return (
     <main className="max-w-[100vw] flex-1 overflow-x-clip bg-paper pb-24 pt-[7.5rem] sm:pt-32 lg:pb-0">
       <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8 sm:py-14">
         <p className="text-sm text-ink-soft">
-          <Link href="/new-york" className="hover:text-amber-deep">
+          <Link href={boardHref} className="hover:text-amber-deep">
             New York Scoreboard
           </Link>
           <span className="mx-2 text-stone">/</span>

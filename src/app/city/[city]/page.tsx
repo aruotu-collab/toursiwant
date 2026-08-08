@@ -10,7 +10,7 @@ import {
 
 type Props = {
   params: Promise<{ city: string }>;
-  searchParams: Promise<{ lens?: string }>;
+  searchParams: Promise<{ lens?: string; focus?: string }>;
 };
 
 export function generateStaticParams() {
@@ -45,6 +45,8 @@ export default async function CityScorecardPage({
 
   const sp = await searchParams;
   const initialLens = parseLens(sp.lens);
+  const focusSlug =
+    typeof sp.focus === "string" && sp.focus.trim() ? sp.focus.trim() : undefined;
 
   return (
     <main className="max-w-[100vw] flex-1 overflow-x-clip bg-paper pt-[7.5rem] sm:pt-32">
@@ -86,6 +88,7 @@ export default async function CityScorecardPage({
           cityName={catalog.name}
           places={catalog.places}
           initialLens={initialLens}
+          focusSlug={focusSlug}
         />
       </div>
     </main>

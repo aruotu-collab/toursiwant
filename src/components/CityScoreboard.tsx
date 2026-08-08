@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   rankCityPlaces,
   type RankedCityPlace,
@@ -14,6 +14,7 @@ import {
   type ScoreboardLens,
 } from "@/lib/tiw-score";
 import {
+  PAGE_SIZE,
   pageSlice,
   ScoreboardPagination,
   totalPages,
@@ -27,17 +28,23 @@ export function CityScoreboard({
   cityName,
   places,
   initialLens = "overall",
+  focusSlug,
 }: {
   citySlug: string;
   cityName: string;
   places: CityPlace[];
   initialLens?: ScoreboardLens;
+  focusSlug?: string;
 }) {
   const [lens, setLens] = useState<ScoreboardLens>(initialLens);
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
+  const [highlightSlug, setHighlightSlug] = useState<string | null>(
+    focusSlug || null,
+  );
+  const skipFilterPageReset = useRef(true);
 
   const ranked = useMemo(() => rankCityPlaces(places, lens), [places, lens]);
 
@@ -66,13 +73,46 @@ export function CityScoreboard({
   }, [ranked, query, sortKey, sortDir]);
 
   useEffect(() => {
+    if (skipFilterPageReset.current) {
+      skipFilterPageReset.current = false;
+      return;
+    }
     setPage(1);
+    setHighlightSlug(null);
   }, [lens, query, sortKey, sortDir]);
 
   useEffect(() => {
     const pages = totalPages(filtered.length);
     if (page > pages) setPage(pages);
   }, [filtered.length, page]);
+
+  useEffect(() => {
+    if (!highlightSlug) return;
+    const idx = filtered.findIndex((p) => p.slug === highlightSlug);
+    if (idx < 0) {
+      setHighlightSlug(null);
+      return;
+    }
+    const targetPage = Math.floor(idx / PAGE_SIZE) + 1;
+    if (page !== targetPage) {
+      setPage(targetPage);
+      return;
+    }
+    const el = document.querySelector<HTMLElement>(
+      `[data-place-slug="${highlightSlug}"]`,
+    );
+    if (!el) return;
+    const scrollTimer = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+    const clearTimer = window.setTimeout(() => {
+      setHighlightSlug(null);
+    }, 2800);
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [filtered, highlightSlug, page]);
 
   const paged = useMemo(() => pageSlice(filtered, page), [filtered, page]);
 
@@ -87,6 +127,7 @@ export function CityScoreboard({
 
   function goToPage(next: number) {
     setPage(next);
+    setHighlightSlug(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -192,6 +233,7 @@ export function CityScoreboard({
               place={p}
               citySlug={citySlug}
               zebra={i % 2 === 1}
+              highlighted={highlightSlug === p.slug}
             />
           ))}
         </ol>
@@ -219,16 +261,19 @@ function PlaceRow({
   place,
   citySlug,
   zebra,
+  highlighted,
 }: {
   place: RankedCityPlace;
   citySlug: string;
   zebra: boolean;
+  highlighted?: boolean;
 }) {
   return (
     <li
-      className={`grid grid-cols-1 gap-2 border-b border-ink/8 px-4 py-4 sm:grid-cols-[3.5rem_1fr_4.5rem_5.5rem] sm:items-center sm:gap-3 sm:px-5 ${
+      data-place-slug={place.slug}
+      className={`scroll-mt-28 grid grid-cols-1 gap-2 border-b border-ink/8 px-4 py-4 transition sm:grid-cols-[3.5rem_1fr_4.5rem_5.5rem] sm:items-center sm:gap-3 sm:px-5 ${
         zebra ? "bg-paper/40" : "bg-white"
-      }`}
+      } ${highlighted ? "bg-amber/15 ring-2 ring-inset ring-amber/50" : ""}`}
     >
       <p className="font-mono text-sm text-amber-deep">#{place.rank}</p>
       <div className="min-w-0">

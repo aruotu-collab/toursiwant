@@ -28,10 +28,12 @@ function parseLens(v: string | undefined): ScoreboardLens {
 export default async function NewYorkScoreboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lens?: string }>;
+  searchParams: Promise<{ lens?: string; focus?: string }>;
 }) {
   const sp = await searchParams;
   const initialLens = parseLens(sp.lens);
+  const focusSlug =
+    typeof sp.focus === "string" && sp.focus.trim() ? sp.focus.trim() : undefined;
   return (
     <main className="max-w-[100vw] flex-1 overflow-x-clip bg-paper pt-[7.5rem] sm:pt-32">
       <div
@@ -68,7 +70,7 @@ export default async function NewYorkScoreboardPage({
       </div>
 
       <div id="board" className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-8 sm:py-6">
-        <NycScoreboard initialLens={initialLens} />
+        <NycScoreboard initialLens={initialLens} focusSlug={focusSlug} />
       </div>
     </main>
   );

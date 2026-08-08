@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  PAGE_SIZE,
   pageSlice,
   ScoreboardPagination,
   totalPages,
@@ -34,6 +35,16 @@ function lensMeta(id: ScoreboardLens) {
   return scoreboardLenses.find((l) => l.id === id);
 }
 
+function visiblePlaceRow(slug: string) {
+  const nodes = document.querySelectorAll<HTMLElement>(
+    `[data-place-slug="${slug}"]`,
+  );
+  for (const el of nodes) {
+    if (el.getClientRects().length > 0) return el;
+  }
+  return null;
+}
+
 type SortKey =
   | "rank"
   | "score"
@@ -46,8 +57,10 @@ type SortDir = "asc" | "desc";
 
 export function NycScoreboard({
   initialLens = "overall",
+  focusSlug,
 }: {
   initialLens?: ScoreboardLens;
+  focusSlug?: string;
 }) {
   const [lens, setLens] = useState<ScoreboardLens>(initialLens);
   const [categoryFilter, setCategoryFilter] = useState<ExperienceCategory | "">(
@@ -56,6 +69,11 @@ export function NycScoreboard({
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [highlightSlug, setHighlightSlug] = useState<string | null>(
+    focusSlug || null,
+  );
+  const skipFilterPageReset = useRef(true);
   const {
     wants,
     days,
@@ -77,7 +95,6 @@ export function NycScoreboard({
   const [clearTitle, setClearTitle] = useState("");
   const [clearBusy, setClearBusy] = useState(false);
   const [clearStatus, setClearStatus] = useState("");
-  const [page, setPage] = useState(1);
 
   const projectedDays = useMemo(
     () => (wants.length ? suggestedDaysForSelections(wants) : days),
@@ -148,13 +165,44 @@ export function NycScoreboard({
   }, [ranked, query, categoryFilter, sortKey, sortDir]);
 
   useEffect(() => {
+    if (skipFilterPageReset.current) {
+      skipFilterPageReset.current = false;
+      return;
+    }
     setPage(1);
+    setHighlightSlug(null);
   }, [lens, query, categoryFilter, sortKey, sortDir]);
 
   useEffect(() => {
     const pages = totalPages(filtered.length);
     if (page > pages) setPage(pages);
   }, [filtered.length, page]);
+
+  useEffect(() => {
+    if (!highlightSlug) return;
+    const idx = filtered.findIndex((p) => p.slug === highlightSlug);
+    if (idx < 0) {
+      setHighlightSlug(null);
+      return;
+    }
+    const targetPage = Math.floor(idx / PAGE_SIZE) + 1;
+    if (page !== targetPage) {
+      setPage(targetPage);
+      return;
+    }
+    const el = visiblePlaceRow(highlightSlug);
+    if (!el) return;
+    const scrollTimer = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+    const clearTimer = window.setTimeout(() => {
+      setHighlightSlug(null);
+    }, 2800);
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [filtered, highlightSlug, page]);
 
   const paged = useMemo(() => pageSlice(filtered, page), [filtered, page]);
 
@@ -176,6 +224,7 @@ export function NycScoreboard({
 
   function goToPage(next: number) {
     setPage(next);
+    setHighlightSlug(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -540,6 +589,7 @@ export function NycScoreboard({
               place={place}
               lens={lens}
               wanted={ready && isWanted(place.slug)}
+              highlighted={highlightSlug === place.slug}
               onToggle={() => toggle(place.slug)}
               onCategoryClick={(cat) => {
                 setCategoryFilter(cat);
@@ -627,6 +677,7 @@ export function NycScoreboard({
                 stripe={i % 2 === 1}
                 lens={lens}
                 wanted={ready && isWanted(place.slug)}
+                highlighted={highlightSlug === place.slug}
                 onToggle={() => toggle(place.slug)}
                 onCategoryClick={(cat) => {
                   setCategoryFilter(cat);
@@ -878,17 +929,24 @@ function ScoreCard({
   place,
   lens,
   wanted,
+  highlighted,
   onToggle,
   onCategoryClick,
 }: {
   place: RankedPlace;
   lens: ScoreboardLens;
   wanted: boolean;
+  highlighted?: boolean;
   onToggle: () => void;
   onCategoryClick: (cat: ExperienceCategory) => void;
 }) {
   return (
-    <li className="border border-ink/10 bg-white p-3.5">
+    <li
+      data-place-slug={place.slug}
+      className={`scroll-mt-28 border border-ink/10 bg-white p-3.5 transition ${
+        highlighted ? "border-amber ring-2 ring-amber/45" : ""
+      }`}
+    >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[11px] font-semibold text-amber-deep">
@@ -977,6 +1035,7 @@ function ScoreRow({
   stripe,
   lens,
   wanted,
+  highlighted,
   onToggle,
   onCategoryClick,
 }: {
@@ -984,14 +1043,16 @@ function ScoreRow({
   stripe: boolean;
   lens: ScoreboardLens;
   wanted: boolean;
+  highlighted?: boolean;
   onToggle: () => void;
   onCategoryClick: (cat: ExperienceCategory) => void;
 }) {
   return (
     <li
-      className={`grid grid-cols-[5.5rem_4rem_minmax(12rem,1.3fr)_5.5rem_7rem_5.5rem_7.5rem_8.5rem] items-center gap-3 border-b border-ink/8 px-4 py-3 sm:px-5 sm:py-4 ${
+      data-place-slug={place.slug}
+      className={`scroll-mt-28 grid grid-cols-[5.5rem_4rem_minmax(12rem,1.3fr)_5.5rem_7rem_5.5rem_7.5rem_8.5rem] items-center gap-3 border-b border-ink/8 px-4 py-3 transition sm:px-5 sm:py-4 ${
         stripe ? "bg-paper/40" : "bg-white"
-      }`}
+      } ${highlighted ? "bg-amber/15 ring-2 ring-inset ring-amber/50" : ""}`}
     >
       <button
         type="button"

@@ -91,7 +91,7 @@ export default async function CityPlacePage({ params }: Props) {
         </p>
 
         <Link
-          href={`/city/${catalog.slug}`}
+          href={`/city/${catalog.slug}?focus=${encodeURIComponent(place.slug)}`}
           className="mt-8 inline-flex bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-ink-soft"
         >
           ← Back to {catalog.name} scorecard
